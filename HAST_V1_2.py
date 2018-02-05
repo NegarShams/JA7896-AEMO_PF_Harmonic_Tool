@@ -112,6 +112,7 @@ def print1(bf, name, af):   # Used to print a message to both python, PF and wri
 	progress.close()
 	return None
 
+
 def print2(name, bf=2, af=0):   # Used to print error message to both python, PF and write it to the file
 	"""
 		Used to print error message to both python, PF and write it to the file
@@ -143,6 +144,7 @@ def print2(name, bf=2, af=0):   # Used to print error message to both python, PF
 	Error_Count = Error_Count + 1
 	return None
 
+
 def print3(bf, name, af):		# Used to print a message to both python, PF and write it to the file with double space
 	"""
 		Used to print a message to both python, PF and write it to the file with double space
@@ -168,6 +170,7 @@ def print3(bf, name, af):		# Used to print a message to both python, PF and writ
 	random.close()
 	return None
 
+
 def startup_message(
 		message="Close all PSSe and Excel Files\n This program kills these tasks while running\nOK to proceed?"
 		):		# Used to Create a startup dialog box
@@ -184,6 +187,7 @@ def startup_message(
 		sys.exit("Cancel Run")
 		# TODO: May be better to raise exception to make it possible to safely exit
 	return None
+
 
 def import_excel_harmonic_inputs(workbookname):		# Import Excel Harmonic Input Settings
 	"""
@@ -315,6 +319,7 @@ def import_excel_harmonic_inputs(workbookname):		# Import Excel Harmonic Input S
 	_wb.Close()                                                          # Close Workbook
 	return _analysis_dict
 
+
 def activate_project(project): 		# Activate project
 	"""
 		Activate project in Power Factory
@@ -333,6 +338,7 @@ def activate_project(project): 		# Activate project
 		# prj renamed _prj to avoid shadowing name from parent project
 		_prj = []
 	return _prj
+
 
 def activate_study_case(study_case): 		# Activate Study case
 	"""
@@ -357,6 +363,7 @@ def activate_study_case(study_case): 		# Activate Study case
 	# Returns handle for study_case and identifier of 0 if case load is successful
 	return study_case1[0], cas
 
+
 def deactivate_study_case(): 		# Deactivate Scenario
 	"""
 		Deactivate loaded study case
@@ -377,6 +384,7 @@ def deactivate_study_case(): 		# Deactivate Scenario
 		print1(2, "No Study Case Active to Deactivate ................................", 0)
 	return None
 
+
 def activate_scenario(scenario): 		# Activate Scenario
 	"""
 		Activate scenario
@@ -394,6 +402,7 @@ def activate_scenario(scenario): 		# Activate Scenario
 		print2('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
 	return scenario1[0], sce
 
+
 def activate_scenario1(scenario): 		# Activate Scenario
 	"""
 		Activate scenario
@@ -407,6 +416,7 @@ def activate_scenario1(scenario): 		# Activate Scenario
 		print2('Error Unsuccessfully Activated Scenario: {}...............................'.format(scenario))
 		print2('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
 	return sce
+
 
 def deactivate_scenario(): 		# Deactivate Scenario
 	"""
@@ -428,6 +438,23 @@ def deactivate_scenario(): 		# Deactivate Scenario
 		print1(2, 'No Scenario Active to Deactivate ................................', 0)
 	return None
 
+def save_active_scenario(): 		# Save active scenario
+	"""
+		Save the active scenario
+	:return: None
+	"""
+	scenario1 = app.GetActiveScenario()
+	sce = scenario1.Save()
+	if sce==0:
+		print1(1, 'Saved active scenario successfully: {}'.format(scenario1), 0)
+	elif sce == 1 and scenario1 is None:
+		print2('Error unsuccessfully saved scenario: {}'.format(scenario1))
+		print2('Unsuccessfully saved scenario error code: {}'.format(sce))
+	else:
+		print1(2, 'No Scenario Active to Save.........................................', 0)
+	return None
+
+
 def get_active_variations():			# Get Active Network Variations
 	"""
 		Get active variations
@@ -436,7 +463,7 @@ def get_active_variations():			# Get Active Network Variations
 	variations =  app.GetActiveNetworkVariations()
 	print1(2, 'Current Active Variations: ', 0)
 	if len(variations) > 1:
-		for item in Variations:
+		for item in variations:
 			aa = str(item)
 			pp = aa.split("Variations.IntPrjfolder\\")
 			ss = pp[1]
@@ -448,6 +475,7 @@ def get_active_variations():			# Get Active Network Variations
 		print1(1, 'No Variations Active', 0)
 	return variations
 
+
 def create_variation(folder, pfclass, name):
 	"""
 		Create a new variaiton
@@ -456,7 +484,7 @@ def create_variation(folder, pfclass, name):
 	:param str name: Name for variation
 	:return powerfactory.Variation: Handle for newly created variation
 	"""
-	variation = Create_Object(folder, pfclass, name)
+	variation = create_object(folder, pfclass, name)
 	# Change color of variation
 	variation.icolor = 1
 	# Variation.chr_name = "1"
@@ -465,6 +493,7 @@ def create_variation(folder, pfclass, name):
 	# Variation.dat_src = "1"
 	app.PrintPlain(variation)
 	return variation
+
 
 def activate_variation(variation): 		# Activate Scenario
 	""" 
@@ -479,6 +508,7 @@ def activate_variation(variation): 		# Activate Scenario
 		print2('Error Unsuccessfully Activated Variation: {}........................'.format(variation))
 		print2('Unsuccessfully Activated Variation Error Code: {}'.format(sce))
 	return sce
+
 
 def create_stage(location, pfclass, name):
 	"""
@@ -505,6 +535,7 @@ def create_stage(location, pfclass, name):
 	activate_stage(stage)
 	return stage
 
+
 def activate_stage(stage):
 	"""
 		Activate stage created by PowerFactory
@@ -513,11 +544,12 @@ def activate_stage(stage):
 	"""
 	sce = stage.Activate()
 	if sce == 0:
-		print1(1, 'Activated Variation Stage Successfully: {}'.format(stage) 0)
+		print1(1, 'Activated Variation Stage Successfully: {}'.format(stage), 0)
 	elif sce != 0:
 		print2('Error Unsuccessfully Activated Variation Stage: {}........................'.format(stage))
 		print2('Unsuccessfully Activated Variation Stage Error Code: {}'.format(sce))
 	return None
+
 
 def load_flow(load_flow_settings):		# Inputs load flow settings and executes load flow
 	"""
@@ -614,6 +646,7 @@ def load_flow(load_flow_settings):		# Inputs load flow settings and executes loa
 		print2('Load Flow failed due to divergence of outer loops, time taken: {:.2f} seconds..............'.format(t2))
 	return error_code
 
+
 def harm_load_flow(results, harmonic_loadflow_settings):		# Inputs load flow settings and executes load flow
 	"""
 		Runs harmonic load flow
@@ -652,6 +685,7 @@ def harm_load_flow(results, harmonic_loadflow_settings):		# Inputs load flow set
 	elif error_code > 0:
 		print2('Harmonic Load Flow calculation unsuccessful: {:.2f} seconds...............................'.format(t2))
 	return error_code
+
 
 def freq_sweep(results, fsweep_settings):		# Inputs Frequency Sweep Settings and executes sweep
 	"""
@@ -693,6 +727,7 @@ def freq_sweep(results, fsweep_settings):		# Inputs Frequency Sweep Settings and
 		print2('Frequency Sweep calculation unsuccessful, time taken: {:.2f} seconds.......................'.format(t2))
 	return error_code
 
+
 # TODO: Believe save_op_scenario is not used
 def save_op_scenario(name, activate): 	# Saves an operational Scenario
 	"""
@@ -708,6 +743,7 @@ def save_op_scenario(name, activate): 	# Saves an operational Scenario
 		print1(2, 'Scenario : {} saved successfully'.format(name), 0)
 	return scenario
 
+
 def switch_coup(element, service):			# Switches an Coupler out if 0 in if 1
 	"""
 		Changes status of coupler (i.e. 0 if in or 1 if out)
@@ -722,6 +758,7 @@ def switch_coup(element, service):			# Switches an Coupler out if 0 in if 1
 		print1(1, 'Switching Element: {} In to service '.format(element), 0)
 	return None
 
+
 def check_if_folder_exists(location, name):		# Checks if the folder exists
 	"""
 		Check if power factory folder already exists
@@ -735,6 +772,7 @@ def check_if_folder_exists(location, name):		# Checks if the folder exists
 		print1(2, 'Folder already exists: {}'.format(name), 0)
 		folder_exists = 1
 	return _new_object, folder_exists
+
 
 def create_folder(location, name):		# Creates Folder in location
 	"""
@@ -758,6 +796,7 @@ def create_folder(location, name):		# Creates Folder in location
 		_new_object = folder1[0]
 	return _new_object, folder_exists
 
+
 # TODO: Don't believe this function is ever used
 def delete_folder(location, name):		# Deletes Folder in Location
 	"""
@@ -771,7 +810,9 @@ def delete_folder(location, name):		# Deletes Folder in Location
 		new_object[0].Delete()
 	return None
 
-def create_mutual_impedance_list(location, terminal_list):		# Creates a mutual Impedance list from the terminal list in a folder under the active studycase
+
+# Creates a mutual Impedance list from the terminal list in a folder under the active studycase
+def create_mutual_impedance_list(location, terminal_list):
 	"""
 		Create a mutual impedance list from the terminal list in a folder under the active studycase
 	:param powerfacory.Location location: Handle for location to be created 
@@ -788,9 +829,10 @@ def create_mutual_impedance_list(location, terminal_list):		# Creates a mutual I
 			if x[3] != y[3]:
 				name = '{}_{}'.format(y[0],x[0])
 				elmmut = create_mutual_elm(location, name, y[3], x[3])
-				list_of_Mutual.append([str(y[0]), name, elmmut, y[3], x[3]])
+				list_of_mutual.append([str(y[0]), name, elmmut, y[3], x[3]])
 	return list_of_mutual
-	
+
+
 def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance between two terminals
 	"""
 		Create mutual impedance between two terminals
@@ -801,12 +843,13 @@ def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance b
 	:return: PowerFactory.ElmMut elmmut: Handle for mutual impedance
 	"""
 	# elmmut = app.GetFromStudyCase(name + )				# Get relevant object or create if it doesn't exist
-	elmmut = Create_Object(location, "ElmMut", name)
+	elmmut = create_object(location, "ElmMut", name)
 	elmmut.loc_name = name
 	elmmut.bus1 = bus1
 	elmmut.bus2 = bus2
 	elmmut.outserv = 0
 	return elmmut
+
 
 def get_object(object_to_retrieve):			# retrieves an object based on filter strings
 	"""
@@ -817,6 +860,7 @@ def get_object(object_to_retrieve):			# retrieves an object based on filter stri
 	ob1 = app.GetCalcRelevantObjects(object_to_retrieve)
 	return ob1
 
+
 def delete_object(object_to_delete):			# retrieves an object based on filter strings
 	ob1 = object_to_delete.Delete()
 	if ob1 == 0:
@@ -824,6 +868,7 @@ def delete_object(object_to_delete):			# retrieves an object based on filter str
 	else:
 		print2('Error deleting object: {}.....................'.format(object_to_delete))
 	return None
+
 
 def check_if_object_exists(location, name):  	# Check if the object exists
 	"""
@@ -839,7 +884,8 @@ def check_if_object_exists(location, name):  	# Check if the object exists
 		print1(2, 'Object Exists: {}'.format(name), 0)
 		object_exists = 1
 	return object_exists, new_object	
-	
+
+
 def add_copy(folder, object, name1):		# copies an object to a new folder Name 1 = new name
 	"""
 		Copies an object to a new folder
@@ -855,6 +901,7 @@ def add_copy(folder, object, name1):		# copies an object to a new folder Name 1 
 		print2('Error AddCopy Unsuccessful: {} to {} as {}'.format(object, folder, name1))
 	return new_object
 
+
 def create_object(location, pfclass, name):			# Creates a database object in a specified location of a specified class
 	"""
 		Creates a database object in a specified location of a specified class
@@ -866,6 +913,7 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 	# _new_object used instead of new_object to avoid shadowing
 	_new_object = location.CreateObject(pfclass, name)
 	return _new_object
+
 
 def create_results_file(location, name, type_of_file):			# Creates Results File
 	"""
@@ -886,6 +934,7 @@ def create_results_file(location, name, type_of_file):			# Creates Results File
 	sweep.header = ["Hello Barry"]
 	sweep.desc = ["Barry Description"]
 	return sweep
+
 
 def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Cases, Operational Scenarios,
 	"""
@@ -945,13 +994,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 				else:
 					print2("Problem with Scenario: " + str(list_to_check[_count_studycase][0]) + " " + str(list_to_check[_count_studycase][3]))
 			else:
-				print2("Problem with Studycase: " + str(list_to_check[_count_studycase][0]) + " " + str(list_to_check[_count_studycase][2]))
+				print2('Problem with Studycase: {} {}'
+					   .format(list_to_check[_count_studycase][0], list_to_check[_count_studycase][2]))
 		else:
-			print2("Problem Activating Project: " + str(list_to_check[_count_studycase][0]) + " " + str(list_to_check[_count_studycase][1]))
+			print2('Problem Activating Project: {} {}'
+				   .format(list_to_check[_count_studycase][0], list_to_check[_count_studycase][1]))
 		_count_studycase += 1
-	print1(1,"Finished Checking Study Cases",0)
-	print1(2,"__________________________________________________________________________________________________________________________________",2)
+	print1(1,"Finished Checking Study Cases", 0)
+	print1(2,"___________________________________________________________________________________________________",2)
 	return new_list
+
 
 def check_terminals(list_of_points): 		# This checks and creates the list of terminals to add to the Results file
 	"""
@@ -986,7 +1038,8 @@ def check_terminals(list_of_points): 		# This checks and creates the list of ter
 		print1(1, list_of_points[tm_count], 0)
 		tm_count = tm_count + 1
 	return terminals_index, terminals_ok
-	
+
+
 def check_contingencis(list_of_contingencies): 		# This checks and creates the list of terminals to add to the Results file
 	"""
 		Checks the status of each contingency
@@ -1040,7 +1093,8 @@ def check_contingencis(list_of_contingencies): 		# This checks and creates the l
 	for item in new_contingency_list:
 		print1(1, item, 0)
 	return new_contingency_list, contingencies_ok
-	
+
+
 def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the results file
 	"""
 		Adds the results variables to the results file
@@ -1050,11 +1104,12 @@ def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the
 	:return: None
 	"""
 	if len(res_vars) > 1:
-		for x in res_var:
+		for x in res_vars:
 			elmres.AddVariable(element, x)
 	elif len(res_vars) == 1:
 		elmres.AddVariable(element,res_vars[0])
 	return None
+
 
 # TODO: Function not used
 def plot(name, plot_type, results, terminal, variable, description, clear):	# Plots the results in Powerfactory
@@ -1080,6 +1135,7 @@ def plot(name, plot_type, results, terminal, variable, description, clear):	# Pl
 	vi_page.DoAutoScaleY()
 	return None
 
+
 # TODO: Function not used
 def results_export(results, output):		# Not used Export results file into Excel
 	res.pResult = results					# Export from
@@ -1091,7 +1147,8 @@ def results_export(results, output):		# Not used Export results file into Excel
 	res.iopt_csel = 0 						# Variable Selection
 	res.Execute()
 	return None
-	
+
+
 def retrieve_results(elmres, res_type):			# Reads results into python lists from results file
 	"""
 		Reads results into python lists from results file for processing to add to Excel
@@ -1127,6 +1184,7 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 	elmres.Release()
 	return scale[0], results
 
+
 # TODO: Function not used
 def read_text_file(file_pth):		# Reads in Textfile
 	# TODO: If required should be written using with: to ensure safe exit
@@ -1135,7 +1193,8 @@ def read_text_file(file_pth):		# Reads in Textfile
 	text_file.close()
 	print1(2, "Reading in textfile: " + str(text_file), 0)
 	return content
-		
+
+
 def create_workbook(workbookname):			# Create Workbook
 	"""
 		Function creates the workbook for results to be written into
@@ -1156,7 +1215,8 @@ def create_workbook(workbookname):			# Create Workbook
 	#ws = wb.Worksheets.Add()                                           # Add worksheet
 	_wb.SaveAs(workbookname)                                             # Save Workbook
 	return _wb
-	
+
+
 def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract information from out file
 	"""
 		Extract infomation form powerfactory file and write to workbook
@@ -1180,7 +1240,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 	# NOT USED - newrow = 2
 	newcol = 1
 	
-	# # NOT USED - R_First, R_Last, R_First, R_Last, X_First, X_Last, Z_First, Z_Last, Z_12_First, Z_12_Last, HRM_endrow, HRM_First, HRM_Last = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	r_first, r_last, x_first, x_last, z_first, z_last, z_12_first, z_12_last, hrm_endrow, hrm_first, hrm_last = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	if Excel_Export_RX:
 		startcol = 19
 	if Excel_Export_Z or Excel_Export_HRM:
@@ -1202,8 +1262,8 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 		
 		if Excel_Export_RX:		# Export the RX data and graphs the Impedance Loci
 			# Insert R data in excel______________________________________________________________________________________________
-			newcol = newcol
-			# # NOT USED - r_first = newcol
+			# # NOT USED - newcol = newcol
+			r_first = newcol
 			r_results, x_results = [], []
 			for x in fs_results:
 				if x[0] == "m:R":
@@ -1211,18 +1271,18 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 							 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
 					r_results.append(x[3:])
 					newcol = newcol + 1	
-			# # NOT USED - r_last = newcol - 1
+			r_last = newcol - 1
 			
 			# Insert X data in excel______________________________________________________________________________________________
-			newcol = newcol + 1
-			# # NOT USED - x_first = newcol
+			newcol += 1
+			x_first = newcol
 			for x in fs_results:
 				if x[0] == "m:X":
 					ws.Range(ws.Cells(startrow, newcol),
 							 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
 					x_results.append(x[3:])
 					newcol = newcol + 1	
-			# # NOT USED - x_last = newcol	- 1
+			x_last = newcol	- 1
 			
 			t2 = time.clock() - t1
 			print1(1, 'Inserting RX data self impedance data, time taken: {:.2f} seconds'.format(t2), 0)
@@ -1283,8 +1343,8 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 			startcol1 = startcol + 3
 			for hrm in non_int_rows:											# Plots the Graphs for the Harmonics including non integer rows
 				ws.Range(ws.Cells(1,1),ws.Cells(1,2)).Select()					# Important for computation as it doesn't graph all the selection first ie these cells should be blank
-				# # NOT USED - ch = ws.Shapes.AddChart(c.xlXYScatter, gph_coord[gc][0], gph_coord[gc][1],
-				# # NOT USED cont.						chart_width, chart_height).Select()      # AddChart(Type, Left, Top, Width, Height)
+				_ = ws.Shapes.AddChart(c.xlXYScatter, gph_coord[gc][0], gph_coord[gc][1],
+									   chart_width, chart_height).Select()      # AddChart(Type, Left, Top, Width, Height)
 				_xl.ActiveChart.ApplyLayout(1)																					# Select Layout 1-11
 				_xl.ActiveChart.ChartTitle.Characters.Text = " Harmonic Order " + str(int(scale_clipped[hrm[1]]/50))      # Add Title
 				_xl.ActiveChart.SeriesCollection(1).Delete()
@@ -1300,8 +1360,10 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				# This is used to graph non integer harmonics on the same plot as integer
 				for tres in range(hrm[0],(hrm[2]+1)):			
 					series = _xl.ActiveChart.SeriesCollection().NewSeries()
-					series.XValues = ws.Range(ws.Cells((startrow + 3 + tres) ,R_First),ws.Cells((startrow + 3 + tres),R_Last))		# X Value
-					series.Values = ws.Range(ws.Cells((startrow + 3 + tres),X_First),ws.Cells((startrow + 3 + tres),X_Last))		# Y Value
+					series.XValues = ws.Range(ws.Cells((startrow + 3 + tres), r_first),
+											  ws.Cells((startrow + 3 + tres), r_last))		# X Value
+					series.Values = ws.Range(ws.Cells((startrow + 3 + tres), x_first),
+											 ws.Cells((startrow + 3 + tres), x_last))		# Y Value
 					series.Name = ws.Cells((startrow + 3 + tres),startcol)															# Name
 					series.MarkerSize = 5																							# Marker Size
 					series.MarkerStyle = 3																							# Marker type
@@ -1395,7 +1457,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				ws.Range(ws.Cells(1,1),ws.Cells(1,2)).Select()			# Important for computation as it doesn't graph all the selection first ie these cells should be blank
 				_ = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers,30,45,825,400).Select()    	# AddChart(Type, Left, Top, Width, Height)
 				_xl.ActiveChart.ApplyLayout(1)													# Select Layout 1-11
-				_xl.ActiveChart.ChartTitle.Characters.Text = Sheet_Name + " Base Cases m:Z Self Impedances"	# Add Title
+				_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " Base Cases m:Z Self Impedances"	# Add Title
 				#_xl.ActiveChart.Legend.Delete()                                                	# Delete legend
 				_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"            # X Axis
 				_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            	# Set minimum of x axis
@@ -1420,7 +1482,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 					_xl.ActiveChart.ApplyLayout(1)													# Select Layout 1-11
 					series_name1 = ws.Range(ws.Cells((startrow + 1), zb_col1[0]),ws.Cells((startrow + 2), zb_col1[0])).Value
 					series_name = str(series_name1[0][0])
-					_xl.ActiveChart.ChartTitle.Characters.Text = Sheet_Name + " " + str(series_name) + " m:Z Self Impedances"	# Add Title
+					_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " " + str(series_name) + " m:Z Self Impedances"	# Add Title
 					#_xl.ActiveChart.Legend.Delete()                                                	# Delete legend
 					_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"            # X Axis
 					_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            	# Set minimum of x axis
@@ -1443,7 +1505,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 						 ws.Cells(endrow, z_last)).Select()			# Important for computation as it doesn't graph all the selection first ie these cells should be blank
 				_ = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers,30,45,825,400).Select()    	# AddChart(Type, Left, Top, Width, Height)
 				_xl.ActiveChart.ApplyLayout(1)													# Select Layout 1-11
-				_xl.ActiveChart.ChartTitle.Characters.Text = Sheet_Name + " m:Z Self Impedance"	# Add Title
+				_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " m:Z Self Impedance"	# Add Title
 				#_xl.ActiveChart.Legend.Delete()                                                	# Delete legend
 				_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"            # X Axis
 				_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            	# Set minimum of x axis
@@ -1516,7 +1578,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				ws.Range(ws.Cells(1,1),ws.Cells(1,2)).Select()
 				_ = ws.Shapes.AddChart(c.xlColumnClustered,30,hrm_top,825,400).Select()    						# AddChart(Type, Left, Top, Width, Height)
 				_xl.ActiveChart.ApplyLayout(9)																	# Select Layout 1-11
-				_xl.ActiveChart.ChartTitle.Characters.Text = Sheet_Name + " Base Case Harmonic Emissions v IEC Limits"		# Add Title
+				_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " Base Case Harmonic Emissions v IEC Limits"		# Add Title
 				_xl.ActiveChart.SeriesCollection(1).Delete()
 				#_xl.ActiveChart.Legend.Delete()                                                					# Delete legend
 				_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "HD %"      									# Y Axis
@@ -1559,7 +1621,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 					_xl.ActiveChart.ApplyLayout(9)																	# Select Layout 1-11
 					series_name1 = ws.Range(ws.Cells((startrow + 1), hrm_col[0]),ws.Cells((startrow + 2), hrm_col[0])).Value
 					series_name = str(series_name1[0][0])
-					_xl.ActiveChart.ChartTitle.Characters.Text = Sheet_Name + " " + str(series_name) + " Harmonic Emissions v IEC Limits"	# Add Title
+					_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " " + str(series_name) + " Harmonic Emissions v IEC Limits"	# Add Title
 					_xl.ActiveChart.SeriesCollection(1).Delete()
 					#_xl.ActiveChart.Legend.Delete()                                                					# Delete legend
 					_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "HD %"      									# Y Axis
@@ -1599,7 +1661,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				ws.Range(ws.Cells(1,1),ws.Cells(1,2)).Select()
 				_ = ws.Shapes.AddChart(c.xlColumnClustered,30,hrm_top,825,400).Select()    						# AddChart(Type, Left, Top, Width, Height)
 				_xl.ActiveChart.ApplyLayout(9)																	# Select Layout 1-11
-				_xl.ActiveChart.ChartTitle.Characters.Text = Sheet_Name + " Harmonic Emissions v IEC Limits"		# Add Title
+				_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " Harmonic Emissions v IEC Limits"		# Add Title
 				_xl.ActiveChart.SeriesCollection(1).Delete()
 				#_xl.ActiveChart.Legend.Delete()                                                					# Delete legend
 				_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "HD %"      									# Y Axis
@@ -1646,6 +1708,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 	_wb.Save()							# Save Workbook
 	return None
 
+
 # TODO: Function not used
 def create_textfile_sheet(sheet_name, text_to_use, _wb):      # Extract information from out file
 	t1 = time.clock()
@@ -1661,7 +1724,8 @@ def create_textfile_sheet(sheet_name, text_to_use, _wb):      # Extract informat
 	t2 = time.clock() - t1
 	print1(2, 'Creating Sheet: {} took {:.2f}'.format(sheet_name, t2), 0)
 	return None
-	
+
+
 def close_workbook(_wb, workbookname):		# Save and close Workbook
 	"""
 		Save and close the workbook
@@ -1676,12 +1740,13 @@ def close_workbook(_wb, workbookname):		# Save and close Workbook
 	_xl.Application.Quit()                                               # Quit Excel
 	return None
 
+
 def convex_hull1(pointlist):			# Gets the convex hull of a numpy array (if you have a list of tuples us np.array(pointlist) to convert
 	"""
 		Gets the convex hull of a numpy array
 			If you have a list of tuples use np.array(pointlist) to convert
 	:param np.array pointlist: Numpy array to be converted 
-	:return list convex_points: List of convex points returned (list of lists)
+	:return list convex_points: List of convex points returned 
 	"""
 	r, x, convex_points = [], [], []
 	# TODO:  Need to see what is being provided as input and whether a try / except statement would be useful for error
@@ -1697,8 +1762,9 @@ def convex_hull1(pointlist):			# Gets the convex hull of a numpy array (if you h
 	convex_points.append(x)
 	return convex_points
 	
-# Main Engine --------------------------------------------------------------------------------------------------------------------------------	
-# --------------------------------------------------------------------------------------------------------------------------------------------	
+
+# Main Engine ------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------
 Error_Count = 1
 # DEBUG -  Disable printing of items to output window
 app.EchoOff()
@@ -1808,8 +1874,8 @@ Excel_Convex_Hull = Study_Settings[16]										# This calculates the minimum po
 Excel_Export_Z = Study_Settings[17]											# Graph the Frequency Sweeps in Excel
 Excel_Export_Z12 = Study_Settings[18]										# Export Mutual Impedances to excel
 Excel_Export_HRM = Study_Settings[19]										# Export Harmonic Data
-print1(1, Title, 0)
-for keys, values in analysis_dict.items():									# Prints all the inputs to progress log
+print1(1,Title,0)
+for keys,values in analysis_dict.items():									# Prints all the inputs to progress log
 	print1(1, keys, 0)
 	print1(1, values, 0)
 List_of_Studycases = analysis_dict["Base_Scenarios"]						# Uses the list of Studycases
@@ -1823,7 +1889,7 @@ if len(List_of_Points) <1:													# Check there are the right number of inp
 	print2("Error - Check excel input Terminals there should be at least 1 Item in the list ")
 Load_Flow_Setting = analysis_dict["Loadflow_Settings"]						# Imports Settings for LDF calculation
 if len(Load_Flow_Setting) != 55:											# Check there are the right number of inputs
-	print2('Error - Check excel input Loadflow_Settings there should be 55 Items in the list there are only: {}{}'
+	print2('Error - Check excel input Loadflow_Settings there should be 55 Items in the list there are only: {} {}'
 		   .format(len(Load_Flow_Setting), Load_Flow_Setting))
 Fsweep_Settings = analysis_dict["Frequency_Sweep"]							# Imports Settings for Frequency Sweep calculation
 if len(Fsweep_Settings) != 16:												# Check there are the right number of inputs
@@ -1831,12 +1897,13 @@ if len(Fsweep_Settings) != 16:												# Check there are the right number of 
 		   .format(len(Fsweep_Settings), Fsweep_Settings))
 Harmonic_Loadflow_Settings = analysis_dict["Harmonic_Loadflow"]				# Imports Settings for Harmonic LDF calculation
 if len(Harmonic_Loadflow_Settings) != 15:									# Check there are the right number of inputs
-	print2("Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: " + len(Harmonic_Loadflow_Settings) + " " + Harmonic_Loadflow_Settings)
+	print2('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: {} {}'
+		   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
 
 List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
 
-if FS_Sim == True or HRM_Sim == True:
+if FS_Sim or HRM_Sim:
 	FS_Contingency_Results, HRM_Contingency_Results = [], []
 	count_studycase = 0
 	while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
@@ -1865,7 +1932,7 @@ if FS_Sim == True or HRM_Sim == True:
 				Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
 			count = 0
 			while count < len(New_Contingency_List):												# Loop Through Contingency list						
-				print1(2, "Carrying out Contingency: " + New_Contingency_List[count][0], 0)
+				print1(2,"Carrying out Contingency: " + New_Contingency_List[count][0],0)
 				deactivate_scenario()																# Can't copy activated Scenario so deactivate it
 				object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
 				if object_exists == 0:
@@ -1949,9 +2016,10 @@ if FS_Sim == True or HRM_Sim == True:
 				Variation.Deactivate
 				delete_object(Variation)
 		else:
-			print2("Could Not Activate Project: " + Project_Name)	
+			print2('Coult Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
+			# ERROR:  print2("Could Not Activate Project: " + Project_Name)
 
-	if Export_to_Excel == True:																# This Exports the Results files to Excel in terminal format
+	if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 		print1(1,"\nProcessing Results and output to Excel",0)
 		start2 = time.clock()																# Used to calc the total excel export time
 		wb = create_workbook(Excel_Results)													# Creates Workbook
@@ -1994,7 +2062,7 @@ if FS_Sim == True or HRM_Sim == True:
 		close_workbook(wb,Excel_Results)																# Closes and saves the workbook
 		print1(2,"Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",0)	# Returns the Total Export time	
 
-print1(2,"Total Time: " + str(round((time.clock() - start),2)) + " Seconds",0)							# Returns the Calc time
+print1(2, 'Total Time: {:.2f}'.format(time.clock() - start), 0)
 
 # End of Script
 # --------------------------------------------------------------------------------------------------------------------------------------------
