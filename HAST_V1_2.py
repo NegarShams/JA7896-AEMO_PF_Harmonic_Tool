@@ -30,6 +30,11 @@ Use these commands to check Environment variables are setup correctly
 	which has these modules present
 5. You can comment out numpy and scipy in the import section if you set Excel_Convex_Hull = False. This will
 	then skip creating the points for the convex hull
+
+---------------------------------------------------------------------------------------------------------------------
+UNIT TESTING
+Unit tests have begun to be added to this script.  When any changes are made it is recommended to run the unittests
+to determine that the code in principal works correctly.
 """
 
 # IMPORT SOME PYTHON MODULES
