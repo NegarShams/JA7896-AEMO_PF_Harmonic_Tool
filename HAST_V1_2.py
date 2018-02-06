@@ -57,7 +57,13 @@ import unittest							# Used to include test functions for error checking of cod
 # import operator
 # import textwrap
 
+# Development into python pacakge
+import hast
+
 if __name__ == '__main__':
+	# Setup logging
+	logger = hast.setup_logging()
+
 	""" Ensures this code is only run when run as the main script and not for unittesting """
 	# TODO: If want to unittest PF will need to put this into a function
 	DIG_PATH = """C:\\Program Files\\DIgSILENT\\PowerFactory 2016 SP3\\"""
@@ -446,6 +452,7 @@ def deactivate_scenario(): 		# Deactivate Scenario
 	else:
 		print1(2, 'No Scenario Active to Deactivate ................................', 0)
 	return None
+
 
 def save_active_scenario(): 		# Save active scenario
 	"""
@@ -1927,8 +1934,15 @@ if __name__ == '__main__':
 		print2('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: {} {}'
 			   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
+	# This loops through all the study cases and operational scenarios listed and checks them skips any ones
+	# which don't solve
+	List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)
 
-	List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
+	# TODO: Implement parallel processing at this point
+
+	# TODO: 1. Check if parallel processing enabled
+	# TODO: 2. Assign relevant functions to parallel processing
+	# TODO: 3. Start parallel processing
 
 	if FS_Sim or HRM_Sim:
 		FS_Contingency_Results, HRM_Contingency_Results = [], []
@@ -2109,8 +2123,8 @@ class TestConvexHull(unittest.TestCase):
 	def test_convex_hull(self):
 		""" Simple test of convex_hull calculation to check it is performing correctly """
 		point_list = [[1.1, 2.1, 3.1, 4.1, 5, 6, 4, 2, 1, 3, 2], [1, 2, 3, 4, 3, 2, 1, 2, 1, 3, 2, 5, 2, 1, 2]]
-		point_list = np.array(point_list)
-		point_list = np.random.rand(30, 2)
+		# point_list = np.array(point_list)
+		# point_list = np.random.rand(30, 2)
 		result = convex_hull1(pointlist=point_list)
 		print(result)
 
