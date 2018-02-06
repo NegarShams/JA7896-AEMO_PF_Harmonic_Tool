@@ -19,7 +19,7 @@ class TestInitSetup(unittest.TestCase):
 	def test_powerfactory_setup(self):
 		""" Test powerfactory import works successfully and that it is the correct verson that has been imported """
 		powerfactory = hast.setup_powerfactory()
-		self.assertTrue(powerfactory.__version__, constants.PowerFactory.version)
+		self.assertTrue(powerfactory.__version__, constants.pf_version)
 
 if __name__ == '__main__':
 	unittest.main()

@@ -58,7 +58,8 @@ def setup_powerfactory():
 	"""
 	# TODO: If unable to access folder then should search for PowerFactory folder before returning error
 	paths = sys.path
-	pf_path = constants.PowerFactory.pf_path
+	pf_constants = constants.PowerFactory(version=constants.pf_version)
+	pf_path = pf_constants.pf_python_path
 	# Check if power factory path is already in system path before adding to avoid excessive length of system path
 	if pf_path not in paths:
 		sys.path.append(pf_path)
