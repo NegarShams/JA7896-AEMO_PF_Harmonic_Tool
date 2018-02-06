@@ -5,12 +5,12 @@
 import os
 import sys
 import time
-import constants
+import hast.constants
 import traceback
-import unittest
 import logging
 
 start_time = (time.strftime("%y_%m_%d_%H_%M_%S"))
+__version__ = '0.1'
 
 def setup_logging(pth_logfile=''):
 	"""
@@ -25,7 +25,7 @@ def setup_logging(pth_logfile=''):
 	# (assuming that this script was the first one initialised)
 	if pth_logfile == '':
 		script_name, _ = os.path.splitext(sys.argv[0])
-		pth_logfile = '{}{}.log'.format(script_name, start_time)
+		pth_logfile = '{}-{}.log'.format(script_name, start_time)
 
 	logging.basicConfig(filename=pth_logfile,
 						level=logging.DEBUG,
@@ -57,7 +57,7 @@ def setup_powerfactory():
 	pf_path = constants.PowerFactory.pf_path
 	# Check if power factory path is already in system path before adding to avoid excessive length of system path
 	if pf_path not in paths:
-		sys.path.append(constants.PowerFactory.dig_path)
+		sys.path.append(pf_path)
 	if pf_path not in os.environ['PATH']:
 		os.environ['PATH'] = os.environ['PATH'] + ';' + pf_path
 
@@ -68,6 +68,7 @@ def setup_powerfactory():
 		traceback.print_exc()
 		raise ImportError(' Could not import powerfactory ')
 
+	return powerfactory
 
 
 
@@ -80,14 +81,4 @@ def setup_powerfactory():
 
 
 
-#   ------------------------- UNIT TESTS -------------------------------------------
-class InitSetup(unittest.TestCase):
-	"""
-		UnitTest to confirm that init setup works correctly, such as log file and powerfactory access
-	"""
-	def test_logging_setup(self):
-		""" Simple test of convex_hull calculation to check it is performing correctly """
-		logger = setup_logging()
-		logger.info(' -- UNIT TEST --')
-		self.assertTrue(type(logger) is logging.Logger)
-		logging.info(' -- UNIT TEST completed --')
+
