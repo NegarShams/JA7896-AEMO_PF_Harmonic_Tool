@@ -45,43 +45,47 @@ import math								#
 import numpy as np						# install anaconda it has numpy in it  https://www.continuum.io/downloadsim
 from scipy.spatial import ConvexHull    # install anaconda it has scipy in it  https://www.continuum.io/downloads
 import re								# Used for stripping text strings
+import unittest							# Used to include test functions for error checking of code
 # import shutil
 # import inspect                      # Inspect functions
 # import string                       # Processing text
 # import operator
 # import textwrap
 
-DIG_PATH = """C:\\Program Files\\DIgSILENT\\PowerFactory 2016 SP3\\"""
-sys.path.append(DIG_PATH)
-os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
-Title = ("""::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n
-NAME:             HAST Harmonics Automated Simulation Tool\n
-VERSION:          1.2 [24 April 2017]\n
-AUTHOR:           Barry O'Connell\n
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n""")
+if __name__ == '__main__':
+	""" Ensures this code is only run when run as the main script and not for unittesting """
+	# TODO: If want to unittest PF will need to put this into a function
+	DIG_PATH = """C:\\Program Files\\DIgSILENT\\PowerFactory 2016 SP3\\"""
+	sys.path.append(DIG_PATH)
+	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
+	Title = ("""::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n
+	NAME:             HAST Harmonics Automated Simulation Tool\n
+	VERSION:          1.2 [24 April 2017]\n
+	AUTHOR:           Barry O'Connell\n
+	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n""")
 
-# Start Timer
-filelocation = os.getcwd() + "\\"
-start = time.clock()
-start1 = (time.strftime("%y_%m_%d_%H_%M_%S")) 
+	# Start Timer
+	filelocation = os.getcwd() + "\\"
+	start = time.clock()
+	start1 = (time.strftime("%y_%m_%d_%H_%M_%S"))
 
-# Excel commands
-xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
+	# Excel commands
+	xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
 
-# Power factory commands
-# --------------------------------------------------------------------------------------------------------------------
-app = powerfactory.GetApplication() 							# Start PowerFactory  in engine  mode
-# help("powerfactory")
-user = app.GetCurrentUser()										# Get the current active user
-ldf = app.GetFromStudyCase("ComLdf")							# Get load flow command
-hldf = app.GetFromStudyCase("ComHldf")							# Get Harmonic load flow
-frq = app.GetFromStudyCase("ComFsweep")							# Get Frequency Sweep Command
-ini = app.GetFromStudyCase("ComInc")							# Get Dynamic Initialisation
-sim = app.GetFromStudyCase("ComSim")							# Get Dynamic Simulation
-shc = app.GetFromStudyCase("ComShc")							# Get short circuit command
-res = app.GetFromStudyCase("ComRes")							# Get Result Export Command
-wr = app.GetFromStudyCase("ComWr")								# Get Write command for wmf and bmp files
-app.ClearOutputWindow()											# Clear Output Window
+	# Power factory commands
+	# --------------------------------------------------------------------------------------------------------------------
+	app = powerfactory.GetApplication() 							# Start PowerFactory  in engine  mode
+	# help("powerfactory")
+	user = app.GetCurrentUser()										# Get the current active user
+	ldf = app.GetFromStudyCase("ComLdf")							# Get load flow command
+	hldf = app.GetFromStudyCase("ComHldf")							# Get Harmonic load flow
+	frq = app.GetFromStudyCase("ComFsweep")							# Get Frequency Sweep Command
+	ini = app.GetFromStudyCase("ComInc")							# Get Dynamic Initialisation
+	sim = app.GetFromStudyCase("ComSim")							# Get Dynamic Simulation
+	shc = app.GetFromStudyCase("ComShc")							# Get short circuit command
+	res = app.GetFromStudyCase("ComRes")							# Get Result Export Command
+	wr = app.GetFromStudyCase("ComWr")								# Get Write command for wmf and bmp files
+	app.ClearOutputWindow()											# Clear Output Window
 
 
 # Functions -----------------------------------------------------------------------------------------------------------
@@ -768,7 +772,7 @@ def check_if_folder_exists(location, name):		# Checks if the folder exists
 	"""
 	_new_object = location.GetContents('{}.IntFolder'.format(name))
 	folder_exists = 0
-	if len(new_object) > 0:
+	if len(_new_object) > 0:
 		print1(2, 'Folder already exists: {}'.format(name), 0)
 		folder_exists = 1
 	return _new_object, folder_exists
@@ -805,9 +809,9 @@ def delete_folder(location, name):		# Deletes Folder in Location
 	:param str name: Name of folder to be deleted 
 	:return: None 
 	"""
-	new_object = location.GetContents('{}.IntFolder'.format(name))
-	if len(new_object) > 0:
-		new_object[0].Delete()
+	_new_object = location.GetContents('{}.IntFolder'.format(name))
+	if len(_new_object) > 0:
+		_new_object[0].Delete()
 	return None
 
 
@@ -878,12 +882,13 @@ def check_if_object_exists(location, name):  	# Check if the object exists
 	:return object_exists, new_object: True / False on whether object exists, handle for powerfactory.Object 
 	"""
 	print1(2, '{} {}'.format(location, name), 0)
-	new_object = location.GetContents(name)
+	#_new_object used instead of new_object to avoid shadowing
+	_new_object = location.GetContents(name)
 	object_exists = 0
-	if len(new_object) > 0:
+	if len(_new_object) > 0:
 		print1(2, 'Object Exists: {}'.format(name), 0)
 		object_exists = 1
-	return object_exists, new_object	
+	return object_exists, _new_object
 
 
 def add_copy(folder, object, name1):		# copies an object to a new folder Name 1 = new name
@@ -979,8 +984,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 									   'Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
 									   0)
 								deactivate_scenario()																# Can't copy activated Scenario so deactivate it
-								_new_scenario = add_copy(op_sc_results_folder,Scenario,List_of_Studycases[_count_studycase][0] + str("_" + New_Contingency_List[cont_count][0]))	# Copies the base scenario
-								_ = activate_scenario1(new_scenario)										# Activates the base scenario
+								_new_scenario = add_copy(_op_sc_results_folder, scenario,
+														 List_of_Studycases[_count_studycase][0] + str("_" + new_contingency_list[cont_count][0]))	# Copies the base scenario
+								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
 									# Take outages described for contingency
 									for _switch in new_contingency_list[cont_count][1:]:
@@ -1268,6 +1274,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 			for x in fs_results:
 				if x[0] == "m:R":
 					ws.Range(ws.Cells(startrow, newcol),
+							 # TODO: endrow is declared in if statement above but reports an error which should be solved if put into separate function
 							 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
 					r_results.append(x[3:])
 					newcol = newcol + 1	
@@ -1297,8 +1304,9 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				top = startrow * 15
 			graph_across = 1		# Number of Graphs Across the Page
 			graph_spacing = 25		# Spacing between the graphs
-			noofgraphrows = math.ceil(len(scale[3:])/graph_across) - 1
-			noofgraphrowsrange = list(range(0, noofgraphrows+1))
+			# TODO: scale is declared in if statement above but reports an error which should be solved if put into separate functions
+			noofgraphrows = int(math.ceil(len(scale[3:])/graph_across) - 1)
+			noofgraphrowsrange = list(range(0, noofgraphrows))
 			gph_coord = []									# List of Graph coordinates for Impedance Loci
 			for uyt in noofgraphrowsrange:					# This creates the graph coordinates
 				mnb = list(range(0, graph_across))
@@ -1486,6 +1494,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 					#_xl.ActiveChart.Legend.Delete()                                                	# Delete legend
 					_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"            # X Axis
 					_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            	# Set minimum of x axis
+					# TODO: scale_end reports error which should be solved if transferred to own function
 					_xl.ActiveChart.Axes(c.xlCategory).MaximumScale = scale_end                  	# Set maximum of x axis
 					_xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"               	# Set number of decimals 0.0
 					_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "Impedance in Ohms"      		# Y Axis
@@ -1506,9 +1515,10 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				_ = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers,30,45,825,400).Select()    	# AddChart(Type, Left, Top, Width, Height)
 				_xl.ActiveChart.ApplyLayout(1)													# Select Layout 1-11
 				_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " m:Z Self Impedance"	# Add Title
-				#_xl.ActiveChart.Legend.Delete()                                                	# Delete legend
+				# _xl.ActiveChart.Legend.Delete()                                                	# Delete legend
 				_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"            # X Axis
 				_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            	# Set minimum of x axis
+				# TODO: scale_end reports error which should be solved if transferred to own function
 				_xl.ActiveChart.Axes(c.xlCategory).MaximumScale = scale_end                  	# Set maximum of x axis
 				_xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"               	# Set number of decimals 0.0
 				_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "Impedance in Ohms"      		# Y Axis
@@ -1603,7 +1613,8 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				series.Format.Fill.ForeColor.RGB = 12611584										# Colour for fill (red + green*256 + blue*256*256)
 				series.Format.Fill.ForeColor.Brightness = 0.75									# Fill Brightness
 				series.Format.Fill.Transparency = 0.75											# Fill Transparency
-				series.Format.Fill.Solid														# Solid Fill
+				# REMOVED - Statement has no effect
+				# series.Format.Fill.Solid					# Solid Fill
 				series.Border.Color = 12611584													# Fill Colour
 				series.Format.Line.Visible = True												# Series line is visible
 				series.Format.Line.Weight = 1.5													# Set line weight for series
@@ -1646,7 +1657,8 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 					series.Format.Fill.ForeColor.RGB = 12611584										# Colour for fill (red + green*256 + blue*256*256)
 					series.Format.Fill.ForeColor.Brightness = 0.75									# Fill Brightness
 					series.Format.Fill.Transparency = 0.75											# Fill Transparency
-					series.Format.Fill.Solid														# Solid Fill
+					# REMOVED - Statement has no effect
+					# series.Format.Fill.Solid														# Solid Fill
 					series.Border.Color = 12611584													# Fill Colour
 					series.Format.Line.Visible = True												# Series line is visible
 					series.Format.Line.Weight = 1.5													# Set line weight for series
@@ -1686,7 +1698,8 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				series.Format.Fill.ForeColor.RGB = 12611584										# Colour for fill (red + green*256 + blue*256*256)
 				series.Format.Fill.ForeColor.Brightness = 0.75									# Fill Brightness
 				series.Format.Fill.Transparency = 0.75											# Fill Transparency
-				series.Format.Fill.Solid														# Solid Fill
+				# REMOVED - statement has no effect
+				# series.Format.Fill.Solid														# Solid Fill
 				series.Border.Color = 12611584													# Fill Colour
 				series.Format.Line.Visible = True												# Series line is visible
 				series.Format.Line.Weight = 1.5													# Set line weight for series
@@ -1748,324 +1761,357 @@ def convex_hull1(pointlist):			# Gets the convex hull of a numpy array (if you h
 	:param np.array pointlist: Numpy array to be converted 
 	:return list convex_points: List of convex points returned 
 	"""
-	r, x, convex_points = [], [], []
+	r, x = [], []
 	# TODO:  Need to see what is being provided as input and whether a try / except statement would be useful for error
 	# TODO: solving
 	cv = ConvexHull(pointlist)
-	for x in cv.vertices:
-		r.append(float(pointlist[x,0]))								# Converts the numpy floats back to regular float and attach
-		x.append(float(pointlist[x,1]))
+	for i in cv.vertices:
+		#For each vertices extracts the R and X values
+		r.append(float(pointlist[i, 0]))								# Converts the numpy floats back to regular float and attach
+		x.append(float(pointlist[i, 1]))
 		#app.PrintPlain(pointlist[x,0])
+
+	# Duplicates the first value of the list back to the end
 	r.append(r[0])
 	x.append(x[0])
-	convex_points.append(r)
-	convex_points.append(x)
+
+	# Combine to return list containing r and x values
+	convex_points = [r, x]
+	# convex_points.append(r)
+	# convex_points.append(x)
 	return convex_points
 	
 
 # Main Engine ------------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------------------------
-Error_Count = 1
-# DEBUG -  Disable printing of items to output window
-app.EchoOff()
+# Following if statement stops the code being run unless it is the main script
+if __name__ == '__main__':
+	Error_Count = 1
+	# DEBUG -  Disable printing of items to output window
+	app.EchoOff()
 
-# User Input (All info is checked to see if it exists in the case file
-# -------------------------------------------------------------------------------------------------------------------------------
-"""Import_Workbook = filelocation + "Harmonic_Inputs.xlsx"
-Results_Export_Folder = "C:\\Users\\oconnell_b\\Desktop\\Scrap\\"			# Folder to Export Excel Results too
-Excel_Results = Results_Export_Folder + "Results_" + start1					# Name of Exported Results File
-Progress_Log = Results_Export_Folder + "Progress_Log_" + start1 + ".txt"	# Progress File
-Error_Log = Results_Export_Folder + "Error_Log_" + start1 + ".txt"			# Error File
-Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development 
-Net_Elm = "EIRGRID.ElmNet"					# Where all the Network elements are stored
-Mut_Elm_Fld = "ElmMut" + start1				# Name of the folder to create under the network elements to store mutual impedances
-Results_Folder = "Results_" + start1		# Name of the folder to keep results under studycase
-Operation_Scenario_Folder = "Op_Scenarios_"	+ start1 # Name of the folder to store Operational Scenarios
-Pre_Case_Check = False					# Checks the N-1 for load flow convergence and saves operational scenarios.
-FS_Sim = True						# Carries out Frequency Sweep Analysis
-HRM_Sim = True						# Carries out Harmonic Load Flow Analysis
-Plot_in_PF = False						# Plot the Frequency Sweeps in PF **************Currently not working
-Skip_Unsolved_Ldf = False				# Skips the frequency sweep if the load flow doesn't solve
-Delete_Created_Folders = False			# Deletes the Results folder, Mutual Elements and the Operational Scenario folder
-Export_to_Excel = True					# Export the results to Excel
-Excel_Visible = False					# Makes Excel Visible while plotting, Can be annoying if you are doing other work as if you click the excel screen it stops the simulation
-Excel_Export_RX = True					# Export RX and graph the Impedance Loci in Excel
-Excel_Convex_Hull = True				# This calculates the minimum points for the Loci
-Excel_Export_Z = False					# Graph the Frequency Sweeps in Excel
-Excel_Export_Z12 = False				# Export Mutual Impedances to excel
-Excel_Export_HRM = False				# Export Harmonic Data
+	# User Input (All info is checked to see if it exists in the case file
+	# -------------------------------------------------------------------------------------------------------------------------------
+	"""Import_Workbook = filelocation + "Harmonic_Inputs.xlsx"
+	Results_Export_Folder = "C:\\Users\\oconnell_b\\Desktop\\Scrap\\"			# Folder to Export Excel Results too
+	Excel_Results = Results_Export_Folder + "Results_" + start1					# Name of Exported Results File
+	Progress_Log = Results_Export_Folder + "Progress_Log_" + start1 + ".txt"	# Progress File
+	Error_Log = Results_Export_Folder + "Error_Log_" + start1 + ".txt"			# Error File
+	Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development 
+	Net_Elm = "EIRGRID.ElmNet"					# Where all the Network elements are stored
+	Mut_Elm_Fld = "ElmMut" + start1				# Name of the folder to create under the network elements to store mutual impedances
+	Results_Folder = "Results_" + start1		# Name of the folder to keep results under studycase
+	Operation_Scenario_Folder = "Op_Scenarios_"	+ start1 # Name of the folder to store Operational Scenarios
+	Pre_Case_Check = False					# Checks the N-1 for load flow convergence and saves operational scenarios.
+	FS_Sim = True						# Carries out Frequency Sweep Analysis
+	HRM_Sim = True						# Carries out Harmonic Load Flow Analysis
+	Plot_in_PF = False						# Plot the Frequency Sweeps in PF **************Currently not working
+	Skip_Unsolved_Ldf = False				# Skips the frequency sweep if the load flow doesn't solve
+	Delete_Created_Folders = False			# Deletes the Results folder, Mutual Elements and the Operational Scenario folder
+	Export_to_Excel = True					# Export the results to Excel
+	Excel_Visible = False					# Makes Excel Visible while plotting, Can be annoying if you are doing other work as if you click the excel screen it stops the simulation
+	Excel_Export_RX = True					# Export RX and graph the Impedance Loci in Excel
+	Excel_Convex_Hull = True				# This calculates the minimum points for the Loci
+	Excel_Export_Z = False					# Graph the Frequency Sweeps in Excel
+	Excel_Export_Z12 = False				# Export Mutual Impedances to excel
+	Excel_Export_HRM = False				# Export Harmonic Data
+	
+	# List of Study case & Scenario to start with [Name, location\\studycase, location\\scenario]
+	List_of_Studycases = [["SV Base Case","Barry\\Summer Valley Base Case.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],
+						["SV with Glen","Barry\\Summer Valley Base Case with Glen.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],
+						["SV with T144","Barry\\Summer Valley Base Case with T144.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],	
+						["SV Both","Barry\\Summer Valley Base Case with Both.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],
+						["WP Base Case","Barry\\Winter Peak Base Case.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"],
+						["WP with Glen","Barry\\Winter Peak Base Case with Glen.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"],
+						["WP with T144","Barry\\Winter Peak Base Case with T144.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"],
+						["WP Both","Barry\\Winter Peak Base Case with Both.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"]]			
+				
+	# What Terminals do you want to look at (must be a minimum of 2 terminals specified)
+	List_of_Points = [("Cauteen.ElmSubstat", "110 kV A1.ElmTerm"), ("Doon.ElmSubstat","110 kV A1.ElmTerm")] 						
+	
+	# List of N-1 Contingencies (must be a minimum of 2 contingencies) 
+	## -------------------------------------------------------------------------------------
+	# Notes Leave item 1 Base Case untouched 
+	# Enter the name and as many contingencies you want to switch ("name_of_the_contingency_as_one_word", "Name_of_Element_1_to_switch", "Name_of_Element_2_to_switch")
+	
+	List_of_Contingencies = [("Base_Case",0),
+							("KIL_CHA",["Killonan", "110 kV Charleville CB.ElmCoup"],["Charleville", "110 kV Killonan CB.ElmCoup"]),
+							("KIL_LIM1",["Killonan", "110 kV Limerick #1 CB.ElmCoup"],["Limerick", "110 kV Killonan #1 CB.ElmCoup"]),
+							("KIL_LIM2",["Killonan", "110 kV Limerick #2 CB.ElmCoup"],["Limerick", "110 kV Killonan #2 CB.ElmCoup"]),
+							("KIL_SING",["Killonan", "110 kV Singland CB.ElmCoup"],["Singland", "110 kV Killonan CB.ElmCoup"]),						
+							("KIL_TA",["Killonan", "220 kV Tarbert CB.ElmCoup"],["Tarbert", "220 kV Killonan CB.ElmCoup"]),	
+							("BDN_CUL",["Ballydine", "110 kV Cullenagh CB.ElmCoup"],["Cullenagh", "110 kV Ballydine CB.ElmCoup"]),	
+							("CAH_BAR_KRA",["Knockraha", "110 kV Cahir CB.ElmCoup"],["Cahir", "110 kV Barrymore CB.ElmCoup"]),	
+							("CAH_DOO",["Doon", "110 kV Cahir CB.ElmCoup"],["Cahir", "110 kV Doon CB.ElmCoup"]),	
+							("CAH_KIL",["Kill Hill", "110 kV Cullenagh CB.ElmCoup"],["Cahir", "110 kV Thurles CB.ElmCoup"]),	
+							("CTN_KIL",["Cauteen", "110 kV Killonan CB.ElmCoup"],["Killonan", "110 kV Cauteen CB.ElmCoup"]),
+							("CTN_TIP",["Cauteen", "110 kV Tipperary CB.ElmCoup"],["Tipperary", "110 kV Cauteen CB.ElmCoup"]),
+							("CUL T2101",["Cullenagh", "110 kV T2101 CB.ElmCoup"],["Cullenagh", "220 kV T2101 CB.ElmCoup"]),
+							("CUL_KRA",["Cullenagh", "220 kV Knockraha CB.ElmCoup"],["Knockraha", "220 kV Cullenagh CB.ElmCoup"]),	
+							("DOO_BDN",["Doon", "110 kV Ballydine CB.ElmCoup"],["Ballydine", "110 kV Doon CB.ElmCoup"]),		
+							("KHIL_THU",["Kill Hill", "110 kV Doon CB.ElmCoup"],["Thurles", "110 kV Cahir CB.ElmCoup"]),						
+							("KIL T2101",["Killonan", "110 kV T2101 CB.ElmCoup"],["Killonan", "220 kV T2101 CB.ElmCoup"]),
+							("KIL_SHA",["Killonan", "220 kV Shannonbridge CB.ElmCoup"],["Shannonbridge", "220 kV Killonan CB.ElmCoup"]),	
+							("KRA T2101",["Knockraha", "110 kV T2101 CB.ElmCoup"],["Knockraha", "220 kV T2101 CB.ElmCoup"]),
+							("KIL_KRA",["Killonan", "220 kV Knockraha CB.ElmCoup"],["Knockraha", "220 kV Killonan CB.ElmCoup"]),	
+							("SHA T2101",["Shannonbridge", "110 kV T2101 CB.ElmCoup"],["Shannonbridge", "220 kV T2101 CB.ElmCoup"]),
+							("THU_IKN_SH",["Shannonbridge", "110 kV Thurles CB.ElmCoup"],["Thurles", "110 kV Ikerrin CB.ElmCoup"]),
+							("TIP_CAH",["Cahir", "110 kV Tipperary CB.ElmCoup"],["Tipperary", "110 kV Cahir CB.ElmCoup"]),						
+							]	
+	"""
 
-# List of Study case & Scenario to start with [Name, location\\studycase, location\\scenario]
-List_of_Studycases = [["SV Base Case","Barry\\Summer Valley Base Case.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],
-					["SV with Glen","Barry\\Summer Valley Base Case with Glen.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],
-					["SV with T144","Barry\\Summer Valley Base Case with T144.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],	
-					["SV Both","Barry\\Summer Valley Base Case with Both.IntCase", "Summer Valley\\2014 Summer Valley_base.IntScenario"],
-					["WP Base Case","Barry\\Winter Peak Base Case.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"],
-					["WP with Glen","Barry\\Winter Peak Base Case with Glen.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"],
-					["WP with T144","Barry\\Winter Peak Base Case with T144.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"],
-					["WP Both","Barry\\Winter Peak Base Case with Both.IntCase", "Winter Peak\\2014 Winter Peak Base.IntScenario"]]			
-			
-# What Terminals do you want to look at (must be a minimum of 2 terminals specified)
-List_of_Points = [("Cauteen.ElmSubstat", "110 kV A1.ElmTerm"), ("Doon.ElmSubstat","110 kV A1.ElmTerm")] 						
-
-# List of N-1 Contingencies (must be a minimum of 2 contingencies) 
-## -------------------------------------------------------------------------------------
-# Notes Leave item 1 Base Case untouched 
-# Enter the name and as many contingencies you want to switch ("name_of_the_contingency_as_one_word", "Name_of_Element_1_to_switch", "Name_of_Element_2_to_switch")
-
-List_of_Contingencies = [("Base_Case",0),
-						("KIL_CHA",["Killonan", "110 kV Charleville CB.ElmCoup"],["Charleville", "110 kV Killonan CB.ElmCoup"]),
-						("KIL_LIM1",["Killonan", "110 kV Limerick #1 CB.ElmCoup"],["Limerick", "110 kV Killonan #1 CB.ElmCoup"]),
-						("KIL_LIM2",["Killonan", "110 kV Limerick #2 CB.ElmCoup"],["Limerick", "110 kV Killonan #2 CB.ElmCoup"]),
-						("KIL_SING",["Killonan", "110 kV Singland CB.ElmCoup"],["Singland", "110 kV Killonan CB.ElmCoup"]),						
-						("KIL_TA",["Killonan", "220 kV Tarbert CB.ElmCoup"],["Tarbert", "220 kV Killonan CB.ElmCoup"]),	
-						("BDN_CUL",["Ballydine", "110 kV Cullenagh CB.ElmCoup"],["Cullenagh", "110 kV Ballydine CB.ElmCoup"]),	
-						("CAH_BAR_KRA",["Knockraha", "110 kV Cahir CB.ElmCoup"],["Cahir", "110 kV Barrymore CB.ElmCoup"]),	
-						("CAH_DOO",["Doon", "110 kV Cahir CB.ElmCoup"],["Cahir", "110 kV Doon CB.ElmCoup"]),	
-						("CAH_KIL",["Kill Hill", "110 kV Cullenagh CB.ElmCoup"],["Cahir", "110 kV Thurles CB.ElmCoup"]),	
-						("CTN_KIL",["Cauteen", "110 kV Killonan CB.ElmCoup"],["Killonan", "110 kV Cauteen CB.ElmCoup"]),
-						("CTN_TIP",["Cauteen", "110 kV Tipperary CB.ElmCoup"],["Tipperary", "110 kV Cauteen CB.ElmCoup"]),
-						("CUL T2101",["Cullenagh", "110 kV T2101 CB.ElmCoup"],["Cullenagh", "220 kV T2101 CB.ElmCoup"]),
-						("CUL_KRA",["Cullenagh", "220 kV Knockraha CB.ElmCoup"],["Knockraha", "220 kV Cullenagh CB.ElmCoup"]),	
-						("DOO_BDN",["Doon", "110 kV Ballydine CB.ElmCoup"],["Ballydine", "110 kV Doon CB.ElmCoup"]),		
-						("KHIL_THU",["Kill Hill", "110 kV Doon CB.ElmCoup"],["Thurles", "110 kV Cahir CB.ElmCoup"]),						
-						("KIL T2101",["Killonan", "110 kV T2101 CB.ElmCoup"],["Killonan", "220 kV T2101 CB.ElmCoup"]),
-						("KIL_SHA",["Killonan", "220 kV Shannonbridge CB.ElmCoup"],["Shannonbridge", "220 kV Killonan CB.ElmCoup"]),	
-						("KRA T2101",["Knockraha", "110 kV T2101 CB.ElmCoup"],["Knockraha", "220 kV T2101 CB.ElmCoup"]),
-						("KIL_KRA",["Killonan", "220 kV Knockraha CB.ElmCoup"],["Knockraha", "220 kV Killonan CB.ElmCoup"]),	
-						("SHA T2101",["Shannonbridge", "110 kV T2101 CB.ElmCoup"],["Shannonbridge", "220 kV T2101 CB.ElmCoup"]),
-						("THU_IKN_SH",["Shannonbridge", "110 kV Thurles CB.ElmCoup"],["Thurles", "110 kV Ikerrin CB.ElmCoup"]),
-						("TIP_CAH",["Cahir", "110 kV Tipperary CB.ElmCoup"],["Tipperary", "110 kV Cahir CB.ElmCoup"]),						
-						]	
-"""
-
-# Enter what Variables you want to look at for terminals
-FS_Terminal_Variables = ["m:R", "m:X", "m:Z", "m:phiz"]	
-Mutual_Variables = ["c:Z_12"]
-HRM_Terminal_Variables = ["m:HD"]
-# Import Excel
-Import_Workbook = filelocation + "HAST_V1_2_Inputs.xlsx"					# Gets the CWD current working directory
-Variation_Name = "Temporary_Variation" + start1
-analysis_dict = import_excel_harmonic_inputs(Import_Workbook) 			# Reads in the Settings from the spreadsheet
-Study_Settings = analysis_dict["Study_Settings"]						
-if len(Study_Settings) != 20:
-	print2("Error Check input Study Settings there should be 20 Items in the list there are only: " + len(Study_Settings) + " " + Study_Settings)
-if not Study_Settings[0]:											# If there is no output location in the spreadsheet it sets it to the CWD
-	Results_Export_Folder = filelocation
-else:
-	Results_Export_Folder = Study_Settings[0]								# Folder to Export Excel Results too
-Excel_Results = Results_Export_Folder + Study_Settings[1] + start1			# Name of Exported Results File
-Progress_Log = Results_Export_Folder + Study_Settings[2] + start1 + ".txt"	# Progress File
-Error_Log = Results_Export_Folder + Study_Settings[3] + start1 + ".txt"		# Error File
-Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development 
-Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
-Mut_Elm_Fld = Study_Settings[5] + start1									# Name of the folder to create under the network elements to store mutual impedances
-Results_Folder = Study_Settings[6] + start1									# Name of the folder to keep results under studycase
-Operation_Scenario_Folder = Study_Settings[7]	+ start1 					# Name of the folder to store Operational Scenarios
-Pre_Case_Check = Study_Settings[8]											# Checks the N-1 for load flow convergence and saves operational scenarios.
-FS_Sim = Study_Settings[9]													# Carries out Frequency Sweep Analysis
-HRM_Sim = Study_Settings[10]												# Carries out Harmonic Load Flow Analysis
-Skip_Unsolved_Ldf = Study_Settings[11]										# Skips the frequency sweep if the load flow doesn't solve
-Delete_Created_Folders = Study_Settings[12]									# Deletes the Results folder, Mutual Elements and the Operational Scenario folder
-Export_to_Excel = Study_Settings[13]										# Export the results to Excel
-Excel_Visible = Study_Settings[14]											# Makes Excel Visible while plotting, Can be annoying if you are doing other work as if you click the excel screen it stops the simulation
-Excel_Export_RX = Study_Settings[15]										# Export RX and graph the Impedance Loci in Excel
-Excel_Convex_Hull = Study_Settings[16]										# This calculates the minimum points for the Loci
-Excel_Export_Z = Study_Settings[17]											# Graph the Frequency Sweeps in Excel
-Excel_Export_Z12 = Study_Settings[18]										# Export Mutual Impedances to excel
-Excel_Export_HRM = Study_Settings[19]										# Export Harmonic Data
-print1(1,Title,0)
-for keys,values in analysis_dict.items():									# Prints all the inputs to progress log
-	print1(1, keys, 0)
-	print1(1, values, 0)
-List_of_Studycases = analysis_dict["Base_Scenarios"]						# Uses the list of Studycases
-if len(List_of_Studycases) <1:												# Check there are the right number of inputs
-	print2("Error - Check excel input Base_Scenarios there should be at least 1 Item in the list ")
-List_of_Contingencies = analysis_dict["Contingencies"]						# Uses the list of Contingencies
-if len(List_of_Contingencies) <1:											# Check there are the right number of inputs
-	print2("Error - Check excel input Contingencies there should be at least 1 Item in the list ")
-List_of_Points = analysis_dict["Terminals"]									# Uses the list of Terminals
-if len(List_of_Points) <1:													# Check there are the right number of inputs
-	print2("Error - Check excel input Terminals there should be at least 1 Item in the list ")
-Load_Flow_Setting = analysis_dict["Loadflow_Settings"]						# Imports Settings for LDF calculation
-if len(Load_Flow_Setting) != 55:											# Check there are the right number of inputs
-	print2('Error - Check excel input Loadflow_Settings there should be 55 Items in the list there are only: {} {}'
-		   .format(len(Load_Flow_Setting), Load_Flow_Setting))
-Fsweep_Settings = analysis_dict["Frequency_Sweep"]							# Imports Settings for Frequency Sweep calculation
-if len(Fsweep_Settings) != 16:												# Check there are the right number of inputs
-	print2('Error - Check excel input Frequency_Sweep there should be 16 Items in the list there are only: {} {}'
-		   .format(len(Fsweep_Settings), Fsweep_Settings))
-Harmonic_Loadflow_Settings = analysis_dict["Harmonic_Loadflow"]				# Imports Settings for Harmonic LDF calculation
-if len(Harmonic_Loadflow_Settings) != 15:									# Check there are the right number of inputs
-	print2('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: {} {}'
-		   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
+	# Enter what Variables you want to look at for terminals
+	FS_Terminal_Variables = ["m:R", "m:X", "m:Z", "m:phiz"]
+	Mutual_Variables = ["c:Z_12"]
+	HRM_Terminal_Variables = ["m:HD"]
+	# Import Excel
+	Import_Workbook = filelocation + "HAST_V1_2_Inputs.xlsx"					# Gets the CWD current working directory
+	Variation_Name = "Temporary_Variation" + start1
+	analysis_dict = import_excel_harmonic_inputs(Import_Workbook) 			# Reads in the Settings from the spreadsheet
+	Study_Settings = analysis_dict["Study_Settings"]
+	if len(Study_Settings) != 20:
+		print2('Error, Check input Study Settings there should be 20 Items in the list there are only: {} {}'
+			   .format(len(Study_Settings), Study_Settings))
+	if not Study_Settings[0]:											# If there is no output location in the spreadsheet it sets it to the CWD
+		Results_Export_Folder = filelocation
+	else:
+		Results_Export_Folder = Study_Settings[0]								# Folder to Export Excel Results too
+	Excel_Results = Results_Export_Folder + Study_Settings[1] + start1			# Name of Exported Results File
+	Progress_Log = Results_Export_Folder + Study_Settings[2] + start1 + ".txt"	# Progress File
+	Error_Log = Results_Export_Folder + Study_Settings[3] + start1 + ".txt"		# Error File
+	Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
+	Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
+	Mut_Elm_Fld = Study_Settings[5] + start1									# Name of the folder to create under the network elements to store mutual impedances
+	Results_Folder = Study_Settings[6] + start1									# Name of the folder to keep results under studycase
+	Operation_Scenario_Folder = Study_Settings[7]	+ start1 					# Name of the folder to store Operational Scenarios
+	Pre_Case_Check = Study_Settings[8]											# Checks the N-1 for load flow convergence and saves operational scenarios.
+	FS_Sim = Study_Settings[9]													# Carries out Frequency Sweep Analysis
+	HRM_Sim = Study_Settings[10]												# Carries out Harmonic Load Flow Analysis
+	Skip_Unsolved_Ldf = Study_Settings[11]										# Skips the frequency sweep if the load flow doesn't solve
+	Delete_Created_Folders = Study_Settings[12]									# Deletes the Results folder, Mutual Elements and the Operational Scenario folder
+	Export_to_Excel = Study_Settings[13]										# Export the results to Excel
+	Excel_Visible = Study_Settings[14]											# Makes Excel Visible while plotting, Can be annoying if you are doing other work as if you click the excel screen it stops the simulation
+	Excel_Export_RX = Study_Settings[15]										# Export RX and graph the Impedance Loci in Excel
+	Excel_Convex_Hull = Study_Settings[16]										# This calculates the minimum points for the Loci
+	Excel_Export_Z = Study_Settings[17]											# Graph the Frequency Sweeps in Excel
+	Excel_Export_Z12 = Study_Settings[18]										# Export Mutual Impedances to excel
+	Excel_Export_HRM = Study_Settings[19]										# Export Harmonic Data
+	print1(1,Title,0)
+	for keys,values in analysis_dict.items():									# Prints all the inputs to progress log
+		print1(1, keys, 0)
+		print1(1, values, 0)
+	List_of_Studycases = analysis_dict["Base_Scenarios"]						# Uses the list of Studycases
+	if len(List_of_Studycases) <1:												# Check there are the right number of inputs
+		print2("Error - Check excel input Base_Scenarios there should be at least 1 Item in the list ")
+	List_of_Contingencies = analysis_dict["Contingencies"]						# Uses the list of Contingencies
+	if len(List_of_Contingencies) <1:											# Check there are the right number of inputs
+		print2("Error - Check excel input Contingencies there should be at least 1 Item in the list ")
+	List_of_Points = analysis_dict["Terminals"]									# Uses the list of Terminals
+	if len(List_of_Points) <1:													# Check there are the right number of inputs
+		print2("Error - Check excel input Terminals there should be at least 1 Item in the list ")
+	Load_Flow_Setting = analysis_dict["Loadflow_Settings"]						# Imports Settings for LDF calculation
+	if len(Load_Flow_Setting) != 55:											# Check there are the right number of inputs
+		print2('Error - Check excel input Loadflow_Settings there should be 55 Items in the list there are only: {} {}'
+			   .format(len(Load_Flow_Setting), Load_Flow_Setting))
+	Fsweep_Settings = analysis_dict["Frequency_Sweep"]							# Imports Settings for Frequency Sweep calculation
+	if len(Fsweep_Settings) != 16:												# Check there are the right number of inputs
+		print2('Error - Check excel input Frequency_Sweep there should be 16 Items in the list there are only: {} {}'
+			   .format(len(Fsweep_Settings), Fsweep_Settings))
+	Harmonic_Loadflow_Settings = analysis_dict["Harmonic_Loadflow"]				# Imports Settings for Harmonic LDF calculation
+	if len(Harmonic_Loadflow_Settings) != 15:									# Check there are the right number of inputs
+		print2('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: {} {}'
+			   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
 
-List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
+	List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
 
-if FS_Sim or HRM_Sim:
-	FS_Contingency_Results, HRM_Contingency_Results = [], []
-	count_studycase = 0
-	while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
-		prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
-		if len(str(prj)) > 0:
-			StudyCase, study_error = activate_study_case(List_of_Studycases1[count_studycase][2])		# Activate Study Case in List
-			Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate corresponding operational Scenario
-			Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
-			Operation_Case_Folder = app.GetProjectFolder("scen")						
-			Variations_Folder = app.GetProjectFolder("scheme")
-			Active_variations = get_active_variations()
-			Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
-			activate_variation(Variation)
-			Stage = create_stage(Variation,"IntSstage",Variation_Name)
-			New_Contingency_List, Con_ok = check_contingencis(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
-			Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
-			studycase_results_folder, folder_exists1 = create_folder(StudyCase, Results_Folder)
-			op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
-			Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
-			if len(Net_Elm1) < 1:
-				print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
-			if len(Terminals_index) > 1 and Excel_Export_Z12 == True:
-				studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
-				List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
+	if FS_Sim or HRM_Sim:
+		FS_Contingency_Results, HRM_Contingency_Results = [], []
+		count_studycase = 0
+		while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
+			prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
+			if len(str(prj)) > 0:
+				StudyCase, study_error = activate_study_case(List_of_Studycases1[count_studycase][2])		# Activate Study Case in List
+				Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate corresponding operational Scenario
+				Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
+				Operation_Case_Folder = app.GetProjectFolder("scen")
+				Variations_Folder = app.GetProjectFolder("scheme")
+				Active_variations = get_active_variations()
+				Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
+				activate_variation(Variation)
+				Stage = create_stage(Variation,"IntSstage",Variation_Name)
+				New_Contingency_List, Con_ok = check_contingencis(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
+				Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
+				studycase_results_folder, folder_exists1 = create_folder(StudyCase, Results_Folder)
+				op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
+				Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
+				if len(Net_Elm1) < 1:
+					print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
+				if len(Terminals_index) > 1 and Excel_Export_Z12:
+					studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
+					List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
+				else:
+					Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
+				count = 0
+				while count < len(New_Contingency_List):												# Loop Through Contingency list
+					print1(2,"Carrying out Contingency: " + New_Contingency_List[count][0],0)
+					deactivate_scenario()																# Can't copy activated Scenario so deactivate it
+					object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
+					if object_exists == 0:
+						new_scenario = add_copy(op_sc_results_folder,Scenario,List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0]))	# Copies the base scenario
+					else:
+						new_scenario = new_object[0]
+					scen_error = activate_scenario1(new_scenario)										# Activates the base scenario
+					if New_Contingency_List[count][0] != "Base_Case":									# Apply Contingencies if it is not the base case
+						for switch in New_Contingency_List[count][1:]:
+							switch_coup(switch[0],switch[1])
+					save_active_scenario()
+					if FS_Sim:
+						sweep = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_FS",9)		# Create Results File
+						trm_count = 0
+						while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
+							add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
+							trm_count = trm_count + 1
+						if Excel_Export_Z12:
+							# TODO: Reports an error due to not being defined which can be resolved by wrapping in function
+							for mut in List_of_Mutual:													# Adds the mutual impedance data to Results File
+								add_vars_res(sweep, mut[2], Mutual_Variables)
+						Fsweep_err_cde = freq_sweep(sweep,Fsweep_Settings)									# Carry out Frequency Sweep
+						if Fsweep_err_cde == 0:															# Skips the contingency if Frequency Sweep doesn't solve
+							fs_scale, fs_res = retrieve_results(sweep,0)
+							fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
+							fs_scale.insert(1,"Scale")
+							fs_scale.pop(3)
+							for tope in fs_res:															# Adds the additional information to the results file
+								tope.insert(1,New_Contingency_List[count][0])							# Op scenario
+								tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
+								FS_Contingency_Results.append(tope)										# Results
+						else:
+							print2("Error with Frequency Sweep Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
+					else:
+						fs_scale = []
+					if HRM_Sim:
+						harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
+						trm_count = 0
+						while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
+							add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
+							trm_count = trm_count + 1
+						Harm_err_cde = harm_load_flow(harm,Harmonic_Loadflow_Settings)
+						if Harm_err_cde == 0:
+							hrm_scale, hrm_res = retrieve_results(harm,1)
+							hrm_scale.insert(1,"THD")													# Inserts the THD
+							hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
+							hrm_scale.insert(1,"Scale")
+							hrm_scale.pop(4)															# Takes out the 50 Hz
+							hrm_scale.pop(4)
+							for res12 in hrm_res:
+								thd1 = re.split(r'[\\.]',res12[1])
+								thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
+								thdz = False
+								if thd2[0] is not None:
+									thd3 = thd2[0].GetContents()
+									for thd4 in thd3:
+										if (thd1[13] + ".ElmTerm") in str(thd4):
+											THD = thd4.GetAttribute('m:THD')
+											thdz = True
+								elif thd2[0] is not None or thdz == False:
+									THD = "NA"
+								#thd4 = app.SearchObjectByForeignKey(thd1[11] + ".ElmSubstat")
+								# TODO: THD recognised as undeclared which will be sovled by wrapping into function
+								res12.insert(2, THD)														# Insert THD
+								res12.insert(2, New_Contingency_List[count][0])							# Op scenario
+								res12.insert(2, List_of_Studycases1[count_studycase][0])					# Study case description
+								res12.pop(5)
+								HRM_Contingency_Results.append(res12)									# Results
+						else:
+							print2("Error with Harmonic Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
+					else:
+						hrm_scale =[]
+					count = count + 1
+				print1(2,"",0)
+				Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate the base case scenario this just ensures that when the script finishes using PF that it goes back to a regular case
+				count_studycase = count_studycase + 1
+				print1(2,"",0)
+				if Delete_Created_Folders:
+					delete_object(studycase_results_folder)
+					delete_object(op_sc_results_folder)
+					if Excel_Export_Z12:
+						# TODO: Error reported that studycase_mutual_folder could be undefined.  Wrapping in function / class will prevent this
+						delete_object(studycase_mutual_folder)
+					# Deactivate active variation
+					Variation.Deactivate()
+					delete_object(Variation)
 			else:
-				Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
-			count = 0
-			while count < len(New_Contingency_List):												# Loop Through Contingency list						
-				print1(2,"Carrying out Contingency: " + New_Contingency_List[count][0],0)
-				deactivate_scenario()																# Can't copy activated Scenario so deactivate it
-				object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
-				if object_exists == 0:
-					new_scenario = add_copy(op_sc_results_folder,Scenario,List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0]))	# Copies the base scenario
-				else:
-					new_scenario = new_object[0]
-				scen_error = activate_scenario1(new_scenario)										# Activates the base scenario
-				if New_Contingency_List[count][0] != "Base_Case":									# Apply Contingencies if it is not the base case
-					for switch in New_Contingency_List[count][1:]:																								
-						switch_coup(switch[0],switch[1])
-				save_active_scenario()
-				if FS_Sim == True:																	# Skips the Frequency Analysis
-					sweep = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_FS",9)		# Create Results File
-					trm_count = 0
-					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file													
-						add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
-						trm_count = trm_count + 1
-					if Excel_Export_Z12 == True:
-						for mut in List_of_Mutual:													# Adds the mutual impedance data to Results File
-							add_vars_res(sweep, mut[2], Mutual_Variables)
-					Fsweep_err_cde = freq_sweep(sweep,Fsweep_Settings)									# Carry out Frequency Sweep
-					if Fsweep_err_cde == 0:															# Skips the contingency if Frequency Sweep doesn't solve
-						fs_scale, fs_res = retrieve_results(sweep,0)
-						fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
-						fs_scale.insert(1,"Scale")
-						fs_scale.pop(3)
-						for tope in fs_res:															# Adds the additional information to the results file
-							tope.insert(1,New_Contingency_List[count][0])							# Op scenario
-							tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
-							FS_Contingency_Results.append(tope)										# Results
-					else:
-						print2("Error with Frequency Sweep Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
-				else:
-					fs_scale = []
-				if HRM_Sim == True:				
-					harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
-					trm_count = 0
-					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file													
-						add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
-						trm_count = trm_count + 1
-					Harm_err_cde = harm_load_flow(harm,Harmonic_Loadflow_Settings)
-					if Harm_err_cde == 0:
-						hrm_scale, hrm_res = retrieve_results(harm,1)
-						hrm_scale.insert(1,"THD")													# Inserts the THD
-						hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
-						hrm_scale.insert(1,"Scale")
-						hrm_scale.pop(4)															# Takes out the 50 Hz
-						hrm_scale.pop(4)		
-						for res12 in hrm_res:
-							thd1 = re.split(r'[\\.]',res12[1])
-							thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
-							thdz = False
-							if thd2[0] != None:
-								thd3 = thd2[0].GetContents()
-								for thd4 in thd3:
-									if (thd1[13] + ".ElmTerm") in str(thd4):
-										THD = thd4.GetAttribute('m:THD')
-										thdz = True
-							elif thd2[0] != None or thdz == False:
-								THD = "NA"
-							#thd4 = app.SearchObjectByForeignKey(thd1[11] + ".ElmSubstat")
-							res12.insert(2,THD)														# Insert THD
-							res12.insert(2,New_Contingency_List[count][0])							# Op scenario
-							res12.insert(2,List_of_Studycases1[count_studycase][0])					# Study case description
-							res12.pop(5)
-							HRM_Contingency_Results.append(res12)									# Results
-					else:
-						print2("Error with Harmonic Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
-				else:
-					hrm_scale =[]
-				count = count + 1
-			print1(2,"",0)
-			Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate the base case scenario this just ensures that when the script finishes using PF that it goes back to a regular case
-			count_studycase = count_studycase + 1
-			print1(2,"",0)
-			if Delete_Created_Folders == True:														# Deletes Folder Created by automation
-				delete_object(studycase_results_folder)
-				delete_object(op_sc_results_folder)
-				if Excel_Export_Z12 == True:
-					delete_object(studycase_mutual_folder)
-				Variation.Deactivate
-				delete_object(Variation)
-		else:
-			print2('Coult Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
-			# ERROR:  print2("Could Not Activate Project: " + Project_Name)
+				print2('Coult Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
+				# ERROR:  print2("Could Not Activate Project: " + Project_Name)
 
-	if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
-		print1(1,"\nProcessing Results and output to Excel",0)
-		start2 = time.clock()																# Used to calc the total excel export time
-		wb = create_workbook(Excel_Results)													# Creates Workbook
-		trm1_count = 0
-		while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
-			start3 = time.clock()															# Used for measuring time to create a sheet
-			FS_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
-			if FS_Sim == True:
-				start4 = time.clock()
-				FS_Terminal_Results.append(fs_scale)										# Adds the scale to terminal
-				for results34 in FS_Contingency_Results:									# Adds each contingency to the terminal results
-					if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
-						results34.pop(3)													# Takes out the terminal  PF object (big long string)
-						FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
-				#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
-				if Excel_Export_Z12 == True:
-					start5 = time.clock()
-					for results35 in FS_Contingency_Results:								# Adds each contingency to the terminal results			
-						for tgb in List_of_Mutual:
-							if Terminals_index[trm1_count][3] == tgb[3]:
-								if str(tgb[2]) == str(results35[3]):						# Checks it it the right terminal and adds it
-									results35.pop(3)										# Takes out the terminal  PF object (big long string)
-									results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
-									FS_Terminal_Results.append(results35)					# If it is the right terminal append
-					print1(1,"Process Results Z12 in Python: " + str(round((time.clock() - start5),2)) + " Seconds",0)		# Returns python results processing time
-			HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
-			if HRM_Sim == True:	
-				start6 = time.clock()
-				HRM_Terminal_Results.append(hrm_scale)										# Adds the scale to terminal
-				if Excel_Export_HRM == True:
-					for results35 in HRM_Contingency_Results:								# Adds each contingency to the terminal results
-						if str(Terminals_index[trm1_count][3]) == results35[1]:				# Checks it it the right terminal and adds it
-							results35.pop(1)												# Takes out the terminal  PF object (big long string)
-							HRM_Terminal_Results.append(results35)							# Append terminal data to the results list to be later passed to excel				
-				print1(1,"Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",0)		# Returns python results processing time
-			create_sheet_plot(Terminals_index[trm1_count][0],FS_Terminal_Results, HRM_Terminal_Results, wb)				# Uses the terminal results to create a sheet and graph
-			trm1_count = trm1_count + 1
-		# progress_txt = read_text_file(Progress_Log)
-		# Create_Textfile_Sheet("Progress_Log", progress_txt, wb)
-		close_workbook(wb,Excel_Results)																# Closes and saves the workbook
-		print1(2,"Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",0)	# Returns the Total Export time	
+		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
+			print1(1,"\nProcessing Results and output to Excel",0)
+			start2 = time.clock()																# Used to calc the total excel export time
+			wb = create_workbook(Excel_Results)													# Creates Workbook
+			trm1_count = 0
+			while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
+				start3 = time.clock()															# Used for measuring time to create a sheet
+				FS_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
+				if FS_Sim:
+					start4 = time.clock()
+					# TODO: Error reported that fs_sclae can be undefined.  Wrapping in class / function will prevent this
+					FS_Terminal_Results.append(fs_scale)										# Adds the scale to terminal
+					for results34 in FS_Contingency_Results:									# Adds each contingency to the terminal results
+						if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
+							results34.pop(3)													# Takes out the terminal  PF object (big long string)
+							FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
+					#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
+					if Excel_Export_Z12:
+						start5 = time.clock()
+						for results35 in FS_Contingency_Results:								# Adds each contingency to the terminal results
+							for tgb in List_of_Mutual:
+								if Terminals_index[trm1_count][3] == tgb[3]:
+									if str(tgb[2]) == str(results35[3]):						# Checks it it the right terminal and adds it
+										results35.pop(3)										# Takes out the terminal  PF object (big long string)
+										results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
+										FS_Terminal_Results.append(results35)					# If it is the right terminal append
+						print1(1,"Process Results Z12 in Python: " + str(round((time.clock() - start5),2)) + " Seconds",0)		# Returns python results processing time
+				HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
+				if HRM_Sim:
+					start6 = time.clock()
+					# TODO: Error reported that fs_sclae can be undefined.  Wrapping in class / function will prevent this
+					HRM_Terminal_Results.append(hrm_scale)										# Adds the scale to terminal
+					if Excel_Export_HRM:
+						for results35 in HRM_Contingency_Results:								# Adds each contingency to the terminal results
+							if str(Terminals_index[trm1_count][3]) == results35[1]:				# Checks it it the right terminal and adds it
+								results35.pop(1)												# Takes out the terminal  PF object (big long string)
+								HRM_Terminal_Results.append(results35)							# Append terminal data to the results list to be later passed to excel
+					print1(1,"Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",0)		# Returns python results processing time
+				create_sheet_plot(Terminals_index[trm1_count][0],FS_Terminal_Results, HRM_Terminal_Results, wb)				# Uses the terminal results to create a sheet and graph
+				trm1_count = trm1_count + 1
+			# progress_txt = read_text_file(Progress_Log)
+			# Create_Textfile_Sheet("Progress_Log", progress_txt, wb)
+			close_workbook(wb,Excel_Results)																# Closes and saves the workbook
+			print1(2,"Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",0)	# Returns the Total Export time
 
-print1(2, 'Total Time: {:.2f}'.format(time.clock() - start), 0)
+	print1(2, 'Total Time: {:.2f}'.format(time.clock() - start), 0)
 
 # End of Script
-# --------------------------------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------------------
+
+# Test cases
+
+class TestConvexHull(unittest.TestCase):
+	"""
+		UnitTest to confirm calculation of convex_hull
+	"""
+	def test_convex_hull(self):
+		""" Simple test of convex_hull calculation to check it is performing correctly """
+		point_list = [[1.1, 2.1, 3.1, 4.1, 5, 6, 4, 2, 1, 3, 2], [1, 2, 3, 4, 3, 2, 1, 2, 1, 3, 2, 5, 2, 1, 2]]
+		point_list = np.array(point_list)
+		point_list = np.random.rand(30, 2)
+		result = convex_hull1(pointlist=point_list)
+		print(result)
+
+
+
+# -------------------------------------------------------------------------------------------------------------------
 
 #case = app.GetActiveStudyCase()												# Get active study case
 #app.PrintPlain(str(Study_Case_Folder))

@@ -2,14 +2,21 @@
   <dictionary name="david">
     <words>
       <w>chkcmd</w>
+      <w>endrow</w>
       <w>filelocation</w>
       <w>hldf</w>
       <w>loadflow</w>
+      <w>newcol</w>
+      <w>noofgraphrows</w>
+      <w>noofgraphrowsrange</w>
       <w>outcmd</w>
       <w>outserv</w>
       <w>pfclass</w>
       <w>powerfactory</w>
       <w>rembar</w>
+      <w>scen</w>
+      <w>startcol</w>
+      <w>startrow</w>
       <w>workbookname</w>
     </words>
   </dictionary>
