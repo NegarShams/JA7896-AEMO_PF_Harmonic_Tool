@@ -8,3 +8,5 @@ class PowerFactory:
 	"""
 	pf_path = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP3'
 	version = '16.0.6'
+
+	

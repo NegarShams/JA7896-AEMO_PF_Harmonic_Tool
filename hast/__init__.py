@@ -9,9 +9,6 @@ import hast.constants
 import traceback
 import logging
 
-start_time = (time.strftime("%y_%m_%d_%H_%M_%S"))
-__version__ = '0.1'
-
 def setup_logging(pth_logfile=''):
 	"""
 		Function to setup the logging functionality
@@ -46,6 +43,13 @@ def setup_logging(pth_logfile=''):
 	logger = logging.getLogger()
 	return logger
 
+def finish_logging():
+	""" Function just to display a completion message but may be required in the future to handle alternative
+		methods to process closing log messages
+	"""
+	logger.info(' -- FINSIHED -- ')
+	logging.shutdown()
+
 def setup_powerfactory():
 	"""
 		Function deals with setting the correct directories required to run PowerFactory and if it is not possible
@@ -70,7 +74,9 @@ def setup_powerfactory():
 
 	return powerfactory
 
-
+start_time = (time.strftime("%y_%m_%d_%H_%M_%S"))
+__version__ = '0.1'
+logger = setup_logging()
 
 
 
