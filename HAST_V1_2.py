@@ -48,6 +48,7 @@ import ctypes                        	# For creating startup message box
 import win32com.client              	# Windows COM clients needed for excel etc. if having trouble see notes
 import math								#
 import numpy as np						# install anaconda it has numpy in it  https://www.continuum.io/downloadsim
+import scipy.spatial							# Added to allow error checking if ConvexHull is unsuccessful
 from scipy.spatial import ConvexHull    # install anaconda it has scipy in it  https://www.continuum.io/downloads
 import re								# Used for stripping text strings
 import unittest							# Used to include test functions for error checking of code
@@ -57,13 +58,10 @@ import unittest							# Used to include test functions for error checking of cod
 # import operator
 # import textwrap
 
-# Development into python pacakge
-import hast
+# GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
+DEBUG_MODE = False
 
 if __name__ == '__main__':
-	# Setup logging
-	logger = hast.setup_logging()
-
 	""" Ensures this code is only run when run as the main script and not for unittesting """
 	# TODO: If want to unittest PF will need to put this into a function
 	DIG_PATH = """C:\\Program Files\\DIgSILENT\\PowerFactory 2016 SP3\\"""
@@ -115,16 +113,20 @@ def print1(bf, name, af):   # Used to print a message to both python, PF and wri
 	# app.PrintError(str message)	# Prints message as an error
 	# app.PrintInfo(str message)		# Prints message as info
 	# app.PrintWarn(str message)		# Prints message as a warning
-	# DEBUG -  Enable printing of items to output window
-	app.EchoOn()
-	app.PrintPlain(name)	# Prints message as plain
-	# DEBUG -  Disable printing of items to output window
-	app.EchoOff()
-	progress = open(Progress_Log, "a")		# Progress File
-	progress.write(bf*"\n")
-	progress.write(name)
-	progress.write(af*"\n")
-	progress.close()
+
+	# Only prints to app and progress log when not running in DEBUG_MODE which is typically for
+	# unittests
+	if not DEBUG_MODE:
+		# DEBUG -  Enable printing of items to output window
+		app.EchoOn()
+		app.PrintPlain(name)	# Prints message as plain
+		# DEBUG -  Disable printing of items to output window
+		app.EchoOff()
+		progress = open(Progress_Log, "a")		# Progress File
+		progress.write(bf*"\n")
+		progress.write(name)
+		progress.write(af*"\n")
+		progress.close()
 	return None
 
 
@@ -141,22 +143,25 @@ def print2(name, bf=2, af=0):   # Used to print error message to both python, PF
 	global Error_Count
 	name = str(name)
 	print(name)
-	# DEBUG -  Enable printing of items to output window
-	app.EchoOn()
-	app.PrintError(name)	# Prints message as an error
-	# DEBUG -  Disable printing of items to output window
-	app.EchoOff()
-	progress = open(Progress_Log, "a")		# Progress File
-	progress.write(bf*"\n")
-	progress.write("Error No." + str(Error_Count) + " " + name)
-	progress.write(af*"\n")
-	progress.close()
-	error = open(Error_Log, "a")
-	error.write(bf*"\n")
-	error.write("Error No." + str(Error_Count) + " " + name)
-	error.write(af*"\n")
-	error.close()
-	Error_Count = Error_Count + 1
+	# Only prints to app and progress log when not running in DEBUG_MODE which is typically for
+	# unittests
+	if not DEBUG_MODE:
+		# DEBUG -  Enable printing of items to output window
+		app.EchoOn()
+		app.PrintError(name)	# Prints message as an error
+		# DEBUG -  Disable printing of items to output window
+		app.EchoOff()
+		progress = open(Progress_Log, "a")		# Progress File
+		progress.write(bf*"\n")
+		progress.write("Error No." + str(Error_Count) + " " + name)
+		progress.write(af*"\n")
+		progress.close()
+		error = open(Error_Log, "a")
+		error.write(bf*"\n")
+		error.write("Error No." + str(Error_Count) + " " + name)
+		error.write(af*"\n")
+		error.close()
+		Error_Count = Error_Count + 1
 	return None
 
 
@@ -174,15 +179,18 @@ def print3(bf, name, af):		# Used to print a message to both python, PF and writ
 	# app.PrintInfo(str message)			# Prints message as info
 	# app.PrintWarn(str message)			# Prints message as a warning
 	# DEBUG -  Enable printing of items to output window
-	app.EchoOn()
-	app.PrintPlain(name)				# Prints message as plain
-	# DEBUG -  Disable printing of items to output window
-	app.EchoOff()
-	random = open(Random_Log, "a")		# Progress File
-	random.write(bf*"\n")
-	random.write(name)
-	random.write(af*"\n")
-	random.close()
+	# Only prints to app and progress log when not running in DEBUG_MODE which is typically for
+	# unittests
+	if not DEBUG_MODE:
+		app.EchoOn()
+		app.PrintPlain(name)				# Prints message as plain
+		# DEBUG -  Disable printing of items to output window
+		app.EchoOff()
+		random = open(Random_Log, "a")		# Progress File
+		random.write(bf*"\n")
+		random.write(name)
+		random.write(af*"\n")
+		random.close()
 	return None
 
 
@@ -1235,6 +1243,34 @@ def create_workbook(workbookname):			# Create Workbook
 	return _wb
 
 
+def get_sheet_name(sheet_name, wkbk):
+	"""
+		Function checks whether the planned sheet name already exists and if it does then it returns a
+		different sheet name to use when naming the worksheet
+	:param str sheet_name: Planned name for worksheet
+	:param wkbk: Handle for workbook into which new worksheet will be added
+	:return str sheet_name: Worksheet name to use
+	"""
+	sheet_names = [wkbk.Sheets(i).Name for i in range(1, wkbk.Sheets.Count + 1)]
+	# If sheet_name is already in workbook then will need to return a new name
+	if sheet_name in sheet_names:
+		i = 2
+		new_name = '{}({})'.format(sheet_name, i)
+		# If first attempt at new_name is already in workbook then try increasing i until find one that
+		# isn't already there
+		while new_name in sheet_names:
+			i += 1
+			new_name = '{}({})'.format(sheet_name, i)
+		print2('Node name {} duplicated and so worksheet name {} has been used for {} instance'
+			   .format(sheet_name, new_name, i))
+
+		# Set sheet_name = new_name so that it can be returned
+		sheet_name = new_name
+
+	# Return either the new sheet_name or the original name that was used
+	return sheet_name
+
+
 def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract information from out file
 	"""
 		Extract infomation form powerfactory file and write to workbook
@@ -1245,9 +1281,13 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 	:return:
 	"""
 	t1 = time.clock()
+	# Check if sheet already exists with that name and if it does then find the next suitable name and report change
+	# to user
+	sheet_name = get_sheet_name(sheet_name=sheet_name, wkbk=_wb)
+
 	print1(1, 'Creating Sheet: {}'.format(sheet_name), 0)
 	#_xl used to avoid shadowing
-	# Is this required if handle for _wb is already provided
+	# TODO: Is this required if handle for _wb is already provided
 	_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call disptach excel application excel
 	c = win32com.client.constants                                       #
 	# Adds new worksheet
@@ -1397,7 +1437,7 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 				
 				if Excel_Convex_Hull:										# This is used to the convex hull of the points on the graph with a line
 					rx_array = np.array(rx_con)										# Converts the RX data to a numpy array
-					convex_rx = convex_hull1(rx_array)									# Get the min area points of the array needs to be in numpy array
+					convex_rx = convex_hull1(rx_array, node_name=sheet_name)									# Get the min area points of the array needs to be in numpy array
 					endcol1 = (startcol1+ len(convex_rx[0]) - 1)
 					ws.Range(ws.Cells(startrow1, startcol1),
 							 ws.Cells(startrow1, endcol1)).Value = convex_rx[0]				# Adds R data to Excel
@@ -1766,17 +1806,27 @@ def close_workbook(_wb, workbookname):		# Save and close Workbook
 	return None
 
 
-def convex_hull1(pointlist):			# Gets the convex hull of a numpy array (if you have a list of tuples us np.array(pointlist) to convert
+def convex_hull1(pointlist, node_name):			# Gets the convex hull of a numpy array (if you have a list of tuples us np.array(pointlist) to convert
 	"""
 		Gets the convex hull of a numpy array
 			If you have a list of tuples use np.array(pointlist) to convert
-	:param np.array pointlist: Numpy array to be converted 
+	:param np.array pointlist: Numpy array to be converted
+	:param str node_name: Name of node being investigated 
 	:return list convex_points: List of convex points returned 
 	"""
 	r, x = [], []
 	# TODO:  Need to see what is being provided as input and whether a try / except statement would be useful for error
 	# TODO: solving
-	cv = ConvexHull(pointlist)
+	# Potential failure here if doesn't return useful data but want script to continue with rest of results
+	try:
+		cv = ConvexHull(pointlist)
+	except scipy.spatial.qhull.QhullError:
+		print2('Error occurred calculating ConvexHull for {} from the following data {}'.format(node_name, pointlist))
+		# Values set to 0, 0 so that something can be plotted
+		err_convex_points = [[0], [0]]
+		# ## -- ## EARLY RETURN ## -- ##
+		return err_convex_points
+
 	for i in cv.vertices:
 		#For each vertices extracts the R and X values
 		r.append(float(pointlist[i, 0]))								# Converts the numpy floats back to regular float and attach
@@ -1934,15 +1984,8 @@ if __name__ == '__main__':
 		print2('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: {} {}'
 			   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
-	# This loops through all the study cases and operational scenarios listed and checks them skips any ones
-	# which don't solve
-	List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)
 
-	# TODO: Implement parallel processing at this point
-
-	# TODO: 1. Check if parallel processing enabled
-	# TODO: 2. Assign relevant functions to parallel processing
-	# TODO: 3. Start parallel processing
+	List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
 
 	if FS_Sim or HRM_Sim:
 		FS_Contingency_Results, HRM_Contingency_Results = [], []
@@ -2122,13 +2165,29 @@ class TestConvexHull(unittest.TestCase):
 	"""
 	def test_convex_hull(self):
 		""" Simple test of convex_hull calculation to check it is performing correctly """
-		point_list = [[1.1, 2.1, 3.1, 4.1, 5, 6, 4, 2, 1, 3, 2], [1, 2, 3, 4, 3, 2, 1, 2, 1, 3, 2, 5, 2, 1, 2]]
-		# point_list = np.array(point_list)
-		# point_list = np.random.rand(30, 2)
-		result = convex_hull1(pointlist=point_list)
-		print(result)
+		x = [0,1,2,3,4,5,6,7,8,9]
+		y = [1,2,2,5,5,6,3,2,1,2]
+		point_list = np.array(list(map(list, zip(*[x,y]))))
+		result = convex_hull1(pointlist=point_list, node_name='Test')
+		self.assertEqual(result[0][0], 9.0)
 
-
+class TestExcelFunctions(unittest.TestCase):
+	"""
+		UnitTest to test the operation of various excel workbook functions
+	"""
+	def test_sheet_name(self):
+		"""
+			Tests checking whether a worksheet name already exists
+		"""
+		global DEBUG_MODE
+		DEBUG_MODE = True
+		excel = win32com.client.gencache.EnsureDispatch('Excel.Application')
+		wkbk = excel.Workbooks.Add()
+		sht_name = 'Sheet1'
+		# Confirm that the returned value does not equal the provided value
+		self.assertFalse(sht_name==get_sheet_name(sht_name, wkbk))
+		wkbk.Close()
+		excel.Quit()
 
 # -------------------------------------------------------------------------------------------------------------------
 
