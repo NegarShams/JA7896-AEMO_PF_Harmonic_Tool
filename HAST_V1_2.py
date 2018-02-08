@@ -42,7 +42,7 @@ to determine that the code in principal works correctly.
 import os
 import sys
 
-# import powerfactory 					# Power factory module see notes above
+import powerfactory 					# Power factory module see notes above
 import time                          	# Time
 import ctypes                        	# For creating startup message box
 import win32com.client              	# Windows COM clients needed for excel etc. if having trouble see notes
@@ -79,7 +79,10 @@ if __name__ == '__main__':
 	start1 = (time.strftime("%y_%m_%d_%H_%M_%S"))
 
 	# Excel commands
-	xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
+	# Don't need to call excel handle at this point
+	# Get handle for excel application
+	xl = win32com.client.DispatchEx('Excel.Application')
+	#xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
 
 	# Power factory commands
 	# --------------------------------------------------------------------------------------------------------------------
@@ -212,16 +215,17 @@ def startup_message(
 	return None
 
 
-def import_excel_harmonic_inputs(workbookname):		# Import Excel Harmonic Input Settings
+def import_excel_harmonic_inputs(workbookname, _xl):		# Import Excel Harmonic Input Settings
 	"""
 		Import Excel Harmonic Input Settings
-	:param str workbookname: Name of workbook to be imported 
+	:param str workbookname: Name of workbook to be imported
+	:param Excel _xl: Handle for access to _xl application 
 	:return analysis_dict: Dictionary of the settings for the analysis work    
 	"""
 	# TODO: Could re-write entire function as class to handle processing
 	# TODO: Better to rewrite <analysis_dict> as a class
 	# xl, wb renamed to _xl, _wb to avoid shadowing from parent function
-	_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
+	# _xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
 	_wb = _xl.Workbooks.Open(workbookname)                                # Open workbook
 	c = win32com.client.constants                                       #
 	_xl.Visible = False                                                  # Make excel Visible
@@ -1221,17 +1225,18 @@ def read_text_file(file_pth):		# Reads in Textfile
 	return content
 
 
-def create_workbook(workbookname):			# Create Workbook
+def create_workbook(workbookname, _xl):			# Create Workbook
 	"""
 		Function creates the workbook for results to be written into
-	:param str workbookname: Name to be given to workbook 
+	:param str workbookname: Name to be given to workbook
+	:param Excel _xl: Handle for excel application 
 	:return (Workbook, Excel) (_wb, _xl): Handle for excel workbook 
 	"""
 	# TODO: Should be re-written as a class
 	print1(2, 'Creating Workbook: {}'.format(workbookname), 0)
 	# _xl used instead of xl to avoid shadowing
 	# changed to ensure excel is running as a new instance
-	_xl = win32com.client.DispatchEx('Excel.Application')
+	# NOT Needed since now passed as input
 	# _xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
 	# NOT USED - _ = win32com.client.constants                                       # used for retrieving constants from excel
 	# _wb used instead of wb to avoid shadowing
@@ -1936,7 +1941,7 @@ if __name__ == '__main__':
 	# Import Excel
 	Import_Workbook = filelocation + "HAST_V1_2_Inputs.xlsx"					# Gets the CWD current working directory
 	Variation_Name = "Temporary_Variation" + start1
-	analysis_dict = import_excel_harmonic_inputs(Import_Workbook) 			# Reads in the Settings from the spreadsheet
+	analysis_dict = import_excel_harmonic_inputs(Import_Workbook, _xl=xl) 			# Reads in the Settings from the spreadsheet
 	Study_Settings = analysis_dict["Study_Settings"]
 	if len(Study_Settings) != 20:
 		print2('Error, Check input Study Settings there should be 20 Items in the list there are only: {} {}'
@@ -2117,7 +2122,7 @@ if __name__ == '__main__':
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1(1,"\nProcessing Results and output to Excel",0)
 			start2 = time.clock()																# Used to calc the total excel export time
-			wb, xl = create_workbook(Excel_Results)												# Creates Workbook
+			wb, xl = create_workbook(Excel_Results, _xl=xl)												# Creates Workbook
 			trm1_count = 0
 			while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
 				start3 = time.clock()															# Used for measuring time to create a sheet
