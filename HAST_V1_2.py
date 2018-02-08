@@ -42,6 +42,7 @@ to determine that the code in principal works correctly.
 import os
 import sys
 
+
 import powerfactory 					# Power factory module see notes above
 import time                          	# Time
 import ctypes                        	# For creating startup message box
