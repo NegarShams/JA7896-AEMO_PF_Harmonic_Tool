@@ -2019,6 +2019,7 @@ if __name__ == '__main__':
 
 		List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
 
+		# Excel export contained within this loop
 		if FS_Sim or HRM_Sim:
 			FS_Contingency_Results, HRM_Contingency_Results = [], []
 			count_studycase = 0
