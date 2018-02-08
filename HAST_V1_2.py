@@ -42,7 +42,7 @@ to determine that the code in principal works correctly.
 import os
 import sys
 
-import powerfactory 					# Power factory module see notes above
+# import powerfactory 					# Power factory module see notes above
 import time                          	# Time
 import ctypes                        	# For creating startup message box
 import win32com.client              	# Windows COM clients needed for excel etc. if having trouble see notes
@@ -1225,13 +1225,15 @@ def create_workbook(workbookname):			# Create Workbook
 	"""
 		Function creates the workbook for results to be written into
 	:param str workbookname: Name to be given to workbook 
-	:return Workbook _wb: Handle for excel workbook 
+	:return (Workbook, Excel) (_wb, _xl): Handle for excel workbook 
 	"""
 	# TODO: Should be re-written as a class
 	print1(2, 'Creating Workbook: {}'.format(workbookname), 0)
 	# _xl used instead of xl to avoid shadowing
-	_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
-	_ = win32com.client.constants                                       # used for retrieving constants from excel
+	# changed to ensure excel is running as a new instance
+	_xl = win32com.client.DispatchEx('Excel.Application')
+	# _xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call dispatch excel application excel
+	# NOT USED - _ = win32com.client.constants                                       # used for retrieving constants from excel
 	# _wb used instead of wb to avoid shadowing
 	_wb = _xl.Workbooks.Add()                                             # Add workbook
 	# Sets excel either visible or invisible depending on constant
@@ -1240,7 +1242,8 @@ def create_workbook(workbookname):			# Create Workbook
 	#wb.Sheets(1).Delete()                                              # Delete Sheet 1 ie "Sheet 1"
 	#ws = wb.Worksheets.Add()                                           # Add worksheet
 	_wb.SaveAs(workbookname)                                             # Save Workbook
-	return _wb
+	# Returns handle for workbook and handle for excel application
+	return _wb, _xl
 
 
 def get_sheet_name(sheet_name, wkbk):
@@ -1271,13 +1274,14 @@ def get_sheet_name(sheet_name, wkbk):
 	return sheet_name
 
 
-def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract information from out file
+def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb, _xl):      # Extract information from out file
 	"""
-		Extract infomation form powerfactory file and write to workbook
+		Extract information form powerfactory file and write to workbook
 	:param str sheet_name: Name of worksheet
 	:param fs_results: Results form frequency scan
 	:param hrm_results: Results from harmonic load flow
-	:param _wb: workbook to write data to (_wb used to avoid shadowing)
+	:param Excel.Workbook _wb: workbook to write data to (_wb used to avoid shadowing)
+	:param Excel _xl: handle for excel application
 	:return:
 	"""
 	t1 = time.clock()
@@ -1288,7 +1292,8 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 	print1(1, 'Creating Sheet: {}'.format(sheet_name), 0)
 	#_xl used to avoid shadowing
 	# TODO: Is this required if handle for _wb is already provided
-	_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call disptach excel application excel
+	# Shouldn't need to do this since handle has already been created
+	#  _xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call disptach excel application excel
 	c = win32com.client.constants                                       #
 	# Adds new worksheet
 	ws = _wb.Worksheets.Add()                                            # Add worksheet
@@ -1774,32 +1779,34 @@ def create_sheet_plot(sheet_name, fs_results, hrm_results, _wb):      # Extract 
 	return None
 
 
-# TODO: Function not used
-def create_textfile_sheet(sheet_name, text_to_use, _wb):      # Extract information from out file
-	t1 = time.clock()
-	_ = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call disptach excel application excel
-	_ = win32com.client.constants                                       #
-	ws = _wb.Worksheets.Add()                                            # Add worksheet
-	_count  = 2
-	for line in text_to_use:
-		ws.Cells(_count,1).Value = line
-		_count += 1
-	ws.Name = sheet_name                                                                                # Rename worksheet
-	_wb.Save()
-	t2 = time.clock() - t1
-	print1(2, 'Creating Sheet: {} took {:.2f}'.format(sheet_name, t2), 0)
-	return None
+# Function not used
+# def create_textfile_sheet(sheet_name, text_to_use, _wb):      # Extract information from out file
+# 	t1 = time.clock()
+# 	_ = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call disptach excel application excel
+# 	_ = win32com.client.constants                                       #
+#	ws = _wb.Worksheets.Add()                                            # Add worksheet
+#	_count  = 2
+#	for line in text_to_use:
+#		ws.Cells(_count,1).Value = line
+#		_count += 1
+#	ws.Name = sheet_name                                                                                # Rename worksheet
+#	_wb.Save()
+#	t2 = time.clock() - t1
+#	print1(2, 'Creating Sheet: {} took {:.2f}'.format(sheet_name, t2), 0)
+#	return None
 
 
-def close_workbook(_wb, workbookname):		# Save and close Workbook
+def close_workbook(_wb, workbookname, _xl):		# Save and close Workbook
 	"""
 		Save and close the workbook
 	:param Excel.Workbook _wb: Handle for workbook to be closed / saved 
-	:param str workbookname: Full path to workbook for it to be saved as 
+	:param str workbookname: Full path to workbook for it to be saved as
+	:param Excel _xl: Handle for excel application so can be closed 
 	:return: 
 	"""
 	print1(1, 'Closing and Saving Workbook: {}'.format(workbookname), 0)
-	_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call disptach excel application excel
+	# Shouldn't be needed since _wb is already handle to win32com workbook
+	#_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')   # Call disptach excel application excel
 	_wb.SaveAs(workbookname)                                             # Save Workbook"""
 	_wb.Close()                                                          # Close Workbook
 	_xl.Application.Quit()                                               # Quit Excel
@@ -2110,7 +2117,7 @@ if __name__ == '__main__':
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1(1,"\nProcessing Results and output to Excel",0)
 			start2 = time.clock()																# Used to calc the total excel export time
-			wb = create_workbook(Excel_Results)													# Creates Workbook
+			wb, xl = create_workbook(Excel_Results)												# Creates Workbook
 			trm1_count = 0
 			while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
 				start3 = time.clock()															# Used for measuring time to create a sheet
@@ -2145,11 +2152,11 @@ if __name__ == '__main__':
 								results35.pop(1)												# Takes out the terminal  PF object (big long string)
 								HRM_Terminal_Results.append(results35)							# Append terminal data to the results list to be later passed to excel
 					print1(1,"Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",0)		# Returns python results processing time
-				create_sheet_plot(Terminals_index[trm1_count][0],FS_Terminal_Results, HRM_Terminal_Results, wb)				# Uses the terminal results to create a sheet and graph
+				create_sheet_plot(Terminals_index[trm1_count][0],FS_Terminal_Results, HRM_Terminal_Results, _wb=wb, _xl=xl)				# Uses the terminal results to create a sheet and graph
 				trm1_count = trm1_count + 1
 			# progress_txt = read_text_file(Progress_Log)
 			# Create_Textfile_Sheet("Progress_Log", progress_txt, wb)
-			close_workbook(wb,Excel_Results)																# Closes and saves the workbook
+			close_workbook(_wb=wb, workbookname=Excel_Results, _xl=xl)																# Closes and saves the workbook
 			print1(2,"Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",0)	# Returns the Total Export time
 
 	print1(2, 'Total Time: {:.2f}'.format(time.clock() - start), 0)
@@ -2181,7 +2188,8 @@ class TestExcelFunctions(unittest.TestCase):
 		"""
 		global DEBUG_MODE
 		DEBUG_MODE = True
-		excel = win32com.client.gencache.EnsureDispatch('Excel.Application')
+		excel = win32com.client.DispatchEx('Excel.Application')
+		# excel = win32com.client.gencache.EnsureDispatch('Excel.Application')
 		wkbk = excel.Workbooks.Add()
 		sht_name = 'Sheet1'
 		# Confirm that the returned value does not equal the provided value
