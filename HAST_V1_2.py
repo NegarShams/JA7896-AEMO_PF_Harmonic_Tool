@@ -53,6 +53,8 @@ import scipy.spatial							# Added to allow error checking if ConvexHull is unsu
 from scipy.spatial import ConvexHull    # install anaconda it has scipy in it  https://www.continuum.io/downloads
 import re								# Used for stripping text strings
 import unittest							# Used to include test functions for error checking of code
+
+import hast								# HAST module package used as functions start to be transferred for efficiency
 # import shutil
 # import inspect                      # Inspect functions
 # import string                       # Processing text
@@ -102,6 +104,7 @@ if __name__ == '__main__':
 		res = app.GetFromStudyCase("ComRes")							# Get Result Export Command
 		wr = app.GetFromStudyCase("ComWr")								# Get Write command for wmf and bmp files
 		app.ClearOutputWindow()											# Clear Output Window
+
 	# All exceptions captured and then raised, the purpose of the exception capture is purely to ensure excel quits
 	except:
 		# Close excel and then raise whatever the exception was so that user is alerted
@@ -126,27 +129,48 @@ def print1(bf, name, af):   # Used to print a message to both python, PF and wri
 	:param str name: Message to display
 	:param int af: Number of blank lines after statement in Progress file
 	:return: None
-	TODO: Convert this to a logging handler
 	"""
-	name = str(name)
-	print(name)
+
+	# Updated to now use logging to control printout
+	logger.info(name)
+
+	# name = str(name)
+	# print(name)
 	# app.PrintError(str message)	# Prints message as an error
 	# app.PrintInfo(str message)		# Prints message as info
 	# app.PrintWarn(str message)		# Prints message as a warning
 
 	# Only prints to app and progress log when not running in DEBUG_MODE which is typically for
 	# unittests
-	if not DEBUG_MODE:
-		# DEBUG -  Enable printing of items to output window
-		app.EchoOn()
-		app.PrintPlain(name)	# Prints message as plain
-		# DEBUG -  Disable printing of items to output window
-		app.EchoOff()
-		progress = open(Progress_Log, "a")		# Progress File
-		progress.write(bf*"\n")
-		progress.write(name)
-		progress.write(af*"\n")
-		progress.close()
+	# if not DEBUG_MODE:
+	#	# DEBUG -  Enable printing of items to output window
+	#	# app.EchoOn()
+	#	app.PrintPlain(name)	# Prints message as plain
+	#	# DEBUG -  Disable printing of items to output window
+	#	app.PrintPlain('File writing started')
+	#	# Updated to ensure file is closed if there is an issue writing
+	#	msg = '{}{}{}'.format(bf*'\n', name, af*'\n')
+	#	try:
+	#		with open(Progress_Log, 'a') as f:
+	#			f.write(msg)
+	#	except PermissionError:
+	#		#Permission error might be because file closure hasn't finished, just wait a moment and try again
+	#		app.PrintError('Waiting for log file access')
+	#		time.sleep(1.0)
+	#		try:
+	#			with open(Progress_Log, 'a') as f:
+	#				f.write(msg)
+	#		except:
+	#			pass
+			
+			
+	#	app.PrintPlain('File writing finished')
+	#	# app.EchoOff()
+	#	# progress = open(Progress_Log, "a")		# Progress File
+	#	# progress.write(bf*"\n")
+	#	# progress.write(name)
+	#	# progress.write(af*"\n")
+	#	# progress.close()
 	return None
 
 
@@ -157,60 +181,42 @@ def print2(name, bf=2, af=0):   # Used to print error message to both python, PF
 	:param int bf: (optional) = Number of empty lines before error message
 	:param int af: (optional) = Number of empty lines after error message
 	:return: None
-	TODO: Include logging handler for error message
 	"""
-	# global used to keep track on number of errors that have occured
-	global Error_Count
-	name = str(name)
-	print(name)
-	# Only prints to app and progress log when not running in DEBUG_MODE which is typically for
-	# unittests
-	if not DEBUG_MODE:
-		# DEBUG -  Enable printing of items to output window
-		app.EchoOn()
-		app.PrintError(name)	# Prints message as an error
-		# DEBUG -  Disable printing of items to output window
-		app.EchoOff()
-		progress = open(Progress_Log, "a")		# Progress File
-		progress.write(bf*"\n")
-		progress.write("Error No." + str(Error_Count) + " " + name)
-		progress.write(af*"\n")
-		progress.close()
-		error = open(Error_Log, "a")
-		error.write(bf*"\n")
-		error.write("Error No." + str(Error_Count) + " " + name)
-		error.write(af*"\n")
-		error.close()
-		Error_Count = Error_Count + 1
-	return None
-
-
-def print3(bf, name, af):		# Used to print a message to both python, PF and write it to the file with double space
-	"""
-		Used to print a message to both python, PF and write it to the file with double space
-	:param int bf: Number of empty lines before message  
-	:param str name: Message to display 
-	:param int af: Number of empty lines after message
-	:return: None
-	"""
-	name = str(name)
-	print(name)
-	# app.PrintError(str message)		# Prints message as an error
-	# app.PrintInfo(str message)			# Prints message as info
-	# app.PrintWarn(str message)			# Prints message as a warning
-	# DEBUG -  Enable printing of items to output window
-	# Only prints to app and progress log when not running in DEBUG_MODE which is typically for
-	# unittests
-	if not DEBUG_MODE:
-		app.EchoOn()
-		app.PrintPlain(name)				# Prints message as plain
-		# DEBUG -  Disable printing of items to output window
-		app.EchoOff()
-		random = open(Random_Log, "a")		# Progress File
-		random.write(bf*"\n")
-		random.write(name)
-		random.write(af*"\n")
-		random.close()
+	# Updated to use logging handler for error messages
+	logger.error(name)
+	# # global used to keep track on number of errors that have occured
+	# global Error_Count
+	# name = str(name)
+	# print(name)
+	# # Only prints to app and progress log when not running in DEBUG_MODE which is typically for
+	# # unittests
+	# if not DEBUG_MODE:
+	# 	# DEBUG -  Enable printing of items to output window
+	# 	# app.EchoOn()
+	# 	app.PrintError(name)	# Prints message as an error
+	# 	# DEBUG -  Disable printing of items to output window
+	# 	# app.EchoOff()
+	# 	# Adjusted so that continues to work even if file fails to close
+	# 	msg = '{}Error No.{} {}{}'.format(bf*'\n', Error_Count, name, af*'\n')
+	# 	try:
+	# 		with open(Progress_Log, 'a') as f:
+	# 			f.write(msg)
+	#
+	#		#progress = open(Progress_Log, "a")		# Progress File
+	#		#progress.write(bf*"\n")
+	#		#progress.write("Error No." + str(Error_Count) + " " + name)
+	#		#progress.write(af*"\n")
+	#		#progress.close()
+	#		with open(Error_Log ,'a') as f:
+	#			f.write(msg)
+	#	except:
+	#		pass
+	#	#error = open(Error_Log, "a")
+	#	#error.write(bf*"\n")
+	#	#error.write("Error No." + str(Error_Count) + " " + name)
+	#	#error.write(af*"\n")
+	#	#error.close()
+	#	Error_Count = Error_Count + 1
 	return None
 
 
@@ -438,11 +444,12 @@ def activate_scenario(scenario): 		# Activate Scenario
 	scenario_folder1 = app.GetProjectFolder("scen")							# Returns string the location of the project folder for study cases, scen,
 	scenario1 = scenario_folder1.GetContents(scenario)
 	deactivate_scenario()
+	#print2('Scenarios :{}'.format(scenario1))
 	sce = scenario1[0].Activate() 											# Activate Study case
 	if sce == 0:
 		print1(1, 'Activated Scenario Successfully: {}'.format(scenario1[0]), 0)
 	elif sce > 0:
-		print2('Error Unsuccessfully Activated Scenario: {}.........................'.format(scenario))
+		print2('Error Unsuccessfully Activated Scenario: {}.........................'.format(scenario1[0]))
 		print2('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
 	return scenario1[0], sce
 
@@ -680,8 +687,10 @@ def load_flow(load_flow_settings):		# Inputs load flow settings and executes loa
 	# Advanced Simulation Options
 	ldf.iopt_prot = load_flow_settings[53]        		# Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
 	ldf.ign_comp = load_flow_settings[54]             	# Ignore Composite Elements
-	
+
+	print2('DEBUG - Load flow started')
 	error_code = ldf.Execute()
+	print2('DEBUG - Load flow completed')
 	t2 = time.clock() - t1
 	if error_code == 0:
 		print1(1, 'Load Flow calculation successful, time taken: {:.2f} seconds'.format(t2), 0)
@@ -1008,7 +1017,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 			if _study_error == 0:
 				scenario, scen_err = activate_scenario(list_to_check[_count_studycase][3])										# Activate Scenario
 				if scen_err == 0:
+					print2('Load flow being run for study case {}'.format(list_to_check[_count_studycase]))
 					ldf_err = load_flow(Load_Flow_Setting)																			# Perform Load Flow
+					print2('DEBUG - Load flow study completed with error code {}'.format(ldf_err))					
 					if ldf_err == 0 or Skip_Unsolved_Ldf == False:
 						new_list.append(list_to_check[_count_studycase])
 						print1(2, "Studycase Scenario Solving added to analysis list: " + str(list_to_check[_count_studycase]), 0)
@@ -1882,7 +1893,7 @@ if __name__ == '__main__':
 	try:
 		Error_Count = 1
 		# DEBUG -  Disable printing of items to output window
-		app.EchoOff()
+		# app.EchoOff()
 
 		# User Input (All info is checked to see if it exists in the case file
 		# -------------------------------------------------------------------------------------------------------------------------------
@@ -1970,10 +1981,20 @@ if __name__ == '__main__':
 			Results_Export_Folder = filelocation
 		else:
 			Results_Export_Folder = Study_Settings[0]								# Folder to Export Excel Results too
+
+		# Declare file names
 		Excel_Results = Results_Export_Folder + Study_Settings[1] + start1			# Name of Exported Results File
 		Progress_Log = Results_Export_Folder + Study_Settings[2] + start1 + ".txt"	# Progress File
 		Error_Log = Results_Export_Folder + Study_Settings[3] + start1 + ".txt"		# Error File
-		Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
+		Debug_Log = Results_Export_Folder + 'DEBUG' + start1 + '.txt'
+
+		# Setup logger with reference to powerfactory app
+		logger = hast.logger.Logger(pth_debug_log=Debug_Log,
+									pth_progress_log=Progress_Log,
+									pth_error_log=Error_Log,
+									app=app)
+
+		# Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
 		Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
 		Mut_Elm_Fld = Study_Settings[5] + start1									# Name of the folder to create under the network elements to store mutual impedances
 		Results_Folder = Study_Settings[6] + start1									# Name of the folder to keep results under studycase
@@ -2017,8 +2038,11 @@ if __name__ == '__main__':
 				   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
 
-		List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
 
+		print2('DEBUG Check - Looping through all study cases')
+		List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
+		print2('DEBUG Check - Finished looping through study cases')
+		
 		# Excel export contained within this loop
 		if FS_Sim or HRM_Sim:
 			FS_Contingency_Results, HRM_Contingency_Results = [], []
