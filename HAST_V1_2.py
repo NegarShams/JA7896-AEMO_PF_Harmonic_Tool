@@ -721,16 +721,30 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 							terminals_index, term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
+							# Adjusted to create new study_case for each op_scenario
+
+							study_case_folder = app.GetProjectFolder('study')
+							study_case_results_folder, _folder_exists2 = create_folder(study_case_folder,
+																					   Operation_Scenario_Folder)
+
 							operation_case_folder = app.GetProjectFolder("scen")
 							_op_sc_results_folder, _folder_exists2 = create_folder(operation_case_folder,
 																				   Operation_Scenario_Folder)
+
 							cont_count = 0
 							while cont_count < len(new_contingency_list):
 								print1('Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
 									   bf=2, af=0)
 								deactivate_scenario()																# Can't copy activated Scenario so deactivate it
+								# Can't copy activated stidu case so deactivate it
+								deactivate_study_case()
+								_new_study_case = add_copy(study_case_results_folder,
+														   study_case,
+														   List_of_Studycases[_count_studycase][0] + str(
+															   "_" + new_contingency_list[cont_count][0]))
 								_new_scenario = add_copy(_op_sc_results_folder, scenario,
 														 List_of_Studycases[_count_studycase][0] + str("_" + new_contingency_list[cont_count][0]))	# Copies the base scenario
+								_ = activate_study_case(_new_study_case)
 								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
 									# Take outages described for contingency
