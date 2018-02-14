@@ -128,7 +128,7 @@ if __name__ == '__main__':
 
 # Functions -----------------------------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
-def print1(bf, name, af):   # Used to print a message to both python, PF and write it to file with double space
+def print1(name, bf=0, af=0):   # Used to print a message to both python, PF and write it to file with double space
 	"""
 		Used to print a message to both python, PF and write it to file with double space
 	:param int bf: Number of blank lines before statement in Progress file
@@ -373,7 +373,7 @@ def activate_project(project): 		# Activate project
 	pro = app.ActivateProject(project) 										# Activate project
 	if pro == 0:															# Project Activate Successfully
 		# Print Information to progress log and PowerFactory window
-		print1(1, 'Activated Project Successfully: {}'.format(project), 0)
+		print1('Activated Project Successfully: {}'.format(project), bf=1, af=0)
 		# prj renamed _prj to avoid shadowing name from parent project
 		_prj = app.GetActiveProject()										# Get active project
 	else:																	# Project Failed to Activate
@@ -396,7 +396,7 @@ def activate_study_case(study_case): 		# Activate Study case
 	if len(study_case1) > 0:
 		cas = study_case1[0].Activate() 														# Activate Study case
 		if cas == 0:
-			print1(1, 'Activated Study Case Successfully: {}'.format(study_case1[0]), 0)
+			print1('Activated Study Case Successfully: {}'.format(study_case1[0]), bf=1, af=0)
 		else:
 			print2('Error Unsuccessfully Activated Study Case: {}.............................'.format(study_case))
 	else:
@@ -425,7 +425,7 @@ def deactivate_study_case(): 		# Deactivate Scenario
 			print2('Error Unsuccessfully Deactivated Study Case: {}..............................'.format(study))
 			print2('Unsuccessfully Deactivated Scenario Error Code: {}'.format(sce))
 	else:
-		print1(2, "No Study Case Active to Deactivate ................................", 0)
+		print1("No Study Case Active to Deactivate ................................", bf=2, af=0)
 	return None
 
 
@@ -441,7 +441,7 @@ def activate_scenario(scenario): 		# Activate Scenario
 	#print2('Scenarios :{}'.format(scenario1))
 	sce = scenario1[0].Activate() 											# Activate Study case
 	if sce == 0:
-		print1(1, 'Activated Scenario Successfully: {}'.format(scenario1[0]), 0)
+		print1('Activated Scenario Successfully: {}'.format(scenario1[0]), bf=1, af=0)
 	elif sce > 0:
 		print2('Error Unsuccessfully Activated Scenario: {}.........................'.format(scenario1[0]))
 		print2('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
@@ -456,7 +456,7 @@ def activate_scenario1(scenario): 		# Activate Scenario
 	"""
 	sce = scenario.Activate() 											# Activate Study case
 	if sce == 0:
-		print1(1, 'Activated Scenario Successfully: {}'.format(scenario), 0)
+		print1('Activated Scenario Successfully: {}'.format(scenario), bf=1, af=0)
 	elif sce == 1:
 		print2('Error Unsuccessfully Activated Scenario: {}...............................'.format(scenario))
 		print2('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
@@ -480,7 +480,7 @@ def deactivate_scenario(): 		# Deactivate Scenario
 			print2('Error Unsuccessfully Deactivated Scenario: {}..............................'.format(scenario1))
 			print2('Unsuccessfully Deactivated Scenario Error Code: {}'.format(sce))
 	else:
-		print1(2, 'No Scenario Active to Deactivate ................................', 0)
+		print1('No Scenario Active to Deactivate ................................', bf=1, af=0)
 	return None
 
 
@@ -492,12 +492,12 @@ def save_active_scenario(): 		# Save active scenario
 	scenario1 = app.GetActiveScenario()
 	sce = scenario1.Save()
 	if sce==0:
-		print1(1, 'Saved active scenario successfully: {}'.format(scenario1), 0)
+		print1('Saved active scenario successfully: {}'.format(scenario1), bf=1, af=0)
 	elif sce == 1 and scenario1 is None:
 		print2('Error unsuccessfully saved scenario: {}'.format(scenario1))
 		print2('Unsuccessfully saved scenario error code: {}'.format(sce))
 	else:
-		print1(2, 'No Scenario Active to Save.........................................', 0)
+		print1('No Scenario Active to Save.........................................', bf=2, af=0)
 	return None
 
 
@@ -507,18 +507,18 @@ def get_active_variations():			# Get Active Network Variations
 	:return list variations: Returns list of variations currently active
 	"""
 	variations =  app.GetActiveNetworkVariations()
-	print1(2, 'Current Active Variations: ', 0)
+	print1('Current Active Variations: ', bf=2, af=0)
 	if len(variations) > 1:
 		for item in variations:
 			aa = str(item)
 			pp = aa.split("Variations.IntPrjfolder\\")
 			ss = pp[1]
 			tt = ss.split(".IntScheme")
-			print1(1, tt[0], 0)
+			print1(tt[0], bf=1, af=0)
 	elif len(variations) == 1:
-		print1(1, variations, 0)
+		print1(variations, bf=1, af=0)
 	else:
-		print1(1, 'No Variations Active', 0)
+		print1('No Variations Active', bf=1, af=0)
 	return variations
 
 
@@ -549,7 +549,7 @@ def activate_variation(variation): 		# Activate Scenario
 	"""
 	sce = variation.Activate() 											# Activate Study case
 	if sce == 0:
-		print1(1, 'Activated Variation Successfully: {}'.format(variation), 0)
+		print1('Activated Variation Successfully: {}'.format(variation), bf=1, af=0)
 	elif sce == 1:
 		print2('Error Unsuccessfully Activated Variation: {}........................'.format(variation))
 		print2('Unsuccessfully Activated Variation Error Code: {}'.format(sce))
@@ -590,7 +590,7 @@ def activate_stage(stage):
 	"""
 	sce = stage.Activate()
 	if sce == 0:
-		print1(1, 'Activated Variation Stage Successfully: {}'.format(stage), 0)
+		print1('Activated Variation Stage Successfully: {}'.format(stage), bf=1, af=0)
 	elif sce != 0:
 		print2('Error Unsuccessfully Activated Variation Stage: {}........................'.format(stage))
 		print2('Unsuccessfully Activated Variation Stage Error Code: {}'.format(sce))
@@ -687,7 +687,7 @@ def load_flow(load_flow_settings):		# Inputs load flow settings and executes loa
 	print2('DEBUG - Load flow completed')
 	t2 = time.clock() - t1
 	if error_code == 0:
-		print1(1, 'Load Flow calculation successful, time taken: {:.2f} seconds'.format(t2), 0)
+		print1('Load Flow calculation successful, time taken: {:.2f} seconds'.format(t2), bf=1, af=0)
 	elif error_code == 1:
 		print2('Load Flow failed due to divergence of inner loops, time taken: {:.2f} seconds..............'.format(t2))
 	elif error_code == 2:
@@ -729,7 +729,7 @@ def harm_load_flow(results, harmonic_loadflow_settings):		# Inputs load flow set
 	error_code = hldf.Execute()
 	t2 = time.clock() - t1
 	if error_code == 0:
-		print1(1, 'Harmonic Load Flow calculation successful: {:.2f} seconds'.format(t2), 0)
+		print1('Harmonic Load Flow calculation successful: {:.2f} seconds'.format(t2), bf=1, af=0)
 	elif error_code > 0:
 		print2('Harmonic Load Flow calculation unsuccessful: {:.2f} seconds...............................'.format(t2))
 	return error_code
@@ -770,7 +770,7 @@ def freq_sweep(results, fsweep_settings):		# Inputs Frequency Sweep Settings and
 	error_code = frq.Execute()	
 	t2 = time.clock() - t1
 	if error_code == 0:
-		print1(1, 'Frequency Sweep calculation successful, time taken: {:.2f} seconds'.format(t2), 0)
+		print1('Frequency Sweep calculation successful, time taken: {:.2f} seconds'.format(t2), bf=1, af=0)
 	elif error_code > 0:
 		print2('Frequency Sweep calculation unsuccessful, time taken: {:.2f} seconds.......................'.format(t2))
 	return error_code
@@ -788,7 +788,7 @@ def save_op_scenario(name, activate): 	# Saves an operational Scenario
 	if len(str(scenario)) == 0:
 		print2('Scenario : {} save unsuccessful ..............................................'.format(name))
 	else:
-		print1(2, 'Scenario : {} saved successfully'.format(name), 0)
+		print1('Scenario : {} saved successfully'.format(name), bf=2, af=0)
 	return scenario
 
 
@@ -801,9 +801,9 @@ def switch_coup(element, service):			# Switches an Coupler out if 0 in if 1
 	"""
 	element.on_off = service
 	if service == 0:
-		print1(1, 'Switching Element: {} Out of service "'.format(element), 0)
+		print1('Switching Element: {} Out of service "'.format(element), bf=1, af=0)
 	if service == 1:
-		print1(1, 'Switching Element: {} In to service '.format(element), 0)
+		print1('Switching Element: {} In to service '.format(element), bf=1, af=0)
 	return None
 
 
@@ -817,7 +817,7 @@ def check_if_folder_exists(location, name):		# Checks if the folder exists
 	_new_object = location.GetContents('{}.IntFolder'.format(name))
 	folder_exists = 0
 	if len(_new_object) > 0:
-		print1(2, 'Folder already exists: {}'.format(name), 0)
+		print1('Folder already exists: {}'.format(name), bf=2, af=0)
 		folder_exists = 1
 	return _new_object, folder_exists
 
@@ -830,7 +830,7 @@ def create_folder(location, name):		# Creates Folder in location
 	:return _new_object, status: Handle for new_object and True/False status on whether it already exists 
 	"""
 	# _new_object used instead of new_object to avoid showing
-	print1(1, 'Creating Folder: {}'.format(name), 0)
+	print1('Creating Folder: {}'.format(name), bf=1, af=0)
 	folder1, folder_exists = check_if_folder_exists(location, name)				# Check if the Results folder exists if it doesn't create it using date and time
 	if folder_exists == 0:
 		_new_object = location.CreateObject("IntFolder",name)
@@ -867,7 +867,7 @@ def create_mutual_impedance_list(location, terminal_list):
 	:param list terminal_list: List of terminals 
 	:return list list_of_mutual: List of mutual impedances 
 	"""
-	print1(1, 'Creating: Mutual Impedance List of Terminals', 0)
+	print1('Creating: Mutual Impedance List of Terminals', bf=1, af=0)
 	terminal_list1 = list(terminal_list)
 	list_of_mutual = []
 	# # count = 0
@@ -912,7 +912,7 @@ def get_object(object_to_retrieve):			# retrieves an object based on filter stri
 def delete_object(object_to_delete):			# retrieves an object based on filter strings
 	ob1 = object_to_delete.Delete()
 	if ob1 == 0:
-		print1(1, 'Object Successfully Deleted: {}'.format(object_to_delete), 0)
+		print1('Object Successfully Deleted: {}'.format(object_to_delete), bf=1, af=0)
 	else:
 		print2('Error deleting object: {}.....................'.format(object_to_delete))
 	return None
@@ -925,12 +925,12 @@ def check_if_object_exists(location, name):  	# Check if the object exists
 	:param str name: Name of object to look for 
 	:return object_exists, new_object: True / False on whether object exists, handle for powerfactory.Object 
 	"""
-	print1(2, '{} {}'.format(location, name), 0)
+	print1('{} {}'.format(location, name), bf=2, af=0)
 	#_new_object used instead of new_object to avoid shadowing
 	_new_object = location.GetContents(name)
 	object_exists = 0
 	if len(_new_object) > 0:
-		print1(2, 'Object Exists: {}'.format(name), 0)
+		print1('Object Exists: {}'.format(name), bf=2, af=0)
 		object_exists = 1
 	return object_exists, _new_object
 
@@ -945,7 +945,7 @@ def add_copy(folder, object, name1):		# copies an object to a new folder Name 1 
 	"""
 	new_object = folder.AddCopy(object, name1)
 	if new_object is not None:
-		print1(1, 'Copying object {} successful'.format(object), 0)
+		print1('Copying object {} successful'.format(object), bf=1, af=0)
 	else:
 		print2('Error AddCopy Unsuccessful: {} to {} as {}'.format(object, folder, name1))
 	return new_object
@@ -992,12 +992,10 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	:return list new_list: 
 	"""
 	# TODO: Check function since there are a lot of unresolved references
-	print1(2, '___________________________________________________________________________________________________', 0)
-	print1(
-		2,
-		('Checking all Projects, Study Cases and Scenarios Solve for Load Flow, it will also check N-1 and create ' +
+	print1('___________________________________________________________________________________________________', bf=2, af=0)
+	print1(('Checking all Projects, Study Cases and Scenarios Solve for Load Flow, it will also check N-1 and create ' +
 		 'the operational scenarios if Pre_Case_Check is True\n'),
-		0)
+		   bf=2, af=0)
 	# _count_studycase used instead of count_studycase to avoid shadowing
 	_count_studycase = 0
 	new_list =[]
@@ -1016,7 +1014,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 					print2('DEBUG - Load flow study completed with error code {}'.format(ldf_err))					
 					if ldf_err == 0 or Skip_Unsolved_Ldf == False:
 						new_list.append(list_to_check[_count_studycase])
-						print1(2, "Studycase Scenario Solving added to analysis list: " + str(list_to_check[_count_studycase]), 0)
+						print1("Studycase Scenario Solving added to analysis list: " + str(list_to_check[_count_studycase]),
+							   bf=2, af=0)
 
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
 							new_contingency_list, con_ok = check_contingencis(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
@@ -1026,9 +1025,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																				   Operation_Scenario_Folder)
 							cont_count = 0
 							while cont_count < len(new_contingency_list):
-								print1(2,
-									   'Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
-									   0)
+								print1('Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
+									   bf=2, af=0)
 								deactivate_scenario()																# Can't copy activated Scenario so deactivate it
 								_new_scenario = add_copy(_op_sc_results_folder, scenario,
 														 List_of_Studycases[_count_studycase][0] + str("_" + new_contingency_list[cont_count][0]))	# Copies the base scenario
@@ -1052,8 +1050,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 			print2('Problem Activating Project: {} {}'
 				   .format(list_to_check[_count_studycase][0], list_to_check[_count_studycase][1]))
 		_count_studycase += 1
-	print1(1,"Finished Checking Study Cases", 0)
-	print1(2,"___________________________________________________________________________________________________",2)
+	print1("Finished Checking Study Cases", bf=1, af=0)
+	print1("___________________________________________________________________________________________________",
+		   bf=2,af=2)
 	return new_list
 
 
@@ -1084,10 +1083,10 @@ def check_terminals(list_of_points): 		# This checks and creates the list of ter
 				print2("Python Entry does not exist in case: " + list_of_points[tm_count][2] + ".ElmTerm ..............................................")
 				terminals_ok = 1
 		tm_count = tm_count + 1
-	print1(2,"Terminals Used for Analysis: ",0)
+	print1("Terminals Used for Analysis: ", bf=2, af=0)
 	tm_count = 0
 	while tm_count < len(list_of_points):
-		print1(1, list_of_points[tm_count], 0)
+		print1(list_of_points[tm_count], bf=1, af=0)
 		tm_count = tm_count + 1
 	return terminals_index, terminals_ok
 
@@ -1141,9 +1140,9 @@ def check_contingencis(list_of_contingencies): 		# This checks and creates the l
 			contingencies_ok = 1
 		elif not skip_contingency:
 			new_contingency_list.append(list_of_couplers)
-	print1(2, "Contingencies Used for Analysis:", 0)
+	print1("Contingencies Used for Analysis:", bf=2, af=0)
 	for item in new_contingency_list:
-		print1(1, item, 0)
+		print1(item, bf=1, af=0)
 	return new_contingency_list, contingencies_ok
 
 
@@ -1243,7 +1242,7 @@ def read_text_file(file_pth):		# Reads in Textfile
 	text_file = open(file_pth, "r")
 	content = text_file.readlines()
 	text_file.close()
-	print1(2, "Reading in textfile: " + str(text_file), 0)
+	print1("Reading in textfile: " + str(text_file), bf=2, af=0)
 	return content
 
 
@@ -1998,10 +1997,10 @@ if __name__ == '__main__':
 	Excel_Export_Z = Study_Settings[17]											# Graph the Frequency Sweeps in Excel
 	Excel_Export_Z12 = Study_Settings[18]										# Export Mutual Impedances to excel
 	Excel_Export_HRM = Study_Settings[19]										# Export Harmonic Data
-	print1(1,Title,0)
+	print1(Title, bf=1, af=0)
 	for keys,values in analysis_dict.items():									# Prints all the inputs to progress log
-		print1(1, keys, 0)
-		print1(1, values, 0)
+		print1(keys, bf=1, af=0)
+		print1(values, bf=1, af=0)
 	List_of_Studycases = analysis_dict["Base_Scenarios"]						# Uses the list of Studycases
 	if len(List_of_Studycases) <1:												# Check there are the right number of inputs
 		print2("Error - Check excel input Base_Scenarios there should be at least 1 Item in the list ")
@@ -2060,7 +2059,7 @@ if __name__ == '__main__':
 					Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
 				count = 0
 				while count < len(New_Contingency_List):												# Loop Through Contingency list
-					print1(2,"Carrying out Contingency: " + New_Contingency_List[count][0],0)
+					print1("Carrying out Contingency: " + New_Contingency_List[count][0], bf=2, af=0)
 					deactivate_scenario()																# Can't copy activated Scenario so deactivate it
 					object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
 					if object_exists == 0:
@@ -2134,10 +2133,10 @@ if __name__ == '__main__':
 					else:
 						hrm_scale =[]
 					count = count + 1
-				print1(2,"",0)
+				print1("", bf=2, af=0)
 				Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate the base case scenario this just ensures that when the script finishes using PF that it goes back to a regular case
 				count_studycase = count_studycase + 1
-				print1(2,"",0)
+				print1("", bf=2, af=0)
 				if Delete_Created_Folders:
 					delete_object(studycase_results_folder)
 					delete_object(op_sc_results_folder)
@@ -2152,7 +2151,7 @@ if __name__ == '__main__':
 				# ERROR:  print2("Could Not Activate Project: " + Project_Name)
 
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
-			print1(1,"\nProcessing Results and output to Excel",0)
+			print1("\nProcessing Results and output to Excel", bf=1, af=0)
 			start2 = time.clock()																# Used to calc the total excel export time
 			wb = excel_cls.create_workbook(workbookname=Excel_Results, excel_visible=Excel_Visible)	# Creates Workbook
 			trm1_count = 0
@@ -2177,7 +2176,8 @@ if __name__ == '__main__':
 										results35.pop(3)										# Takes out the terminal  PF object (big long string)
 										results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
 										FS_Terminal_Results.append(results35)					# If it is the right terminal append
-						print1(1,"Process Results Z12 in Python: " + str(round((time.clock() - start5),2)) + " Seconds",0)		# Returns python results processing time
+						print1("Process Results Z12 in Python: " + str(round((time.clock() - start5),2)) + " Seconds",
+							   bf=1, af=0)		# Returns python results processing time
 				HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
 				if HRM_Sim:
 					start6 = time.clock()
@@ -2188,7 +2188,8 @@ if __name__ == '__main__':
 							if str(Terminals_index[trm1_count][3]) == results35[1]:				# Checks it it the right terminal and adds it
 								results35.pop(1)												# Takes out the terminal  PF object (big long string)
 								HRM_Terminal_Results.append(results35)							# Append terminal data to the results list to be later passed to excel
-					print1(1,"Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",0)		# Returns python results processing time
+					print1("Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",
+						   bf=1, af=0)		# Returns python results processing time
 
 				# Replaced with using instance in excel_writing
 				excel_cls.create_sheet_plot(sheet_name=Terminals_index[trm1_count][0],
@@ -2210,9 +2211,11 @@ if __name__ == '__main__':
 			# Save and close workbook
 			excel_cls.close_workbook(wb=wb, workbookname=Excel_Results)
 			# #close_workbook(_wb=wb, workbookname=Excel_Results, _xl=xl)																# Closes and saves the workbook
-			print1(2,"Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",0)	# Returns the Total Export time
+			print1("Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",
+				   bf=1, af=0)	# Returns the Total Export time
 
-	print1(2, 'Total Time: {:.2f}'.format(time.clock() - start), 0)
+	print1('Total Time: {:.2f}'.format(time.clock() - start),
+		   bf=1, af=0)
 	# All exceptions captured and then raised, the purpose of the exception capture is purely to ensure excel quits
 	# Not required any more since excel will automatically close if an exception occurs due to Python garbage collection
 	# except:
