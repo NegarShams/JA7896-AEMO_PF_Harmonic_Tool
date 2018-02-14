@@ -70,6 +70,11 @@ class Logger:
 		logger.addHandler(self.handler_debug_log)
 		logger.addHandler(self.handler_error_log)
 
+		logger.info('Path for debug log is {}'.format(self.pth_debug_log))
+		logger.info('Path for process log is {}'.format(self.pth_progress_log))
+		logger.info('Path for error log is {}'.format(self.pth_error_log))
+		self.handler_progress_log.flush()
+
 		return logger
 
 	def close_logging(self):
