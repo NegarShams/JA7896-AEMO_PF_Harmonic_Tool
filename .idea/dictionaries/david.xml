@@ -2,9 +2,12 @@
   <dictionary name="david">
     <words>
       <w>chkcmd</w>
+      <w>chrt</w>
+      <w>endcol</w>
       <w>endrow</w>
       <w>filelocation</w>
       <w>hldf</w>
+      <w>hrmb</w>
       <w>loadflow</w>
       <w>newcol</w>
       <w>noofgraphrows</w>
