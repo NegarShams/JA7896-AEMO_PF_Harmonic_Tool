@@ -52,25 +52,23 @@ something happens
 import os
 import sys
 
-
-
 import powerfactory 					# Power factory module see notes above
 import time                          	# Time
 import ctypes                        	# For creating startup message box
-import win32com.client              	# Windows COM clients needed for excel etc. if having trouble see notes
-import math								#
-import numpy as np						# install anaconda it has numpy in it  https://www.continuum.io/downloadsim
-import scipy.spatial							# Added to allow error checking if ConvexHull is unsuccessful
-from scipy.spatial import ConvexHull    # install anaconda it has scipy in it  https://www.continuum.io/downloads
+# #import win32com.client              	# Windows COM clients needed for excel etc. if having trouble see notes
+# #import math								#
+# #import numpy as np						# install anaconda it has numpy in it  https://www.continuum.io/downloadsim
+# #import scipy.spatial							# Added to allow error checking if ConvexHull is unsuccessful
+# #from scipy.spatial import ConvexHull    # install anaconda it has scipy in it  https://www.continuum.io/downloads
 import re								# Used for stripping text strings
 import unittest							# Used to include test functions for error checking of code
 
 import hast								# HAST module package used as functions start to be transferred for efficiency
-# import shutil
-# import inspect                      # Inspect functions
-# import string                       # Processing text
-# import operator
-# import textwrap
+# #import shutil
+# #import inspect                      # Inspect functions
+# #import string                       # Processing text
+# #import operator
+# #import textwrap
 
 # GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
 DEBUG_MODE = False
