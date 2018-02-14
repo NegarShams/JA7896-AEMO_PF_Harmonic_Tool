@@ -138,7 +138,14 @@ def print1(name, bf=0, af=0):   # Used to print a message to both python, PF and
 	"""
 
 	# Updated to now use logging to control printout
-	logger.info(name)
+	# First call to logger occurs before it has been declared and therefore if this is the case a simple print of the
+	# message is performed.  This should only happen because a status message is provided when the excel instance is
+	# initiated and this occurs before the excel workbook containing details of the log files has been imported.
+	# TODO:  Future update to logger to use debug log and change the target file after reading in the workbook
+	try:
+		logger.info(name)
+	except NameError:
+		print(name)
 
 	# name = str(name)
 	# print(name)
@@ -189,7 +196,14 @@ def print2(name, bf=2, af=0):   # Used to print error message to both python, PF
 	:return: None
 	"""
 	# Updated to use logging handler for error messages
-	logger.error(name)
+	# First call to logger occurs before it has been declared and therefore if this is the case a simple print of the
+	# message is performed.  This should only happen because a status message is provided when the excel instance is
+	# initiated and this occurs before the excel workbook containing details of the log files has been imported.
+	# TODO:  Future update to logger to use debug log and change the target file after reading in the workbook
+	try:
+		logger.error(name)
+	except NameError:
+		print(name)
 	# # global used to keep track on number of errors that have occured
 	# global Error_Count
 	# name = str(name)
