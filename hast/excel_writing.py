@@ -11,6 +11,7 @@ import time
 import math
 import numpy as np
 import scipy.spatial
+import scipy.spatial.qhull
 from scipy.spatial import ConvexHull
 
 class Excel:
@@ -97,7 +98,7 @@ class Excel:
 			row_end = self.xl.Selection.Address
 			row_input = []
 			# Code only to be executed for these sheets
-			# TODO: 'Contingencies', 'Base_Scneraios' and 'Terminals' should be defined in <constants.py>
+			# TODO: 'Contingencies', 'Base_Scenarios' and 'Terminals' should be defined in <constants.py>
 			if x[0] in ('Contingencies', 'Base_Scenarios', 'Terminals'):
 				# if x[0] == "Contingencies" or x[0] == "Base_Scenarios" or x[0] == "Terminals":	# For these sheets
 				# Find the starting and ending cells
@@ -240,7 +241,7 @@ class Excel:
 		# to user
 		sheet_name = self.get_sheet_name(sheet_name=sheet_name, wb=wb)
 
-		self.log_info(1, 'Creating Sheet: {}'.format(sheet_name), 0)
+		self.log_info('Creating Sheet: {}'.format(sheet_name))
 		# Adds new worksheet
 		ws = wb.Worksheets.Add()  # Add worksheet
 		ws.Name = sheet_name  # Rename worksheet
@@ -249,7 +250,7 @@ class Excel:
 		startcol = 1
 		newcol = 1
 
-		r_first, r_last, x_first, x_last, z_first, z_last, z_12_first, z_12_last, hrm_endrow, hrm_first, hrm_last = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		# r_first, r_last, x_first, x_last, z_first, z_last, z_12_first, z_12_last, hrm_endrow, hrm_first, hrm_last = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		if excel_export_rx:
 			startcol = 19
 		if excel_export_z or excel_export_hrm:
@@ -295,7 +296,7 @@ class Excel:
 					x_last = newcol - 1
 
 					t2 = time.clock() - t1
-					self.log_info(1, 'Inserting RX data self impedance data, time taken: {:.2f} seconds'.format(t2), 0)
+					self.log_info('Inserting RX data self impedance data, time taken: {:.2f} seconds'.format(t2))
 					t1 = time.clock()
 
 					# Graph R X Data impedance Loci____________________________________________________________________________
@@ -444,7 +445,6 @@ class Excel:
 							series.Name = "Convex Hull"  # Name
 
 							# Plots the graphs for the customers
-							# TODO: Duplicate existing graphs and remove plots rather than replotting
 							ws.Range(ws.Cells(1, 1), ws.Cells(1, 2)).Select()
 							# Using chart reference handle rather than making active chart
 							chrt = ws.Shapes.AddChart(c.xlXYScatter, gph_coord[gc][0] + 425, gph_coord[gc][1], chart_width,
@@ -490,7 +490,7 @@ class Excel:
 						new_row += 1
 						gc += 1
 					t2 = time.clock() - t1
-					self.log_info(1, 'Graphing RX data self impedance data, time taken: {:.2f} seconds'.format(t2), 0)
+					self.log_info('Graphing RX data self impedance data, time taken: {:.2f} seconds'.format(t2))
 
 					t1 = time.clock()
 					newcol = newcol + 1
@@ -513,7 +513,7 @@ class Excel:
 							newcol = newcol + 1
 					z_last = newcol - 1
 					t2 = time.clock() - t1
-					self.log_info(1, "Inserting Z self impedance data, time taken: " + str(round(t2, 2)) + " seconds", 0)
+					self.log_info('Inserting Z self impedance data, time taken: {:0.2f} seconds'.format(t2))
 
 					t1 = time.clock()
 					# Graph Z Data_________________________________________________________________________________________________________
@@ -558,8 +558,8 @@ class Excel:
 							series = chrt.SeriesCollection().NewSeries()
 							# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 							series.Values = ws.Range(ws.Cells((startrow + 3), zb_col[0]),
-													 ws.Cells((endrow), zb_col[0]))  # Y Value
-							series.XValues = ws.Range(ws.Cells((startrow + 3), z_first), ws.Cells((endrow), z_first))
+													 ws.Cells(endrow, zb_col[0]))  # Y Value
+							series.XValues = ws.Range(ws.Cells((startrow + 3), z_first), ws.Cells(endrow, z_first))
 							series.Name = series_name
 
 						zb_count = 1
@@ -607,8 +607,8 @@ class Excel:
 								series = chrt.SeriesCollection().NewSeries()
 								# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 								series.Values = ws.Range(ws.Cells((startrow + 3), zzcol),
-														 ws.Cells((endrow), zzcol))  # Y Value
-								series.XValues = ws.Range(ws.Cells((startrow + 3), z_first), ws.Cells((endrow), z_first))
+														 ws.Cells(endrow, zzcol))  # Y Value
+								series.XValues = ws.Range(ws.Cells((startrow + 3), z_first), ws.Cells(endrow, z_first))
 								series.Name = series_name
 							zb_count = zb_count + 1
 
@@ -640,7 +640,7 @@ class Excel:
 						# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
 
 					t2 = time.clock() - t1
-					self.log_info(1, "Graphing Z self impedance data, time taken: " + str(round(t2, 2)) + " seconds", 0)
+					self.log_info('Graphing Z self impedance data, time taken: {:0.2f} seconds'.format(t2))
 
 
 					t1 = time.clock()
@@ -648,7 +648,7 @@ class Excel:
 				# Export Mutual impedance data to excel
 				if excel_export_z12:  # Export Z12 data
 					# Insert Mutual Z_12 data to excel______________________________________________________________________________________________
-					self.log_info(1, "Inserting Z_12 data", 0)
+					self.log_info('Inserting Z_12 data')
 					if excel_export_rx or excel_export_z:
 						newcol += 1
 
@@ -659,7 +659,7 @@ class Excel:
 							newcol = newcol + 1
 
 					t2 = time.clock() - t1
-					self.log_info(1, 'Exporting Z_12 data self impedance data, time taken: {:.2f} seconds'.format(t2), 0)
+					self.log_info('Exporting Z_12 data self impedance data, time taken: {:.2f} seconds'.format(t2))
 
 					t1 = time.clock()
 
@@ -672,7 +672,7 @@ class Excel:
 
 			# Export harmonic data to excel
 			if excel_export_hrm:
-				self.log_info(1, "Inserting Harmonic data", 0)
+				self.log_info('Inserting Harmonic data')
 				if excel_export_rx or excel_export_z or excel_export_z12:  # Adds a space between FS & harmonic data
 					newcol = newcol + 1
 
@@ -737,9 +737,9 @@ class Excel:
 												ws.Cells((startrow + 2), hrm_col[0])).Value
 						series_name = str(series_name1[0][0]) + "_" + str(series_name1[1][0])
 						series.Values = ws.Range(ws.Cells((startrow + 3), hrm_col[0]),
-												 ws.Cells((hrm_endrow), hrm_col[0]))  # Y Value
+												 ws.Cells(hrm_endrow, hrm_col[0]))  # Y Value
 						series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
-												  ws.Cells((hrm_endrow), hrm_first))
+												  ws.Cells(hrm_endrow, hrm_first))
 						series.Name = series_name  #
 					
 					# Add new series with IEC limits to datasheet and plot
@@ -816,9 +816,9 @@ class Excel:
 													ws.Cells((startrow + 2), hrm_col1)).Value
 							series_name = str(series_name1[0][0]) + "_" + str(series_name1[1][0])
 							series.Values = ws.Range(ws.Cells((startrow + 3), hrm_col1),
-													 ws.Cells((hrm_endrow), hrm_col1))  # Y Value
+													 ws.Cells(hrm_endrow, hrm_col1))  # Y Value
 							series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
-													  ws.Cells((hrm_endrow), hrm_first))
+													  ws.Cells(hrm_endrow, hrm_first))
 							series.Name = series_name  #
 						
 						# Add IEC limits to plots and excel
@@ -829,7 +829,7 @@ class Excel:
 						series.Values = ws.Range(ws.Cells(startrow + 3, newcol),
 												 ws.Cells(startrow + len(self.limits) - 1, newcol))  # Y Value
 						series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
-												  ws.Cells((hrm_endrow), hrm_first))
+												  ws.Cells(hrm_endrow, hrm_first))
 						series.Name = "IEC 61000-3-6"  # Name
 						series.Format.Fill.Visible = True  # Add fill to chart
 						series.Format.Fill.ForeColor.RGB = 12611584  # Colour for fill (red + green*256 + blue*256*256)
@@ -894,9 +894,9 @@ class Excel:
 						series = chrt.SeriesCollection().NewSeries()
 						# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 						series.Values = ws.Range(ws.Cells((startrow + 3), hrm_col),
-												 ws.Cells((hrm_endrow), hrm_col))  # Y Value
+												 ws.Cells(hrm_endrow, hrm_col))  # Y Value
 						series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
-												  ws.Cells((hrm_endrow), hrm_first))
+												  ws.Cells(hrm_endrow, hrm_first))
 						series.Name = series_name  #
 					
 					# Add IEC limits
@@ -921,7 +921,7 @@ class Excel:
 					series.AxisGroup = 2  # Move to Secondary Axes
 					
 					# Allow charts to overlap
-					# Using chrt reference rather than active chart to avoid repeatadly activating the chart
+					# Using chrt reference rather than active chart to avoid repeatedly activating the chart
 					chrt.ChartGroups(2).Overlap = 100  # Edit Secondary Axis Overlap of bars
 					chrt.ChartGroups(2).GapWidth = 0  # Edit Secondary Axis width between bars
 					chrt.Axes(c.xlValue).MaximumScale = 3.5  # Set scale Max
@@ -932,7 +932,7 @@ class Excel:
 					# #_xl.ActiveChart.Axes(c.xlValue, c.xlSecondary).MaximumScale = 3.5  # Set scale Min
 
 				t2 = time.clock() - t1
-				self.log_info(1, 'Exporting Harmonic data, time taken: {:.2f} seconds'.format(t2), 0)
+				self.log_info('Exporting Harmonic data, time taken: {:.2f} seconds'.format(t2))
 
 		# Save workbook and return nothing
 		wb.Save()
@@ -1005,7 +1005,7 @@ class Excel:
 		:param str workbookname: Full path to workbook for it to be saved as
 		:return:
 		"""
-		self.log_info(1, 'Closing and Saving Workbook: {}'.format(workbookname), 0)
+		self.log_info('Closing and Saving Workbook: {}'.format(workbookname))
 		wb.SaveAs(workbookname)  # Save Workbook"""
 		wb.Close()  # Close Workbook
 		return None
@@ -1016,20 +1016,6 @@ class TestExcelSetup(unittest.TestCase):
 	"""
 		UnitTest to test the operation of various excel workbook functions
 	"""
-	#@classmethod
-	#def setUpClass(cls):
-	#	"""
-	#	Setup excel instance before running
-	#	:return:
-	#	"""
-	#	cls.xl = Excel()
-
-	#@classmethod
-	#def tearDownClass(cls):
-	#	"""
-	#		Clear up excel instance after running
-	#	"""
-	#	del cls.xl
 
 	def test_excel_instance(self):
 		"""
