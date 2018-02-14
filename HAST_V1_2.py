@@ -51,24 +51,18 @@ something happens
 # --------------------------------------------------------------------------------------------------------------------
 import os
 import sys
+import importlib
 
 import powerfactory 					# Power factory module see notes above
 import time                          	# Time
 import ctypes                        	# For creating startup message box
-# #import win32com.client              	# Windows COM clients needed for excel etc. if having trouble see notes
-# #import math								#
-# #import numpy as np						# install anaconda it has numpy in it  https://www.continuum.io/downloadsim
-# #import scipy.spatial							# Added to allow error checking if ConvexHull is unsuccessful
-# #from scipy.spatial import ConvexHull    # install anaconda it has scipy in it  https://www.continuum.io/downloads
 import re								# Used for stripping text strings
 import unittest							# Used to include test functions for error checking of code
 
-import hast								# HAST module package used as functions start to be transferred for efficiency
-# #import shutil
-# #import inspect                      # Inspect functions
-# #import string                       # Processing text
-# #import operator
-# #import textwrap
+# HAST module package requires reload during code development since python does not reload itself
+# HAST module package used as functions start to be transferred for efficiency
+import hast
+hast = importlib.reload(hast)
 
 # GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
 DEBUG_MODE = False
@@ -2235,6 +2229,10 @@ if __name__ == '__main__':
 
 	print1('Total Time: {:.2f}'.format(time.clock() - start),
 		   bf=1, af=0)
+
+	# Close the logger since script has now completed and this forces flushing of the open logs before script exits
+	logger.close_logging()
+
 	# All exceptions captured and then raised, the purpose of the exception capture is purely to ensure excel quits
 	# Not required any more since excel will automatically close if an exception occurs due to Python garbage collection
 	# except:

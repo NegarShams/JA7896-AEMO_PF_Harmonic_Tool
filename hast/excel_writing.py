@@ -262,7 +262,6 @@ class Excel:
 			# Exporting of frequency vs impedance data to excel
 			if excel_export_rx or excel_export_z or excel_export_z12:  # Prints the FS Scale
 				endrow = startrow + len(fs_results[0]) - 1
-				# # NOT USED - endcol = startcol + len(fs_results) - 1
 				# Plots the Scale_______________________________________________________________________________________
 				scale = fs_results[0]
 				scale_end = scale[-1]
@@ -273,7 +272,6 @@ class Excel:
 				# Export RX data and graphs
 				if excel_export_rx:  # Export the RX data and graphs the Impedance Loci
 					# Insert R data in excel___________________________________________________________________________
-					# # NOT USED - newcol = newcol
 					r_first = newcol
 					r_results, x_results = [], []
 					for x in fs_results:
@@ -376,28 +374,12 @@ class Excel:
 						chrt.Axes(c.xlValue).AxisTitle.Text = "Reactance in Ohms"  # Y Axis
 						chrt.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
 
-						#
-						# #_ = ws.Shapes.AddChart(c.xlXYScatter, gph_coord[gc][0], gph_coord[gc][1],
-						# #						  chart_width,
-						# #						  chart_height).Select()  # AddChart(Type, Left, Top, Width, Height)
-						# #_xl.ActiveChart.ApplyLayout(1)  # Select Layout 1-11
-						# #_xl.ActiveChart.ChartTitle.Characters.Text = " Harmonic Order " + str(
-						# #	int(scale_clipped[hrm[1]] / 50))  # Add Title
-						# #_xl.ActiveChart.SeriesCollection(1).Delete()
-						# #xl.ActiveChart.Legend.Delete()                                                         # Delete legend
-						# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Resistance in Ohms"  # X Axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0  # Set minimum of x axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"  # Set number of decimals 0.0
-						# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "Reactance in Ohms"  # Y Axis
-						# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
-						# #NOT USED - impedance_loci_pos = list(range(R_First,R_Last,2))
 						rx_con = []
 
 						# This is used to graph non integer harmonics on the same plot as integer
 						for tres in range(hrm[0], (hrm[2] + 1)):
 							# Create series to add to the plot
 							series = chrt.SeriesCollection().NewSeries()
-							# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 							series.XValues = ws.Range(ws.Cells((startrow + 3 + tres), r_first),
 													  ws.Cells((startrow + 3 + tres), r_last))  # X Value
 							series.Values = ws.Range(ws.Cells((startrow + 3 + tres), x_first),
@@ -428,7 +410,6 @@ class Excel:
 
 							# Create new series for Convex Hull plot (could be added to a separate function)
 							series = chrt.SeriesCollection().NewSeries()  # Adds a new series for it
-							# #series = _xl.ActiveChart.SeriesCollection().NewSeries()  # Adds a new series for it
 							series.XValues = ws.Range(ws.Cells(startrow1, startcol1),
 													  ws.Cells(startrow1, endcol1))  # X Value
 							series.Values = ws.Range(ws.Cells(startrow1 + 1, startcol1),
@@ -460,22 +441,8 @@ class Excel:
 							chrt.Axes(c.xlValue).AxisTitle.Text = "Reactance in Ohms"  # Y Axis
 							chrt.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
 
-
-							# #_ = ws.Shapes.AddChart(c.xlXYScatter, gph_coord[gc][0] + 425, gph_coord[gc][1], chart_width,
-							# #					   chart_height).Select()  # AddChart(Type, Left, Top, Width, Height)
-							# #_xl.ActiveChart.ApplyLayout(1)  # Select Layout 1-11
-							# #_xl.ActiveChart.ChartTitle.Characters.Text = " Harmonic Order " + str(
-							# #	int(scale_clipped[hrm[1]] / 50))  # Add Title
-							# #_xl.ActiveChart.SeriesCollection(1).Delete()
-							# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Resistance in Ohms"  # X Axis
-							# #_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0  # Set minimum of x axis
-							# #_xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"  # Set number of decimals 0.0
-							# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "Reactance in Ohms"  # Y Axis
-							# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
-
 							# Add new series to chart
 							series = chrt.SeriesCollection().NewSeries()  # Adds a new series for it
-							# #series = _xl.ActiveChart.SeriesCollection().NewSeries()  # Adds a new series for it
 							series.XValues = ws.Range(ws.Cells(startrow1, startcol1),
 													  ws.Cells(startrow1, endcol1))  # X Value
 							series.Values = ws.Range(ws.Cells(startrow1 + 1, startcol1),
@@ -537,26 +504,12 @@ class Excel:
 						chrt.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
 						chrt.SeriesCollection(1).Delete()
 
-						# #_ = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30, 45, 825,
-						# #					   400).Select()  # AddChart(Type, Left, Top, Width, Height)
-						# #_xl.ActiveChart.ApplyLayout(1)  # Select Layout 1-11
-						# #_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " Base Cases m:Z Self Impedances"  # Add Title
-						# # _xl.ActiveChart.Legend.Delete()                                                	# Delete legend
-						# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"  # X Axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0  # Set minimum of x axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).MaximumScale = scale_end  # Set maximum of x axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"  # Set number of decimals 0.0
-						# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "Impedance in Ohms"  # Y Axis
-						# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
-						# #_xl.ActiveChart.SeriesCollection(1).Delete()
-
 						for zb_col in base_case_pos:
 							series_name1 = ws.Range(ws.Cells((startrow + 1), zb_col[0]),
 													ws.Cells((startrow + 2), zb_col[0])).Value
 							series_name = str(series_name1[0][0]) + "_" + str(series_name1[1][0])
 							# Using chart reference rather than active chart
 							series = chrt.SeriesCollection().NewSeries()
-							# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 							series.Values = ws.Range(ws.Cells((startrow + 3), zb_col[0]),
 													 ws.Cells(endrow, zb_col[0]))  # Y Value
 							series.XValues = ws.Range(ws.Cells((startrow + 3), z_first), ws.Cells(endrow, z_first))
@@ -585,27 +538,12 @@ class Excel:
 							chrt.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
 							chrt.SeriesCollection(1).Delete()
 
-							# #_ = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30 + zb_count * 855, 45, 825,
-							# #					   400).Select()  # AddChart(Type, Left, Top, Width, Height)
-							# #_xl.ActiveChart.ApplyLayout(1)  # Select Layout 1-11
-							# #_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " " + str(
-							# #	series_name) + " m:Z Self Impedances"  # Add Title
-							# # _xl.ActiveChart.Legend.Delete()                                                	# Delete legend
-							# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"  # X Axis
-							# #_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0  # Set minimum of x axis
-							# #_xl.ActiveChart.Axes(c.xlCategory).MaximumScale = scale_end  # Set maximum of x axis
-							# #_xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"  # Set number of decimals 0.0
-							# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "Impedance in Ohms"  # Y Axis
-							# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
-							# #_xl.ActiveChart.SeriesCollection(1).Delete()
-							
 							# Add data series to chart
 							for zzcol in list(range(zb_col1[0], (zb_col1[0] + z_no_of_contingencies))):
 								series_name1 = ws.Range(ws.Cells((startrow + 1), zzcol),
 														ws.Cells((startrow + 2), zzcol)).Value
 								series_name = str(series_name1[0][0]) + "_" + str(series_name1[1][0])
 								series = chrt.SeriesCollection().NewSeries()
-								# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 								series.Values = ws.Range(ws.Cells((startrow + 3), zzcol),
 														 ws.Cells(endrow, zzcol))  # Y Value
 								series.XValues = ws.Range(ws.Cells((startrow + 3), z_first), ws.Cells(endrow, z_first))
@@ -626,18 +564,6 @@ class Excel:
 						chrt.Axes(c.xlCategory).TickLabels.NumberFormat = "0"  # Set number of decimals 0.0
 						chrt.Axes(c.xlValue).AxisTitle.Text = "Impedance in Ohms"  # Y Axis
 						chrt.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
-						
-						# #_ = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30, 45, 825,
-						# #					   400).Select()  # AddChart(Type, Left, Top, Width, Height)
-						# #_xl.ActiveChart.ApplyLayout(1)  # Select Layout 1-11
-						# #_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " m:Z Self Impedance"  # Add Title
-						# #_xl.ActiveChart.Legend.Delete()                                                	# Delete legend
-						# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"  # X Axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0  # Set minimum of x axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).MaximumScale = scale_end  # Set maximum of x axis
-						# #_xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"  # Set number of decimals 0.0
-						# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "Impedance in Ohms"  # Y Axis
-						# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0"  # Set number of decimals
 
 					t2 = time.clock() - t1
 					self.log_info('Graphing Z self impedance data, time taken: {:0.2f} seconds'.format(t2))
@@ -714,25 +640,10 @@ class Excel:
 					chrt.Axes(c.xlCategory).AxisTitle.Text = "Harmonic"  # X Axis
 					chrt.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
 											ws.Cells(hrm_endrow, hrm_first))  # X Value
-					
-					# #_ = ws.Shapes.AddChart(c.xlColumnClustered, 30, hrm_top, 825,
-					# #					   400).Select()  # AddChart(Type, Left, Top, Width, Height)
-					# #_xl.ActiveChart.ApplyLayout(9)  # Select Layout 1-11
-					# #_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " Base Case Harmonic Emissions v IEC Limits"  # Add Title
-					# #_xl.ActiveChart.SeriesCollection(1).Delete()
-					# # _xl.ActiveChart.Legend.Delete()                                                					# Delete legend
-					# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "HD %"  # Y Axis
-					# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0.0"  # Set number of decimals
-					# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Harmonic"  # X Axis
-					# # _xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            					# Set minimum of x axis
-					# # _xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"               					# Set number of decimals 0.0
-					# #_xl.ActiveChart.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
-					# #								   ws.Cells((hrm_endrow), hrm_first))  # X Value
-					
+
 					# Add date for each harmonic result
 					for hrm_col in hrm_base_case_pos:
 						series = chrt.SeriesCollection().NewSeries()
-						# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 						series_name1 = ws.Range(ws.Cells((startrow + 1), hrm_col[0]),
 												ws.Cells((startrow + 2), hrm_col[0])).Value
 						series_name = str(series_name1[0][0]) + "_" + str(series_name1[1][0])
@@ -746,7 +657,6 @@ class Excel:
 					ws.Range(ws.Cells(startrow, newcol), ws.Cells(startrow + len(self.limits) - 1,
 																  newcol)).Value = self.limits  # Export the limits as far as the 40th Harmonic
 					series = chrt.SeriesCollection().NewSeries()  # Add series to the graph
-					# #series = _xl.ActiveChart.SeriesCollection().NewSeries()  # Add series to the graph
 					series.Values = ws.Range(ws.Cells(startrow + 3, newcol),
 											 ws.Cells(startrow + len(self.limits) - 1, newcol))  # Y Value
 					series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first), ws.Cells(hrm_endrow, hrm_first))
@@ -769,10 +679,6 @@ class Excel:
 					chrt.ChartGroups(2).GapWidth = 0  # Edit Secondary Axis width between bars
 					chrt.Axes(c.xlValue).MaximumScale = 3.5  # Set scale Max
 					chrt.Axes(c.xlValue, c.xlSecondary).MaximumScale = 3.5  # Set scale Min
-					# #_xl.ActiveChart.ChartGroups(2).Overlap = 100  # Edit Secondary Axis Overlap of bars
-					# #_xl.ActiveChart.ChartGroups(2).GapWidth = 0  # Edit Secondary Axis width between bars
-					# #_xl.ActiveChart.Axes(c.xlValue).MaximumScale = 3.5  # Set scale Max
-					# #_xl.ActiveChart.Axes(c.xlValue, c.xlSecondary).MaximumScale = 3.5  # Set scale Min
 
 					hrmb_count = 1
 					for hrm_col in hrm_base_case_pos:
@@ -793,25 +699,9 @@ class Excel:
 						chrt.Axes(c.xlCategory).AxisTitle.Text = "Harmonic"  # X Axis
 						chrt.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
 														   ws.Cells(hrm_endrow, hrm_first))  # X Value
-						
-						# #_ = ws.Shapes.AddChart(c.xlColumnClustered, 30 + hrmb_count * 855, hrm_top, 825,
-						# #					   400).Select()  # AddChart(Type, Left, Top, Width, Height)
-						# #_xl.ActiveChart.ApplyLayout(9)  # Select Layout 1-11						
-						# #_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " " + str(
-						# #	series_name) + " Harmonic Emissions v IEC Limits"  # Add Title
-						# #_xl.ActiveChart.SeriesCollection(1).Delete()
-						# # _xl.ActiveChart.Legend.Delete()                                                					# Delete legend
-						# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "HD %"  # Y Axis
-						# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0.0"  # Set number of decimals
-						# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Harmonic"  # X Axis
-						# # _xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            					# Set minimum of x axis
-						# # _xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"               					# Set number of decimals 0.0
-						# #_xl.ActiveChart.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
-						# #								   ws.Cells((hrm_endrow), hrm_first))  # X Value
-						
+
 						for hrm_col1 in list(range(hrm_col[0], (hrm_col[0] + hrm_no_of_contingencies))):
 							series = chrt.SeriesCollection().NewSeries()
-							# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 							series_name1 = ws.Range(ws.Cells((startrow + 1), hrm_col1),
 													ws.Cells((startrow + 2), hrm_col1)).Value
 							series_name = str(series_name1[0][0]) + "_" + str(series_name1[1][0])
@@ -825,7 +715,6 @@ class Excel:
 						ws.Range(ws.Cells(startrow, newcol), ws.Cells(startrow + len(self.limits) - 1,
 																	  newcol)).Value = self.limits  # Export the limits as far as the 40th Harmonic
 						series = chrt.SeriesCollection().NewSeries()  # Add series to the graph
-						# #series = _xl.ActiveChart.SeriesCollection().NewSeries()  # Add series to the graph
 						series.Values = ws.Range(ws.Cells(startrow + 3, newcol),
 												 ws.Cells(startrow + len(self.limits) - 1, newcol))  # Y Value
 						series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
@@ -849,10 +738,6 @@ class Excel:
 						chrt.ChartGroups(2).GapWidth = 0  # Edit Secondary Axis width between bars
 						chrt.Axes(c.xlValue).MaximumScale = 3.5  # Set scale Max
 						chrt.Axes(c.xlValue, c.xlSecondary).MaximumScale = 3.5  # Set scale Min
-						# #_xl.ActiveChart.ChartGroups(2).Overlap = 100  # Edit Secondary Axis Overlap of bars
-						# #_xl.ActiveChart.ChartGroups(2).GapWidth = 0  # Edit Secondary Axis width between bars
-						# #_xl.ActiveChart.Axes(c.xlValue).MaximumScale = 3.5  # Set scale Max
-						# #_xl.ActiveChart.Axes(c.xlValue, c.xlSecondary).MaximumScale = 3.5  # Set scale Min
 						hrmb_count += 1
 				
 				# If only single base case then no need to compare base cases
@@ -872,27 +757,12 @@ class Excel:
 					# chrt.Axes(c.xlCategory).TickLabels.NumberFormat = "0"               					# Set number of decimals 0.0
 					chrt.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
 											ws.Cells(hrm_endrow, hrm_first))  # X Value
-					
-					# #_ = ws.Shapes.AddChart(c.xlColumnClustered, 30, hrm_top, 825,
-					# #					   400).Select()  # AddChart(Type, Left, Top, Width, Height)
-					# #_xl.ActiveChart.ApplyLayout(9)  # Select Layout 1-11
-					# #_xl.ActiveChart.ChartTitle.Characters.Text = sheet_name + " Harmonic Emissions v IEC Limits"  # Add Title
-					# #_xl.ActiveChart.SeriesCollection(1).Delete()
-					# # _xl.ActiveChart.Legend.Delete()                                                					# Delete legend
-					# #_xl.ActiveChart.Axes(c.xlValue).AxisTitle.Text = "HD %"  # Y Axis
-					# #_xl.ActiveChart.Axes(c.xlValue).TickLabels.NumberFormat = "0.0"  # Set number of decimals
-					# #_xl.ActiveChart.Axes(c.xlCategory).AxisTitle.Text = "Harmonic"  # X Axis
-					# # _xl.ActiveChart.Axes(c.xlCategory).MinimumScale = 0                            					# Set minimum of x axis
-					# # _xl.ActiveChart.Axes(c.xlCategory).TickLabels.NumberFormat = "0"               					# Set number of decimals 0.0
-					# #_xl.ActiveChart.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
-					# #								   ws.Cells((hrm_endrow), hrm_first))  # X Value
-					
+
 					for hrm_col in range(hrm_first + 1, hrm_last + 1):
 						series_name1 = ws.Range(ws.Cells((startrow + 1), hrm_col),
 												ws.Cells((startrow + 2), hrm_col)).Value
 						series_name = str(series_name1[0][0]) + "_" + str(series_name1[1][0])
 						series = chrt.SeriesCollection().NewSeries()
-						# #series = _xl.ActiveChart.SeriesCollection().NewSeries()
 						series.Values = ws.Range(ws.Cells((startrow + 3), hrm_col),
 												 ws.Cells(hrm_endrow, hrm_col))  # Y Value
 						series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first),
@@ -903,7 +773,6 @@ class Excel:
 					ws.Range(ws.Cells(startrow, newcol), ws.Cells(startrow + len(self.limits) - 1,
 																  newcol)).Value = self.limits  # Export the limits as far as the 40th Harmonic
 					series = chrt.SeriesCollection().NewSeries()  # Add series to the graph
-					# #series = _xl.ActiveChart.SeriesCollection().NewSeries()  # Add series to the graph
 					series.Values = ws.Range(ws.Cells(startrow + 3, newcol),
 											 ws.Cells(startrow + len(self.limits) - 1, newcol))  # Y Value
 					series.XValues = ws.Range(ws.Cells((startrow + 3), hrm_first), ws.Cells(hrm_endrow, hrm_first))
@@ -926,10 +795,6 @@ class Excel:
 					chrt.ChartGroups(2).GapWidth = 0  # Edit Secondary Axis width between bars
 					chrt.Axes(c.xlValue).MaximumScale = 3.5  # Set scale Max
 					chrt.Axes(c.xlValue, c.xlSecondary).MaximumScale = 3.5  # Set scale Min
-					# #_xl.ActiveChart.ChartGroups(2).Overlap = 100  # Edit Secondary Axis Overlap of bars
-					# #_xl.ActiveChart.ChartGroups(2).GapWidth = 0  # Edit Secondary Axis width between bars
-					# #_xl.ActiveChart.Axes(c.xlValue).MaximumScale = 3.5  # Set scale Max
-					# #_xl.ActiveChart.Axes(c.xlValue, c.xlSecondary).MaximumScale = 3.5  # Set scale Min
 
 				t2 = time.clock() - t1
 				self.log_info('Exporting Harmonic data, time taken: {:.2f} seconds'.format(t2))
@@ -982,7 +847,6 @@ class Excel:
 				'Error occurred calculating ConvexHull for {} from the following data {}'.format(node_name, pointlist))
 			# Values set to 0, 0 so that something can be plotted
 			err_convex_points = [[0], [0]]
-			# ## -- ## EARLY RETURN ## -- ##
 			return err_convex_points
 
 		for i in cv.vertices:
