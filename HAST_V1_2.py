@@ -689,6 +689,8 @@ def create_results_file(location, name, type_of_file):			# Creates Results File
 def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Cases, Operational Scenarios,
 	"""
 		Check list of projects, study cases, operational scenarios, etc. solve for load flow
+		Produces a new operational scenario and study case of each contingency so that each study case can be split
+		out into separate parallel processing functions
 	:param list list_to_check: List of items to check 
 	:return list new_list: 
 	"""
@@ -742,9 +744,10 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 														   study_case,
 														   List_of_Studycases[_count_studycase][0] + str(
 															   "_" + new_contingency_list[cont_count][0]))
+								print2(_new_study_case)
 								_new_scenario = add_copy(_op_sc_results_folder, scenario,
 														 List_of_Studycases[_count_studycase][0] + str("_" + new_contingency_list[cont_count][0]))	# Copies the base scenario
-								_ = activate_study_case(_new_study_case)
+								_new_study_case.Activate()
 								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
 									# Take outages described for contingency
@@ -754,6 +757,10 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								save_active_scenario()
 								_ = load_flow(Load_Flow_Setting)															# Carry out load flow
 								cont_count = cont_count + 1
+
+								# Deactivate new study case and reactivate old study case
+								_new_study_case.Deactivate()
+								study_case.Activate()
 					else:
 						print2("Problem with Loadflow: " + str(list_to_check[_count_studycase][0]))
 				else:
@@ -1028,19 +1035,28 @@ if __name__ == '__main__':
 		print2('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: {} {}'
 			   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
-
-
-	print2('DEBUG Check - Looping through all study cases')
+	# Check all study cases converge, etc. and produce a new study case + operational scenario for each one
 	List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
-	print2('DEBUG Check - Finished looping through study cases')
+	# At this point now have a new study case which has been associated with an operational scenario for each
+	# contingency such that the PowerFactory TaskAutomation can now be used to run 3 studies in parallel
 
-
-	break
+	# TODO: Find the points at which frequency sweeps are being run and instead create a ComFreqSweep and ComHLF within
+	# TODO: each study case.
+	# TODO: These can then be added to the ComTaskAutomation to run 3 processes at a time.
 
 	# Excel export contained within this loop
+	# TODO: This section needs splitting up to firstly loop through creating the results folders and frequency sweeps,
+	# TODO: these should be assigned to a task automation
+	# TODO: Second stage is that these automated tasks are run
+	# TODO: Third stage is that the results are retrieved
+	# TODO: Comments have been put in below with the relevant locations which need looking into
 	if FS_Sim or HRM_Sim:
+		# TODO: Create task automation command and store it in general studies folder (ComTasks)
+
 		FS_Contingency_Results, HRM_Contingency_Results = [], []
 		count_studycase = 0
+		# TODO: Create centralised results folders here for all the FS and HRM results
+
 		while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
 			prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
 			if len(str(prj)) > 0:
@@ -1049,18 +1065,23 @@ if __name__ == '__main__':
 				Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
 				Operation_Case_Folder = app.GetProjectFolder("scen")
 				Variations_Folder = app.GetProjectFolder("scheme")
+				# TODO: Clarify purpose of variation
 				Active_variations = get_active_variations()
 				Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
 				activate_variation(Variation)
 				Stage = create_stage(Variation,"IntSstage",Variation_Name)
 				New_Contingency_List, Con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 				Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
+
+				# TODO: Results folder should now be declared above rather than being related to a particular
+				# TODO study case.
 				studycase_results_folder, folder_exists1 = create_folder(StudyCase, Results_Folder)
 				op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
 				Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
 				if len(Net_Elm1) < 1:
 					print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
 				if len(Terminals_index) > 1 and Excel_Export_Z12:
+					# TODO: Move mutual folder to central study case results folder
 					studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
 					List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
 				else:
@@ -1071,6 +1092,8 @@ if __name__ == '__main__':
 				while count < len(New_Contingency_List):												# Loop Through Contingency list
 					print1("Carrying out Contingency: " + New_Contingency_List[count][0], bf=2, af=0)
 					deactivate_scenario()																# Can't copy activated Scenario so deactivate it
+
+					# TODO: Since scenarios already produced this may no longer be required
 					object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
 					if object_exists == 0:
 						new_scenario = add_copy(op_sc_results_folder,Scenario,List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0]))	# Copies the base scenario
@@ -1091,6 +1114,9 @@ if __name__ == '__main__':
 							# TODO: Reports an error due to not being defined which can be resolved by wrapping in function
 							for mut in List_of_Mutual:													# Adds the mutual impedance data to Results File
 								add_vars_res(sweep, mut[2], Mutual_Variables)
+
+						# TODO: Adjust freq_sweep code so that instead it creates a new command and returns it as a handle
+						# TODO: Add freq_sweep handle to task automation for this study case
 						Fsweep_err_cde = freq_sweep(sweep,Fsweep_Settings)								# Carry out Frequency Sweep
 						if Fsweep_err_cde == 0:															# Skips the contingency if Frequency Sweep doesn't solve
 							fs_scale, fs_res = retrieve_results(sweep,0)
@@ -1111,7 +1137,9 @@ if __name__ == '__main__':
 						while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
 							add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
 							trm_count = trm_count + 1
-						Harm_err_cde = harm_load_flow(harm,Harmonic_Loadflow_Settings)
+
+						# TODO: Runs harmonic results here
+						Harm_err_cde = harm_load_flow(harm, Harmonic_Loadflow_Settings)
 						if Harm_err_cde == 0:
 							hrm_scale, hrm_res = retrieve_results(harm,1)
 							hrm_scale.insert(1,"THD")													# Inserts the THD
