@@ -48,15 +48,26 @@ class Excel:
 		self.log_info = print_info
 		self.log_error = print_error
 
-		# Initialise
-		# Launch excel instance
+	def __enter__(self):
+		# Launch  new excel instance
 		self.xl = win32com.client.DispatchEx('Excel.Application')
-
 		# Following code ensures that makepy has been run to obtain the excel constants and defines them
 		_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
 		self.excel_constants = win32com.client.constants
 		del _xl
 		self.log_info('Excel instance initialised')
+		return self
+
+
+	def __exit__(self, exc_type, exc_value, traceback):
+		"""
+			Function deals with closing the excel instance once its been created
+		:return:
+		"""
+		# Disable alerts and quit excel
+		self.xl.DisplayAlerts = False
+		self.xl.Quit()
+		self.log_info('excel instance closed')
 
 	def import_excel_harmonic_inputs(self, workbookname):  # Import Excel Harmonic Input Settings
 		"""
@@ -353,7 +364,7 @@ class Excel:
 						# reference
 						chrt = ws.Shapes.AddChart(c.xlXYScatter, gph_coord[gc][0], gph_coord[gc][1],
 												  chart_width,
-												  chart_height)  # AddChart(Type, Left, Top, Width, Height)
+												  chart_height).Chart  # AddChart(Type, Left, Top, Width, Height)
 						chrt.ApplyLayout(1)  # Select Layout 1-11
 						chrt.ChartTitle.Characters.Text = " Harmonic Order " + str(
 							int(scale_clipped[hrm[1]] / 50))  # Add Title
@@ -437,7 +448,7 @@ class Excel:
 							ws.Range(ws.Cells(1, 1), ws.Cells(1, 2)).Select()
 							# Using chart reference handle rather than making active chart
 							chrt = ws.Shapes.AddChart(c.xlXYScatter, gph_coord[gc][0] + 425, gph_coord[gc][1], chart_width,
-												   chart_height)  # AddChart(Type, Left, Top, Width, Height)
+												   chart_height).Chart  # AddChart(Type, Left, Top, Width, Height)
 							chrt.ApplyLayout(1)  # Select Layout 1-11
 							chrt.ChartTitle.Characters.Text = " Harmonic Order " + str(
 								int(scale_clipped[hrm[1]] / 50))  # Add Title
@@ -515,7 +526,7 @@ class Excel:
 														  2)).Select()  # Important for computation as it doesn't graph all the selection first ie these cells should be blank
 
 						# Using chart reference rather than activating chart
-						chrt = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30, 45, 825, 400)  # AddChart(Type, Left, Top, Width, Height)
+						chrt = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30, 45, 825, 400).Chart  # AddChart(Type, Left, Top, Width, Height)
 						chrt.ApplyLayout(1)  # Select Layout 1-11
 						chrt.ChartTitle.Characters.Text = sheet_name + " Base Cases m:Z Self Impedances"  # Add Title
 						chrt.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"  # X Axis
@@ -561,7 +572,7 @@ class Excel:
 							series_name = str(series_name1[0][0])
 
 							chrt = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30 + zb_count * 855, 45, 825,
-												   400)  # AddChart(Type, Left, Top, Width, Height)
+													  400).Chart  # AddChart(Type, Left, Top, Width, Height)
 							chrt.ApplyLayout(1)  # Select Layout 1-11
 							chrt.ChartTitle.Characters.Text = sheet_name + " " + str(
 								series_name) + " m:Z Self Impedances"  # Add Title
@@ -606,7 +617,7 @@ class Excel:
 						ws.Range(ws.Cells(startrow + 1, z_first),
 								 ws.Cells(endrow, z_last)).Select()  # Important for computation as it doesn't graph all the selection first ie these cells should be blank
 						
-						chrt = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30, 45, 825, 400)  # AddChart(Type, Left, Top, Width, Height)
+						chrt = ws.Shapes.AddChart(c.xlXYScatterLinesNoMarkers, 30, 45, 825, 400).Chart  # AddChart(Type, Left, Top, Width, Height)
 						chrt.ApplyLayout(1)  # Select Layout 1-11
 						chrt.ChartTitle.Characters.Text = sheet_name + " m:Z Self Impedance"  # Add Title
 						chrt.Axes(c.xlCategory).AxisTitle.Text = "Frequency in Hz"  # X Axis
@@ -694,7 +705,7 @@ class Excel:
 					ws.Range(ws.Cells(1, 1), ws.Cells(1, 2)).Select()
 
 					# Replaced to use chart reference rather than activating chart
-					chrt = ws.Shapes.AddChart(c.xlColumnClustered, 30, hrm_top, 825, 400)  # AddChart(Type, Left, Top, Width, Height)
+					chrt = ws.Shapes.AddChart(c.xlColumnClustered, 30, hrm_top, 825, 400).Chart  # AddChart(Type, Left, Top, Width, Height)
 					chrt.ApplyLayout(9)  # Select Layout 1-11
 					chrt.ChartTitle.Characters.Text = sheet_name + " Base Case Harmonic Emissions v IEC Limits"  # Add Title
 					chrt.SeriesCollection(1).Delete()                                     					# Delete legend
@@ -772,7 +783,7 @@ class Excel:
 						series_name = str(series_name1[0][0])
 						
 						# Using chart handle rather than reference to active chart
-						chrt = ws.Shapes.AddChart(c.xlColumnClustered, 30 + hrmb_count * 855, hrm_top, 825, 400)  # AddChart(Type, Left, Top, Width, Height)
+						chrt = ws.Shapes.AddChart(c.xlColumnClustered, 30 + hrmb_count * 855, hrm_top, 825, 400).Chart  # AddChart(Type, Left, Top, Width, Height)
 						chrt.ApplyLayout(9)  # Select Layout 1-11						
 						chrt.ChartTitle.Characters.Text = sheet_name + " " + str(
 							series_name) + " Harmonic Emissions v IEC Limits"  # Add Title
@@ -849,7 +860,7 @@ class Excel:
 					ws.Range(ws.Cells(1, 1), ws.Cells(1, 2)).Select()
 					
 					# Using chart reference rather than active chart
-					chrt = ws.Shapes.AddChart(c.xlColumnClustered, 30, hrm_top, 825, 400)  # AddChart(Type, Left, Top, Width, Height)
+					chrt = ws.Shapes.AddChart(c.xlColumnClustered, 30, hrm_top, 825, 400).Chart  # AddChart(Type, Left, Top, Width, Height)
 					chrt.ApplyLayout(9)  # Select Layout 1-11
 					chrt.ChartTitle.Characters.Text = sheet_name + " Harmonic Emissions v IEC Limits"  # Add Title
 					chrt.SeriesCollection(1).Delete()
@@ -999,45 +1010,33 @@ class Excel:
 		wb.Close()  # Close Workbook
 		return None
 
-	def __del__(self):
-		"""
-			Funciton is automatically called when class instance is garbage collected i.e. during an exception
-		:return: None
-		"""
-		# Try / except clauses because the garbage collection may have already deleted the excel instance
-		try:
-			# Avoid any alerts when closing and close newly made instanced
-			self.xl.DisplayAlerts = False
-			self.xl.Quit()
-			self.log_info('excel instance closed')
-		except ImportError:
-			self.log_info('excel instance already closed')
 
 #  ----- UNIT TESTS -----
 class TestExcelSetup(unittest.TestCase):
 	"""
 		UnitTest to test the operation of various excel workbook functions
 	"""
-	@classmethod
-	def setUpClass(cls):
-		"""
-		Setup excel instance before running
-		:return:
-		"""
-		cls.xl = Excel()
+	#@classmethod
+	#def setUpClass(cls):
+	#	"""
+	#	Setup excel instance before running
+	#	:return:
+	#	"""
+	#	cls.xl = Excel()
 
-	@classmethod
-	def tearDownClass(cls):
-		"""
-			Clear up excel instance after running
-		"""
-		del cls.xl
+	#@classmethod
+	#def tearDownClass(cls):
+	#	"""
+	#		Clear up excel instance after running
+	#	"""
+	#	del cls.xl
 
 	def test_excel_instance(self):
 		"""
 			Tests that excel instance is properly opened and closed
 		"""
-		self.assertEqual(str(self.xl.xl), 'Microsoft Excel')
+		with Excel(print_info=print, print_error=print) as xl:
+			self.assertEqual(str(xl.xl), 'Microsoft Excel')
 
 	def test_hast_settings_import(self):
 		"""
@@ -1047,8 +1046,9 @@ class TestExcelSetup(unittest.TestCase):
 		pth_test_files = 'test_file_store'
 		test_workbook = 'HAST_test_inputs.xlsx'
 		input_file = os.path.join(pth, pth_test_files, test_workbook)
-		analysis_dict = self.xl.import_excel_harmonic_inputs(workbookname=input_file)
-		self.assertEqual(len(analysis_dict.keys()), 7)
+		with Excel(print_info=print, print_error=print) as xl:
+			analysis_dict = xl.import_excel_harmonic_inputs(workbookname=input_file)
+			self.assertEqual(len(analysis_dict.keys()), 7)
 
 	def test_create_close_workbook(self):
 		"""
@@ -1058,23 +1058,24 @@ class TestExcelSetup(unittest.TestCase):
 		pth_test_files = 'test_file_store'
 		test_workbook = 'HAST_test_outputs.xlsx'
 		output_file = os.path.join(pth, pth_test_files, test_workbook)
-		wb = self.xl.create_workbook(workbookname=output_file, excel_visible=False)
-		self.assertTrue(os.path.isfile(output_file))
+		with Excel(print_info=print, print_error=print) as xl:
+			wb = xl.create_workbook(workbookname=output_file, excel_visible=False)
+			self.assertTrue(os.path.isfile(output_file))
 
-		self.xl.close_workbook(wb=wb, workbookname=output_file)
-		os.remove(output_file)
-		self.assertFalse(os.path.isfile(output_file))
-
+			xl.close_workbook(wb=wb, workbookname=output_file)
+			os.remove(output_file)
+			self.assertFalse(os.path.isfile(output_file))
 
 	def test_sheet_name(self):
 		"""
 			Tests checking whether a worksheet name already exists
 		"""
 		# Create unnamed workbook
-		wb = self.xl.xl.Workbooks.Add()
-		sht_name = 'Sheet1'
-		# Confirm that the returned value does not equal the provided value
-		self.assertFalse(sht_name==self.xl.get_sheet_name(sht_name, wb))
-		wb.Close()
+		with Excel(print_info=print, print_error=print) as xl:
+			wb = xl.xl.Workbooks.Add()
+			sht_name = 'Sheet1'
+			# Confirm that the returned value does not equal the provided value
+			self.assertFalse(sht_name==xl.get_sheet_name(sht_name, wb))
+			wb.Close()
 
 

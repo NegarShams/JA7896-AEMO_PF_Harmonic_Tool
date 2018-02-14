@@ -73,6 +73,8 @@ import hast								# HAST module package used as functions start to be transferr
 # GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
 DEBUG_MODE = False
 
+# TODO:  Log files going to incorrect folder
+
 if __name__ == '__main__':
 
 	""" Ensures this code is only run when run as the main script and not for unittesting """
@@ -82,7 +84,7 @@ if __name__ == '__main__':
 	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
 	Title = ("""::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n
 	NAME:             HAST Harmonics Automated Simulation Tool\n
-	VERSION:          1.2 [24 April 2017]\n
+	VERSION:          Development Verson by David Mills (PSC)\n
 	AUTHOR:           Barry O'Connell\n
 	::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n""")
 
@@ -1968,11 +1970,11 @@ if __name__ == '__main__':
 	Import_Workbook = filelocation + "HAST_V1_2_Inputs.xlsx"					# Gets the CWD current working directory
 	Variation_Name = "Temporary_Variation" + start1
 
-	# Create excel instance to deal with writing to excel
-	excel_cls = hast.excel_writing.Excel(print_info=print1, print_error=print2)
-	xl = excel_cls.xl
+	# Create excel instance to deal with retrieving import data from excel
+	with hast.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
+		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
 
-	analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
+
 	Study_Settings = analysis_dict["Study_Settings"]
 	if len(Study_Settings) != 20:
 		print2('Error, Check input Study Settings there should be 20 Items in the list there are only: {} {}'
@@ -2167,66 +2169,69 @@ if __name__ == '__main__':
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1("\nProcessing Results and output to Excel", bf=1, af=0)
 			start2 = time.clock()																# Used to calc the total excel export time
-			wb = excel_cls.create_workbook(workbookname=Excel_Results, excel_visible=Excel_Visible)	# Creates Workbook
-			trm1_count = 0
-			while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
-				start3 = time.clock()															# Used for measuring time to create a sheet
-				FS_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
-				if FS_Sim:
-					start4 = time.clock()
-					# TODO: Error reported that fs_sclae can be undefined.  Wrapping in class / function will prevent this
-					FS_Terminal_Results.append(fs_scale)										# Adds the scale to terminal
-					for results34 in FS_Contingency_Results:									# Adds each contingency to the terminal results
-						if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
-							results34.pop(3)													# Takes out the terminal  PF object (big long string)
-							FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
-					#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
-					if Excel_Export_Z12:
-						start5 = time.clock()
-						for results35 in FS_Contingency_Results:								# Adds each contingency to the terminal results
-							for tgb in List_of_Mutual:
-								if Terminals_index[trm1_count][3] == tgb[3]:
-									if str(tgb[2]) == str(results35[3]):						# Checks it it the right terminal and adds it
-										results35.pop(3)										# Takes out the terminal  PF object (big long string)
-										results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
-										FS_Terminal_Results.append(results35)					# If it is the right terminal append
-						print1("Process Results Z12 in Python: " + str(round((time.clock() - start5),2)) + " Seconds",
+			# Create a new instance of excel to deal with reading and writing of data to excel instance
+			# With statement means that even if error occurs new instance of excel is closed
+			with hast.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
+				wb = excel_cls.create_workbook(workbookname=Excel_Results, excel_visible=Excel_Visible)	# Creates Workbook
+				trm1_count = 0
+				while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
+					start3 = time.clock()															# Used for measuring time to create a sheet
+					FS_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
+					if FS_Sim:
+						start4 = time.clock()
+						# TODO: Error reported that fs_sclae can be undefined.  Wrapping in class / function will prevent this
+						FS_Terminal_Results.append(fs_scale)										# Adds the scale to terminal
+						for results34 in FS_Contingency_Results:									# Adds each contingency to the terminal results
+							if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
+								results34.pop(3)													# Takes out the terminal  PF object (big long string)
+								FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
+						#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
+						if Excel_Export_Z12:
+							start5 = time.clock()
+							for results35 in FS_Contingency_Results:								# Adds each contingency to the terminal results
+								for tgb in List_of_Mutual:
+									if Terminals_index[trm1_count][3] == tgb[3]:
+										if str(tgb[2]) == str(results35[3]):						# Checks it it the right terminal and adds it
+											results35.pop(3)										# Takes out the terminal  PF object (big long string)
+											results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
+											FS_Terminal_Results.append(results35)					# If it is the right terminal append
+							print1("Process Results Z12 in Python: " + str(round((time.clock() - start5),2)) + " Seconds",
+								   bf=1, af=0)		# Returns python results processing time
+					HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
+					if HRM_Sim:
+						start6 = time.clock()
+						# TODO: Error reported that fs_sclae can be undefined.  Wrapping in class / function will prevent this
+						HRM_Terminal_Results.append(hrm_scale)										# Adds the scale to terminal
+						if Excel_Export_HRM:
+							for results35 in HRM_Contingency_Results:								# Adds each contingency to the terminal results
+								if str(Terminals_index[trm1_count][3]) == results35[1]:				# Checks it it the right terminal and adds it
+									results35.pop(1)												# Takes out the terminal  PF object (big long string)
+									HRM_Terminal_Results.append(results35)							# Append terminal data to the results list to be later passed to excel
+						print1("Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",
 							   bf=1, af=0)		# Returns python results processing time
-				HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
-				if HRM_Sim:
-					start6 = time.clock()
-					# TODO: Error reported that fs_sclae can be undefined.  Wrapping in class / function will prevent this
-					HRM_Terminal_Results.append(hrm_scale)										# Adds the scale to terminal
-					if Excel_Export_HRM:
-						for results35 in HRM_Contingency_Results:								# Adds each contingency to the terminal results
-							if str(Terminals_index[trm1_count][3]) == results35[1]:				# Checks it it the right terminal and adds it
-								results35.pop(1)												# Takes out the terminal  PF object (big long string)
-								HRM_Terminal_Results.append(results35)							# Append terminal data to the results list to be later passed to excel
-					print1("Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",
-						   bf=1, af=0)		# Returns python results processing time
 
-				# Replaced with using instance in excel_writing
-				excel_cls.create_sheet_plot(sheet_name=Terminals_index[trm1_count][0],
-											fs_results=FS_Terminal_Results,
-											hrm_results=HRM_Terminal_Results,
-											wb=wb,
-											# TODO:  The following are all booleans and could be passed in a better way
-											excel_export_rx=Excel_Export_RX,
-											excel_export_z=Excel_Export_Z,
-											excel_export_hrm=Excel_Export_HRM,
-											fs_sim=FS_Sim,
-											excel_export_z12=Excel_Export_Z12,
-											excel_convex_hull=Excel_Convex_Hull,
-											hrm_sim=HRM_Sim)				# Uses the terminal results to create a sheet and graph
-				# #create_sheet_plot(Terminals_index[trm1_count][0],FS_Terminal_Results, HRM_Terminal_Results, _wb=wb, _xl=xl)				# Uses the terminal results to create a sheet and graph
-				trm1_count = trm1_count + 1
-			# progress_txt = read_text_file(Progress_Log)
+					# Replaced with using instance in excel_writing
+					excel_cls.create_sheet_plot(sheet_name=Terminals_index[trm1_count][0],
+												fs_results=FS_Terminal_Results,
+												hrm_results=HRM_Terminal_Results,
+												wb=wb,
+												# TODO:  The following are all booleans and could be passed in a better way
+												excel_export_rx=Excel_Export_RX,
+												excel_export_z=Excel_Export_Z,
+												excel_export_hrm=Excel_Export_HRM,
+												fs_sim=FS_Sim,
+												excel_export_z12=Excel_Export_Z12,
+												excel_convex_hull=Excel_Convex_Hull,
+												hrm_sim=HRM_Sim)				# Uses the terminal results to create a sheet and graph
+					# #create_sheet_plot(Terminals_index[trm1_count][0],FS_Terminal_Results, HRM_Terminal_Results, _wb=wb, _xl=xl)				# Uses the terminal results to create a sheet and graph
+					trm1_count = trm1_count + 1
+				# progress_txt = read_text_file(Progress_Log)
 
-			# Save and close workbook
-			excel_cls.close_workbook(wb=wb, workbookname=Excel_Results)
-			# #close_workbook(_wb=wb, workbookname=Excel_Results, _xl=xl)																# Closes and saves the workbook
-			print1("Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",
-				   bf=1, af=0)	# Returns the Total Export time
+				# Save and close workbook
+				excel_cls.close_workbook(wb=wb, workbookname=Excel_Results)
+				# #close_workbook(_wb=wb, workbookname=Excel_Results, _xl=xl)																# Closes and saves the workbook
+				print1("Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",
+					   bf=1, af=0)	# Returns the Total Export time
 
 	print1('Total Time: {:.2f}'.format(time.clock() - start),
 		   bf=1, af=0)
