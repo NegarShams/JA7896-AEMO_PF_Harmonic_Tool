@@ -470,7 +470,7 @@ def freq_sweep(results, fsweep_settings):		# Inputs Frequency Sweep Settings and
 	"""
 		Sets up and runs frequency sweep
 	:param results: powerfactory results variable
-	:param list fsweep_settings: Settings for frequency sweep 
+	:param list fsweep_settings: Settings for frequency sweep
 	:return int error_code: Error code showing whether frequency sweep was successful 
 	"""
 	t1 = time.clock()
@@ -702,11 +702,19 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	# _count_studycase used instead of count_studycase to avoid shadowing
 	_count_studycase = 0
 	new_list =[]
-	# # err = 0
+
+	# Empty list which will be populated with the new classes
+	cls_list = []
 	while _count_studycase < len(list_to_check):
 		# ERROR: Previously was not actually looking at the list passed to function
 		# # prj = activate_project(List_of_Studycases[_count_studycase][1])												# Activate Project
-		prj = activate_project(list_to_check[_count_studycase][1])  # Activate Project
+		_prj = activate_project(list_to_check[_count_studycase][1])  # Activate Project
+		# Create a results folder for each project so that the reference can be included in the study_cls
+		results_folder, folder_exists = create_folder(prj, Results_Folder)
+
+		# Create ComTasks and store in this location
+		task_automation = create_object(results_folder, 'ComTasks', 'Task_Automation_{}'.format(start1))
+
 		if len(str(prj)) > 0:
 			study_case, _study_error = activate_study_case(list_to_check[_count_studycase][2])									# Activate Case
 			if _study_error == 0:
@@ -717,8 +725,12 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 					print2('DEBUG - Load flow study completed with error code {}'.format(ldf_err))					
 					if ldf_err == 0 or Skip_Unsolved_Ldf == False:
 						new_list.append(list_to_check[_count_studycase])
+
 						print1("Studycase Scenario Solving added to analysis list: " + str(list_to_check[_count_studycase]),
 							   bf=2, af=0)
+
+						# TODO: At this point could create just a list that references the newly created study case and return that,
+						# TODO: The newly created study cases can then just be activated and deactivated as appropriate.
 
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
@@ -738,15 +750,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								print1('Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
 									   bf=2, af=0)
 								deactivate_scenario()																# Can't copy activated Scenario so deactivate it
-								# Can't copy activated stidu case so deactivate it
+								# Can't copy activated studu case so deactivate it
 								deactivate_study_case()
+								cont_name = '{}_{}'.format(List_of_Studycases[_count_studycase][0],
+														   new_contingency_list[cont_count][0])
 								_new_study_case = add_copy(study_case_results_folder,
 														   study_case,
-														   List_of_Studycases[_count_studycase][0] + str(
-															   "_" + new_contingency_list[cont_count][0]))
-								print2(_new_study_case)
+														   cont_name)
+								# #print2(_new_study_case)
 								_new_scenario = add_copy(_op_sc_results_folder, scenario,
-														 List_of_Studycases[_count_studycase][0] + str("_" + new_contingency_list[cont_count][0]))	# Copies the base scenario
+														 cont_name)	# Copies the base scenario
 								_new_study_case.Activate()
 								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
@@ -755,12 +768,26 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 										switch_coup(_switch[0], _switch[1])
 
 								save_active_scenario()
+
+								# TODO: This load flow may be unnecessary
 								_ = load_flow(Load_Flow_Setting)															# Carry out load flow
 								cont_count = cont_count + 1
 
 								# Deactivate new study case and reactivate old study case
 								_new_study_case.Deactivate()
 								study_case.Activate()
+
+								# Create new class reference with all the details for this contingency and then add to
+								# list to be returned
+								_study_cls = hast.pf.PFStudyCase(full_name=cont_name,
+																 list_parameters=list_to_check[_count_studycase],
+																 cont_name=new_contingency_list[cont_count][0],
+																 sc=_new_study_case,
+																 op=_new_scenario,
+																 prj=_prj,
+																 res_folder=results_folder,
+																 task_auto=task_automation)
+								cls_list.append(_study_cls)
 					else:
 						print2("Problem with Loadflow: " + str(list_to_check[_count_studycase][0]))
 				else:
@@ -775,7 +802,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	print1("Finished Checking Study Cases", bf=1, af=0)
 	print1("___________________________________________________________________________________________________",
 		   bf=2,af=2)
-	return new_list
+	# #return new_list
+	return cls_list
 
 
 def check_terminals(list_of_points): 		# This checks and creates the list of terminals to add to the Results file
@@ -1036,13 +1064,14 @@ if __name__ == '__main__':
 			   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
 	# Check all study cases converge, etc. and produce a new study case + operational scenario for each one
-	List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
-	# At this point now have a new study case which has been associated with an operational scenario for each
-	# contingency such that the PowerFactory TaskAutomation can now be used to run 3 studies in parallel
+	# #List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
+	# Adjusted to now return a list of handles to class <hast.pf.PF_Study_Case> which contain handles for the powerfactory
+	# scenario objects that require activating.
+	list_of_studycase_handles = check_list_of_studycases(List_of_Studycases)
 
 	# TODO: Find the points at which frequency sweeps are being run and instead create a ComFreqSweep and ComHLF within
 	# TODO: each study case.
-	# TODO: These can then be added to the ComTaskAutomation to run 3 processes at a time.
+	# TODO: These can then be added to the ComTaskAutomation to run 3+ processes at a time.
 
 	# Excel export contained within this loop
 	# TODO: This section needs splitting up to firstly loop through creating the results folders and frequency sweeps,
@@ -1055,28 +1084,46 @@ if __name__ == '__main__':
 
 		FS_Contingency_Results, HRM_Contingency_Results = [], []
 		count_studycase = 0
-		# TODO: Create centralised results folders here for all the FS and HRM results
 
-		while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
-			prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
+		# #while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
+		for count_studycase, study_cls in enumerate(list_of_studycase_handles):  # Loop Through (Study Cases, Operational Scenarios)
+			# Results folder created for each project
+			# TODO: Check project isn't already active before activating
+			prj = study_cls.prj.Activate()  # Activate Project
+			print1('Carrying out study for study case {} with operational scenario {} and contingency {}'
+				   .format(study_cls.sc_name, study_cls.op_name, study_cls.cont_name))
+
+			# #MOVED - prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
 			if len(str(prj)) > 0:
-				StudyCase, study_error = activate_study_case(List_of_Studycases1[count_studycase][2])		# Activate Study Case in List
-				Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate corresponding operational Scenario
+
+				# TODO: Need to add back in error checking
+				# #StudyCase, study_error = activate_study_case(List_of_Studycases1[count_studycase][2])		# Activate Study Case in List
+				# Activate Study Case
+				StudyCase = study_cls.sc
+				StudyCase.Activate()
+				# TODO: This could be done as part of class when initialised
+				# Add study case to task automation
+				study_cls.task_auto.AppendStudyCase(study_cls.sc)
+
+				# #Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate corresponding operational Scenario
+				# Activate Scenario
+				Scenario = study_cls.op
+				Scenario.Activate()
 				Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
 				Operation_Case_Folder = app.GetProjectFolder("scen")
-				Variations_Folder = app.GetProjectFolder("scheme")
+				# #Variations_Folder = app.GetProjectFolder("scheme")
 				# TODO: Clarify purpose of variation
-				Active_variations = get_active_variations()
-				Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
-				activate_variation(Variation)
-				Stage = create_stage(Variation,"IntSstage",Variation_Name)
-				New_Contingency_List, Con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
+				# #Active_variations = get_active_variations()
+				# #Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
+				# #activate_variation(Variation)
+				# #Stage = create_stage(Variation,"IntSstage",Variation_Name)
+				# #New_Contingency_List, Con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 				Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
 
 				# TODO: Results folder should now be declared above rather than being related to a particular
 				# TODO study case.
-				studycase_results_folder, folder_exists1 = create_folder(StudyCase, Results_Folder)
-				op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
+				# #studycase_results_folder, folder_exists1 = create_folder(StudyCase, Results_Folder)
+				# #op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
 				Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
 				if len(Net_Elm1) < 1:
 					print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
@@ -1088,104 +1135,136 @@ if __name__ == '__main__':
 					Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
 					List_of_Mutual = []
 					studycase_mutual_folder = ''
-				count = 0
-				while count < len(New_Contingency_List):												# Loop Through Contingency list
-					print1("Carrying out Contingency: " + New_Contingency_List[count][0], bf=2, af=0)
-					deactivate_scenario()																# Can't copy activated Scenario so deactivate it
+				# #count = 0
 
-					# TODO: Since scenarios already produced this may no longer be required
-					object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
-					if object_exists == 0:
-						new_scenario = add_copy(op_sc_results_folder,Scenario,List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0]))	# Copies the base scenario
-					else:
-						new_scenario = new_object[0]
-					scen_error = activate_scenario1(new_scenario)										# Activates the base scenario
-					if New_Contingency_List[count][0] != "Base_Case":									# Apply Contingencies if it is not the base case
-						for switch in New_Contingency_List[count][1:]:
-							switch_coup(switch[0],switch[1])
-					save_active_scenario()
-					if FS_Sim:
-						sweep = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_FS",9)		# Create Results File
-						trm_count = 0
-						while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
-							add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
-							trm_count = trm_count + 1
-						if Excel_Export_Z12:
-							# TODO: Reports an error due to not being defined which can be resolved by wrapping in function
-							for mut in List_of_Mutual:													# Adds the mutual impedance data to Results File
-								add_vars_res(sweep, mut[2], Mutual_Variables)
+				# No need to loop through contingencies any more since each study case is contingency specific
+				# #while count < len(New_Contingency_List):												# Loop Through Contingency list
+				# #	print1("Carrying out Contingency: " + New_Contingency_List[count][0], bf=2, af=0)
+				# # deactivate_scenario()																# Can't copy activated Scenario so deactivate it
 
-						# TODO: Adjust freq_sweep code so that instead it creates a new command and returns it as a handle
-						# TODO: Add freq_sweep handle to task automation for this study case
-						Fsweep_err_cde = freq_sweep(sweep,Fsweep_Settings)								# Carry out Frequency Sweep
-						if Fsweep_err_cde == 0:															# Skips the contingency if Frequency Sweep doesn't solve
-							fs_scale, fs_res = retrieve_results(sweep,0)
-							fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
-							fs_scale.insert(1,"Scale")
-							fs_scale.pop(3)
-							for tope in fs_res:															# Adds the additional information to the results file
-								tope.insert(1,New_Contingency_List[count][0])							# Op scenario
-								tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
-								FS_Contingency_Results.append(tope)										# Results
-						else:
-							print2("Error with Frequency Sweep Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
-					else:
-						fs_scale = []
-					if HRM_Sim:
-						harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
-						trm_count = 0
-						while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
-							add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
-							trm_count = trm_count + 1
+				# #	object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
+				# #	if object_exists == 0:
+				# #		new_scenario = add_copy(op_sc_results_folder,Scenario,List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0]))	# Copies the base scenario
+				# #	else:
+				# #		new_scenario = new_object[0]
+				# #	scen_error = activate_scenario1(new_scenario)										# Activates the base scenario
+				# #	if New_Contingency_List[count][0] != "Base_Case":									# Apply Contingencies if it is not the base case
+				# #		for switch in New_Contingency_List[count][1:]:
+				# #			switch_coup(switch[0],switch[1])
+				# #	save_active_scenario()
 
-						# TODO: Runs harmonic results here
-						Harm_err_cde = harm_load_flow(harm, Harmonic_Loadflow_Settings)
-						if Harm_err_cde == 0:
-							hrm_scale, hrm_res = retrieve_results(harm,1)
-							hrm_scale.insert(1,"THD")													# Inserts the THD
-							hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
-							hrm_scale.insert(1,"Scale")
-							hrm_scale.pop(4)															# Takes out the 50 Hz
-							hrm_scale.pop(4)
-							for res12 in hrm_res:
-								thd1 = re.split(r'[\\.]',res12[1])
-								thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
-								thdz = False
-								if thd2[0] is not None:
-									thd3 = thd2[0].GetContents()
-									for thd4 in thd3:
-										if (thd1[13] + ".ElmTerm") in str(thd4):
-											THD = thd4.GetAttribute('m:THD')
-											thdz = True
-								elif thd2[0] is not None or thdz == False:
-									THD = "NA"
-								#thd4 = app.SearchObjectByForeignKey(thd1[11] + ".ElmSubstat")
-								# TODO: THD recognised as undeclared which will be solved by wrapping into function
-								res12.insert(2, THD)														# Insert THD
-								res12.insert(2, New_Contingency_List[count][0])							# Op scenario
-								res12.insert(2, List_of_Studycases1[count_studycase][0])					# Study case description
-								res12.pop(5)
-								HRM_Contingency_Results.append(res12)									# Results
-						else:
-							print2("Error with Harmonic Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
-					else:
-						hrm_scale =[]
-					count = count + 1
-				print1("", bf=2, af=0)
-				Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate the base case scenario this just ensures that when the script finishes using PF that it goes back to a regular case
-				count_studycase = count_studycase + 1
-				print1("", bf=2, af=0)
-				if Delete_Created_Folders:
-					delete_object(studycase_results_folder)
-					delete_object(op_sc_results_folder)
+				# TODO: create results file and associated command, save results to results folder and command to study case
+				if FS_Sim:
+					# #sweep = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_FS",9)		# Create Results File
+					sweep = create_results_file(study_cls.res_folder, study_cls.name + "_FS", 9)  # Create Results File
+					trm_count = 0
+					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
+						add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
+						trm_count = trm_count + 1
 					if Excel_Export_Z12:
-						delete_object(studycase_mutual_folder)
-					# Deactivate active variation
-					Variation.Deactivate()
-					delete_object(Variation)
+						for mut in List_of_Mutual:													# Adds the mutual impedance data to Results File
+							add_vars_res(sweep, mut[2], Mutual_Variables)
+
+					# Create command for frequency sweep and add to Task Automation
+					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings)
+					# Add freq_sweep to task automation
+					study_cls.task_auto.AppendCommand(freq_sweep, 0)
+					print1('Frequency sweep added for study case {}'.format(study_cls.name))
+
+					# #Fsweep_err_cde = freq_sweep(sweep, Fsweep_Settings)								# Carry out Frequency Sweep
+
+
+					# #TODO: results processing needs to happen later once parallel processing has been completed
+					# #if Fsweep_err_cde == 0:															# Skips the contingency if Frequency Sweep doesn't solve
+					# #	fs_scale, fs_res = retrieve_results(sweep,0)
+					# #	fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
+					# #	fs_scale.insert(1,"Scale")
+					# #	fs_scale.pop(3)
+					# #	for tope in fs_res:															# Adds the additional information to the results file
+					# #		tope.insert(1,New_Contingency_List[count][0])							# Op scenario
+					# #		tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
+					# #		FS_Contingency_Results.append(tope)										# Results
+					# #else:
+					# #	print2("Error with Frequency Sweep Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
+				else:
+					# Frequency sweep not carried out so no need to add to task automation
+					print1('No frequency sweep included for study case {}'.format(study_cls.name))
+					# #fs_scale = []
+				if HRM_Sim:
+					# Create a results file to store the results from the harmonic load flow
+					harm = create_results_file(study_cls.res_folder, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
+					# #harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
+					trm_count = 0
+					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
+						add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
+						trm_count = trm_count + 1
+
+					# Create command for harmonic load flow and add to Task Automation
+					hldf_command = study_cls.create_harm_load_flow(results_file=harm,
+																   settings=Harmonic_Loadflow_Settings)
+					study_cls.task_auto.AddCommand(hldf_command, 0)
+					print1('Harmonic load flow added for study case {}'.format(study_cls.name))
+					# #TODO: Results processing needs to happen elsewhere
+					# #Harm_err_cde = harm_load_flow(harm, Harmonic_Loadflow_Settings)
+					# #if Harm_err_cde == 0:
+					# #	hrm_scale, hrm_res = retrieve_results(harm,1)
+					# #	hrm_scale.insert(1,"THD")													# Inserts the THD
+					# #	hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
+					# #	hrm_scale.insert(1,"Scale")
+					# #	hrm_scale.pop(4)															# Takes out the 50 Hz
+					# #	hrm_scale.pop(4)
+					# #	for res12 in hrm_res:
+					# #		thd1 = re.split(r'[\\.]',res12[1])
+					# #		thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
+					# #		thdz = False
+					# #		if thd2[0] is not None:
+					# #			thd3 = thd2[0].GetContents()
+					# #			for thd4 in thd3:
+					# #				if (thd1[13] + ".ElmTerm") in str(thd4):
+					# #					THD = thd4.GetAttribute('m:THD')
+					# #					thdz = True
+					# #		elif thd2[0] is not None or thdz == False:
+					# #			THD = "NA"
+					# #		#thd4 = app.SearchObjectByForeignKey(thd1[11] + ".ElmSubstat")
+					# #		# TODO: THD recognised as undeclared which will be solved by wrapping into function
+					# #		res12.insert(2, THD)														# Insert THD
+					# #		res12.insert(2, New_Contingency_List[count][0])							# Op scenario
+					# #		res12.insert(2, List_of_Studycases1[count_studycase][0])					# Study case description
+					# #		res12.pop(5)
+					# #		HRM_Contingency_Results.append(res12)									# Results
+					# #else:
+					# #	print2("Error with Harmonic Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
+
+				else:
+					print1('No Harmonic load flow added for study case {}'.format(study_cls.name))
+					# #hrm_scale =[]
+				# #count = count + 1
+				# #print1("", bf=2, af=0)
+
+				# TODO:  Need to add in statement that will mean the initial study case is restored once completed
+				# #Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate the base case scenario this just ensures that when the script finishes using PF that it goes back to a regular case
+				# #count_studycase = count_studycase + 1
+				# #print1("", bf=2, af=0)
+				# TODO: Delete folders once created, if requested to do so in settings
+				# #if Delete_Created_Folders:
+				# #	delete_object(studycase_results_folder)
+				# #	delete_object(op_sc_results_folder)
+				# #	if Excel_Export_Z12:
+				# #		delete_object(studycase_mutual_folder)
+				# #	# Deactivate active variation
+				# #	Variation.Deactivate()
+				# #	delete_object(Variation)
 			else:
-				print2('Could Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
+				print2('Could Not Activate Project {}'.format(study_cls.prj))
+				# #print2('Could Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
 				# ERROR:  print2("Could Not Activate Project: " + Project_Name)
+
+		print2('DEBUG FORCED EXIT')
+		raise SyntaxError('EXIT')
+
+
+		# TODO:  At this point the task automation files have been created and will now need to loop through each project
+		# TODO: iteratively to run the commands before then processing the results
 
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1("\nProcessing Results and output to Excel", bf=1, af=0)
