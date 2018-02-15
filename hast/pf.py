@@ -95,7 +95,7 @@ class PFStudyCase:
 		self.fs_scale = []
 		self.hrm_scale = []
 
-	def create_freq_sweep(self, results_file, settings, logger):
+	def create_freq_sweep(self, results_file, settings):
 		"""
 			Create a frequency sweep command in the study_case and return this as a reference
 		:param object results_file:  Reference to the power factory results file for frequency sweep results
@@ -121,10 +121,6 @@ class PFStudyCase:
 		frq.p_resvar = results_file  # Results Variable
 		# TODO: Load flow settings for frequency sweep are currently not configured
 		# frq.cbutldf = fsweep_settings[11]                 # Load flow
-		logger.info('Results file = {}'.format(results_file))
-		logger.info('FSweep = {}'.format(frq.p_resvar))
-
-		raise SyntaxError('TEST')
 
 		# Advanced
 		frq.errmax = settings[12]  # Setting for Step Size Adaption    Maximum Prediction Error
@@ -178,7 +174,10 @@ class PFStudyCase:
 			Function extracts and prodcesses the load flow results for this study case
 		:return list fs_res
 		"""
-		fs_scale, fs_res = retrieve_results(self.fs_results, 0, logger)
+		logger.info('Result variable in frq is = {}'.format(self.frq.p_resvar))
+		logger.info('Target result variable should be = {}'.format(self.fs_results))
+		fs_scale, fs_res = retrieve_results(self.frq.p_resvar, 0, logger)
+		# #fs_scale, fs_res = retrieve_results(self.fs_results, 0, logger)
 		fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
 		fs_scale.insert(1,"Scale")
 		fs_scale.pop(3)
@@ -200,9 +199,11 @@ class PFStudyCase:
 			Process the hrlf results ready for inclusion into spreadsheet
 		:return hrm_res
 		"""
-		hrlf_results_returned = []
+		logger.info('Result variable in hldf is = {}'.format(self.hldf.p_resvar))
+		logger.info('Target result variable should be = {}'.format(self.hldf_results))
 
-		hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
+		#  hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
+		hrm_scale, hrm_res = retrieve_results(self.hldf.p_resvar, 1)
 		hrm_scale.insert(1,"THD")													# Inserts the THD
 		hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
 		hrm_scale.insert(1,"Scale")
