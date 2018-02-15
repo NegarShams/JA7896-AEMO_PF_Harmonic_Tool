@@ -1118,7 +1118,7 @@ if __name__ == '__main__':
 			prj_activation_failed = prj_cls.prj.Activate()
 
 			#If failed activation then returns 1 (i.e. True) and for loop is continued
-			if prj_activation_failed:
+			if prj_activation_failed == 1:
 				print2('Not possible to activate project {} and so no studies are performed for this project'
 					   .format(prj_cls.name))
 				continue
@@ -1306,9 +1306,6 @@ if __name__ == '__main__':
 			print1('Parallel running of frequency scans and harmonic load flows associated with project {}'
 				.format(prj_cls.name))
 
-			print2(' DEBUG FORCED EXIT ')
-			raise SyntaxError('EXIT')
-
 			# Call Task automation to run studies
 			prj_cls.task_auto.Execute()
 
@@ -1323,7 +1320,8 @@ if __name__ == '__main__':
 		# TODO:  At this point the task automation files have been created and will now need to loop through each project
 		# TODO: iteratively to run the commands before then processing the results
 
-
+		print2(' DEBUG FORCED EXIT ')
+		raise SyntaxError('EXIT')
 
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1("\nProcessing Results and output to Excel", bf=1, af=0)
