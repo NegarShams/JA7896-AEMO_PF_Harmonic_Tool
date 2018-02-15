@@ -2,6 +2,8 @@
 	Classes containing details needed for pf extract
 """
 
+import re
+
 def create_object(location, pfclass, name):			# Creates a database object in a specified location of a specified class
 	"""
 		Creates a database object in a specified location of a specified class
@@ -13,6 +15,41 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 	# _new_object used instead of new_object to avoid shadowing
 	_new_object = location.CreateObject(pfclass, name)
 	return _new_object
+
+def retrieve_results(elmres, res_type):			# Reads results into python lists from results file
+	"""
+		Reads results into python lists from results file for processing to add to Excel
+	:param powerfactory.Results elmres: handle for powerfactory results file 
+	:param int res_type: Type of results being dealt with 
+	:return: 
+	"""
+	# Note both column number and row start at 1.
+	# The first column is usually the scale ie timestep, frequency etc.
+	# The columns are made up of Objects from left to right (ElmTerm, ElmLne)
+	# The Objects then have sub variables (m:R, m:X etc)
+	elmres.Load()
+	cno = elmres.GetNumberOfColumns()	# Returns number of Columns
+	rno = elmres.GetNumberOfRows()		# Returns number of Rows in File
+	results = []
+	for i in range(cno):
+		column = []
+		p = elmres.GetObject(i) 		# Object
+		d = elmres.GetVariable(i)		# Variable
+		column.append(d)
+		column.append(str(p))
+		# column.append(d)
+		# app.PrintPlain([i,p,d])
+		for j in range(rno):
+			r, t = elmres.GetValue(j, i)
+			# app.PrintPlain([i,p,d,j,t])
+			column.append(t)
+		results.append(column)
+	if res_type == 1:
+		results = results[:-1]
+	scale = results[-1:]
+	results = results[:-1]
+	elmres.Release()
+	return scale[0], results
 
 
 class PFStudyCase:
@@ -49,6 +86,10 @@ class PFStudyCase:
 		# Attributes set during study completion
 		self.frq = None
 		self.hldf = None
+		self.fs_resuls = None
+		self.hldf_results = None
+		self.fs_scale = []
+		self.hrm_scale = []
 
 	def create_freq_sweep(self, results_file, settings):
 		"""
@@ -57,6 +98,7 @@ class PFStudyCase:
 		:param list settings:  Settings for the frequency sweep to be created
 		:return object frq_sweep:  Handle to the frq_sweep command that has been created
 		"""
+		self.fs_resuls = results_file
 		# Create a new frequency sweep command object and store it in the study case
 		frq = create_object(self.sc, 'ComFsweep', 'FSweep_{}'.format(self.uid))
 
@@ -92,7 +134,8 @@ class PFStudyCase:
 		:param list settings: Harmonic load flow settings
 		:return object hldf:  Handle to the hldf that has just been created
 		"""
-		# Create a new harmonnic load flow object and store it in the study case
+		self.hldf_results = results_file
+		# Create a new harmonic load flow object and store it in the study case
 		hldf = create_object(self.sc, 'ComHldf', 'HLDF_{}'.format(self.uid))
 
 		## Loadflow settings
@@ -122,6 +165,69 @@ class PFStudyCase:
 		self.hldf = hldf
 		return self.hldf
 
+	def process_lf_results(self, logger, app):
+		"""
+			Function extracts and prodcesses the load flow results for this study case
+		:return list fs_res
+		"""
+		fs_scale, fs_res = retrieve_results(self.fs_resuls, 0)
+		fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
+		fs_scale.insert(1,"Scale")
+		fs_scale.pop(3)
+		for tope in fs_res:															# Adds the additional information to the results file
+			# #tope.insert(1, New_Contingency_List[count][0])							# Op scenario
+			tope.insert(1, self.cont_name)											# Contingency name
+			# #tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
+			tope.insert(1, self.sc_name)					# Study case description
+
+			# TODO: Figure out how to return results
+			# #FS_Contingency_Results.append(tope)										# Results
+
+		self.fs_scale = fs_scale
+
+		return fs_res
+
+	def process_hrlf_results(self, logger, app):
+		"""
+			Process the hrlf results ready for inclusion into spreadsheet
+		:return hrm_res
+		"""
+		hrlf_results_returned = []
+
+		hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
+		hrm_scale.insert(1,"THD")													# Inserts the THD
+		hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
+		hrm_scale.insert(1,"Scale")
+		hrm_scale.pop(4)															# Takes out the 50 Hz
+		hrm_scale.pop(4)
+		for res12 in hrm_res:
+			thd1 = re.split(r'[\\.]', res12[1])
+			logger.info('thd1[11] = {}.ElmSubstat'.format(thd1[11]))
+			thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
+			thdz = False
+			if thd2[0] is not None:
+				thd3 = thd2[0].GetContents()
+				for thd4 in thd3:
+					if (thd1[13] + ".ElmTerm") in str(thd4):
+						logger.info('thd4 = {}'.format(thd4))
+						str_thd = thd4.GetAttribute('m:THD')
+						thdz = True
+			elif thd2[0] is not None or thdz == False:
+				str_thd = "NA"
+			res12.insert(2, str_thd)														# Insert THD
+			# #res12.insert(2, New_Contingency_List[count][0])							# Op scenario
+			res12.insert(2, self.cont_name)												# Op scenario
+			res12.insert(2, self.sc_name)												# Study case description
+			res12.pop(5)
+
+			# TODO: Figure out how to return results
+			# #HRM_Contingency_Results.append(res12)									# Results
+
+		self.hrm_scale = hrm_scale
+
+		return hrm_res
+
+
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
 	def __init__(self, name, prj, res_folder, task_auto):
@@ -137,3 +243,23 @@ class PFProject:
 		self.res_folder = res_folder
 		self.task_auto = task_auto
 		self.sc_cases = []
+
+	def process_fs_results(self, logger, app):
+		""" Loop through each study case cls and process results files
+		:return list fs_res
+		"""
+		fs_res = []
+		for sc_cls in self.sc_cases:
+			sc_cls.sc.Activate()
+			fs_res.extend(sc_cls.process_fs_results(logger, app))
+			sc_cls.sc.Deactivate()
+
+	def process_hrlf_results(self, logger, app):
+		""" Loop through each study case cls and process results files
+		:return list hrlf_res:
+		"""
+		hrlf_res = []
+		for sc_cls in self.sc_cases:
+			sc_cls.sc.Activate()
+			hrlf_res.extend(sc_cls.process_hrlf_results(logger, app))
+			sc_cls.sc.Deactivate()

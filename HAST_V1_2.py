@@ -1317,11 +1317,26 @@ if __name__ == '__main__':
 
 		print1('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
 
+		print1('Processing results into suitable format for extraction to excel')
+		for prj_name, prj_cls in dict_of_projects.items():
+			# TODO: Confirm if project needs to be activated for .GetCalcRelevantObjects to work (in pf.py)
+			# TODO: If it is then reorder if staments to avoid activating and deactivating study cases multiple times
+			prj_cls.prj.Activate()
+			# If frequency scan results were carried out process those
+			if FS_Sim:
+				FS_Contingency_Results.extend(prj_cls.process_fs_results(logger, app))
+				# Is it possible that the fs_scale could be different for different results
+				fs_scale = prj_cls.sc_cases[0].fs_scale
+			if HRM_Sim:
+				HRM_Contingency_Results.extend(prj_cls.process_hrlf_results(logger, app))
+				# TODO: Is it possible that the hrm_scale could be different for different sets of results
+				hrm_scale = prj_cls.sc_cases[0].hrm_scale
+
+			# TODO: Only required if project activated above
+			prj_cls.prj.Deactivate()
+
 		# TODO:  At this point the task automation files have been created and will now need to loop through each project
 		# TODO: iteratively to run the commands before then processing the results
-
-		print2(' DEBUG FORCED EXIT ')
-		raise SyntaxError('EXIT')
 
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1("\nProcessing Results and output to Excel", bf=1, af=0)
