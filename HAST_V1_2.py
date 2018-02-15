@@ -1206,7 +1206,7 @@ if __name__ == '__main__':
 							add_vars_res(sweep, mut[2], Mutual_Variables)
 
 					# Create command for frequency sweep and add to Task Automation
-					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings)
+					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings, logger=logger)
 					# Add freq_sweep to task automation
 					study_cls.task_auto.AppendCommand(freq_sweep, 0)
 					print1('Frequency sweep added for study case {}'.format(study_cls.name))

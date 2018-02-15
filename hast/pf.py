@@ -16,7 +16,7 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 	_new_object = location.CreateObject(pfclass, name)
 	return _new_object
 
-def retrieve_results(elmres, res_type):			# Reads results into python lists from results file
+def retrieve_results(elmres, res_type, logger):			# Reads results into python lists from results file
 	"""
 		Reads results into python lists from results file for processing to add to Excel
 	:param powerfactory.Results elmres: handle for powerfactory results file 
@@ -27,9 +27,12 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 	# The first column is usually the scale ie timestep, frequency etc.
 	# The columns are made up of Objects from left to right (ElmTerm, ElmLne)
 	# The Objects then have sub variables (m:R, m:X etc)
+	logger.info('ElmRes = {}'.format(elmres))
 	elmres.Load()
 	cno = elmres.GetNumberOfColumns()	# Returns number of Columns
 	rno = elmres.GetNumberOfRows()		# Returns number of Rows in File
+	logger.info('Number of columns = {}'.format(cno))
+	logger.info('Number of rows = {}'.format(rno))
 	results = []
 	for i in range(cno):
 		column = []
@@ -46,6 +49,7 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 		results.append(column)
 	if res_type == 1:
 		results = results[:-1]
+	logger.info('Results length = {}'.format(len(results)))
 	scale = results[-1:]
 	results = results[:-1]
 	elmres.Release()
@@ -86,19 +90,19 @@ class PFStudyCase:
 		# Attributes set during study completion
 		self.frq = None
 		self.hldf = None
-		self.fs_resuls = None
+		self.fs_results = None
 		self.hldf_results = None
 		self.fs_scale = []
 		self.hrm_scale = []
 
-	def create_freq_sweep(self, results_file, settings):
+	def create_freq_sweep(self, results_file, settings, logger):
 		"""
 			Create a frequency sweep command in the study_case and return this as a reference
 		:param object results_file:  Reference to the power factory results file for frequency sweep results
 		:param list settings:  Settings for the frequency sweep to be created
 		:return object frq_sweep:  Handle to the frq_sweep command that has been created
 		"""
-		self.fs_resuls = results_file
+		self.fs_results = results_file
 		# Create a new frequency sweep command object and store it in the study case
 		frq = create_object(self.sc, 'ComFsweep', 'FSweep_{}'.format(self.uid))
 
@@ -117,6 +121,10 @@ class PFStudyCase:
 		frq.p_resvar = results_file  # Results Variable
 		# TODO: Load flow settings for frequency sweep are currently not configured
 		# frq.cbutldf = fsweep_settings[11]                 # Load flow
+		logger.info('Results file = {}'.format(results_file))
+		logger.info('FSweep = {}'.format(frq.p_resvar))
+
+		raise SyntaxError('TEST')
 
 		# Advanced
 		frq.errmax = settings[12]  # Setting for Step Size Adaption    Maximum Prediction Error
@@ -165,12 +173,12 @@ class PFStudyCase:
 		self.hldf = hldf
 		return self.hldf
 
-	def process_lf_results(self, logger, app):
+	def process_fs_results(self, logger, app):
 		"""
 			Function extracts and prodcesses the load flow results for this study case
 		:return list fs_res
 		"""
-		fs_scale, fs_res = retrieve_results(self.fs_resuls, 0)
+		fs_scale, fs_res = retrieve_results(self.fs_results, 0, logger)
 		fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
 		fs_scale.insert(1,"Scale")
 		fs_scale.pop(3)
