@@ -50,7 +50,6 @@ class PFStudyCase:
 		self.frq = None
 		self.hldf = None
 
-
 	def create_freq_sweep(self, results_file, settings):
 		"""
 			Create a frequency sweep command in the study_case and return this as a reference
@@ -123,3 +122,18 @@ class PFStudyCase:
 		self.hldf = hldf
 		return self.hldf
 
+class PFProject:
+	""" Class contains reference to a project, results folder and associated task automation file"""
+	def __init__(self, name, prj, res_folder, task_auto):
+		"""
+			Initialise class
+		:param str name:  project name
+		:param object prj:  project reference
+		:param object res_folder:  folder reference
+		:param object task_auto:  task automation reference
+		"""
+		self.name = name
+		self.prj = prj
+		self.res_folder = res_folder
+		self.task_auto = task_auto
+		self.sc_cases = []

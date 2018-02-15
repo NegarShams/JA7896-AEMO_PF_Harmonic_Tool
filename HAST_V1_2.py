@@ -692,7 +692,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 		Produces a new operational scenario and study case of each contingency so that each study case can be split
 		out into separate parallel processing functions
 	:param list list_to_check: List of items to check 
-	:return list new_list: 
+	:return dict prj_dict:  Dictionary of projects where the study cases associated with each project are contained within 
 	"""
 	# TODO: Check function since there are a lot of unresolved references
 	print1('___________________________________________________________________________________________________', bf=2, af=0)
@@ -705,13 +705,15 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 	# Empty list which will be populated with the new classes
 	cls_list = []
+	prj_dict = dict()
 	while _count_studycase < len(list_to_check):
 		# ERROR: Previously was not actually looking at the list passed to function
 		# # prj = activate_project(List_of_Studycases[_count_studycase][1])												# Activate Project
 		# TODO: Efficieny - This is activating a new project even if it is the same
-		_prj = activate_project(list_to_check[_count_studycase][1])  # Activate Project
+		project_name = list_to_check[_count_studycase][1]
+		_prj = activate_project(project_name)  # Activate Project
 
-		if len(str(prj)) > 0:
+		if len(str(_prj)) > 0:
 			study_case, _study_error = activate_study_case(list_to_check[_count_studycase][2])									# Activate Case
 			if _study_error == 0:
 				scenario, scen_err = activate_scenario(list_to_check[_count_studycase][3])										# Activate Scenario
@@ -774,7 +776,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 								# TODO: This load flow may be unnecessary
 								_ = load_flow(Load_Flow_Setting)															# Carry out load flow
-								cont_count = cont_count + 1
 
 								# Deactivate new study case and reactivate old study case
 								_new_study_case.Deactivate()
@@ -789,8 +790,19 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																 op=_new_scenario,
 																 prj=_prj,
 																 res_folder=results_folder,
-																 task_auto=task_automation)
-								cls_list.append(_study_cls)
+																 task_auto=task_automation,
+																 uid=start1)
+								# Add study case to dictionary of projects
+								if project_name in prj_dict.keys():
+									prj_dict[project_name].sc_cases.append(_study_cls)
+								else:
+									prj_dict[project_name] = hast.pf.PFProject(name=project_name,
+																			   prj=_prj,
+																			   res_folder=results_folder,
+																			   task_auto=task_automation)
+								# #cls_list.append(_study_cls)
+								# TODO: Use enumerator rather than iterating counter
+								cont_count = cont_count + 1
 					else:
 						print2("Problem with Loadflow: " + str(list_to_check[_count_studycase][0]))
 				else:
@@ -806,7 +818,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	print1("___________________________________________________________________________________________________",
 		   bf=2,af=2)
 	# #return new_list
-	return cls_list
+	# Get unique list of projects
+	return prj_dict
 
 
 def check_terminals(list_of_points): 		# This checks and creates the list of terminals to add to the Results file
@@ -1070,7 +1083,7 @@ if __name__ == '__main__':
 	# #List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
 	# Adjusted to now return a list of handles to class <hast.pf.PF_Study_Case> which contain handles for the powerfactory
 	# scenario objects that require activating.
-	list_of_studycase_handles = check_list_of_studycases(List_of_Studycases)
+	dict_of_projects = check_list_of_studycases(List_of_Studycases)
 
 	# TODO: Find the points at which frequency sweeps are being run and instead create a ComFreqSweep and ComHLF within
 	# TODO: each study case.
@@ -1088,16 +1101,33 @@ if __name__ == '__main__':
 		FS_Contingency_Results, HRM_Contingency_Results = [], []
 		count_studycase = 0
 
-		# #while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
-		for count_studycase, study_cls in enumerate(list_of_studycase_handles):  # Loop Through (Study Cases, Operational Scenarios)
-			# Results folder created for each project
-			# TODO: Check project isn't already active before activating
-			prj = study_cls.prj.Activate()  # Activate Project
-			print1('Carrying out study for study case {} with operational scenario {} and contingency {}'
-				   .format(study_cls.sc_name, study_cls.op_name, study_cls.cont_name))
+		# List of projects are created and then a unique list is used to iterate through for running studies in parallel
+		prj_list = []
 
-			# #MOVED - prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
-			if len(str(prj)) > 0:
+		# #while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
+		t1 = time.clock()
+		for prj_name, prj_cls in dict_of_projects.items():
+			# Activate project
+			prj_activation_failed = prj_cls.prj.Activate()
+
+			#If failed activation then returns 1 (i.e. True) and for loop is continued
+			if prj_activation_failed:
+				print2('Not possible to activate project {} and so no studies are performed for this project'
+					   .format(prj_cls.name))
+				continue
+
+			t1_prj_start = time.clock()
+			print1('Creating studies for Study Cases associated with project {}'.format(prj_cls.name))
+
+			for count_studycase, study_cls in enumerate(prj_cls.sc_cases):  # Loop Through (Study Cases, Operational Scenarios)
+				# Results folder created for each project
+				# TODO: Check project isn't already active before activating
+				# #prj = study_cls.prj.Activate()  # Activate Project
+				print1('Creating studies for study case {} with operational scenario {} and contingency {}'
+					   .format(study_cls.sc_name, study_cls.op_name, study_cls.cont_name))
+
+				# #MOVED - prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
+				# #if len(str(prj)) > 0:
 
 				# TODO: Need to add back in error checking
 				# #StudyCase, study_error = activate_study_case(List_of_Studycases1[count_studycase][2])		# Activate Study Case in List
@@ -1205,7 +1235,7 @@ if __name__ == '__main__':
 					# Create command for harmonic load flow and add to Task Automation
 					hldf_command = study_cls.create_harm_load_flow(results_file=harm,
 																   settings=Harmonic_Loadflow_Settings)
-					study_cls.task_auto.AddCommand(hldf_command, 0)
+					study_cls.task_auto.AppendCommand(hldf_command, 0)
 					print1('Harmonic load flow added for study case {}'.format(study_cls.name))
 					# #TODO: Results processing needs to happen elsewhere
 					# #Harm_err_cde = harm_load_flow(harm, Harmonic_Loadflow_Settings)
@@ -1257,17 +1287,33 @@ if __name__ == '__main__':
 				# #	# Deactivate active variation
 				# #	Variation.Deactivate()
 				# #	delete_object(Variation)
-			else:
-				print2('Could Not Activate Project {}'.format(study_cls.prj))
-				# #print2('Could Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
-				# ERROR:  print2("Could Not Activate Project: " + Project_Name)
+				# #else:
+				# #	print2('Could Not Activate Project {}'.format(study_cls.prj))
+				# #	# #print2('Could Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
+				# #	# ERROR:  print2("Could Not Activate Project: " + Project_Name)
 
-		print2('DEBUG FORCED EXIT')
-		raise SyntaxError('EXIT')
+			print1('Creating of commands for studies in project {} completed in {:0.2f} seconds'
+				   .format(prj_cls.name, time.clock()-t1_prj_start))
+			t1_prj_studies = time.clock()
 
+			print1('Parallel running of frequency scans and harmonic load flows associated with project {}'
+				.format(prj_cls.name))
+
+			# Call Task automation to run studies
+			prj_cls.task_auto.Execute()
+
+			print1('Studies for project {} completed in {:0.2f} seconds'
+				   .format(prj_cls.name, time.clock()-t1_prj_studies))
+
+		print1('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
 
 		# TODO:  At this point the task automation files have been created and will now need to loop through each project
 		# TODO: iteratively to run the commands before then processing the results
+
+
+		print2(' DEBUG FORCED EXIT ')
+		raise SyntaxError('EXIT')
+
 
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1("\nProcessing Results and output to Excel", bf=1, af=0)
