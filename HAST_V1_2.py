@@ -708,12 +708,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	while _count_studycase < len(list_to_check):
 		# ERROR: Previously was not actually looking at the list passed to function
 		# # prj = activate_project(List_of_Studycases[_count_studycase][1])												# Activate Project
+		# TODO: Efficieny - This is activating a new project even if it is the same
 		_prj = activate_project(list_to_check[_count_studycase][1])  # Activate Project
-		# Create a results folder for each project so that the reference can be included in the study_cls
-		results_folder, folder_exists = create_folder(prj, Results_Folder)
-
-		# Create ComTasks and store in this location
-		task_automation = create_object(results_folder, 'ComTasks', 'Task_Automation_{}'.format(start1))
 
 		if len(str(prj)) > 0:
 			study_case, _study_error = activate_study_case(list_to_check[_count_studycase][2])									# Activate Case
@@ -744,6 +740,13 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							operation_case_folder = app.GetProjectFolder("scen")
 							_op_sc_results_folder, _folder_exists2 = create_folder(operation_case_folder,
 																				   Operation_Scenario_Folder)
+
+							# Create a results folder for each project so that the reference can be included in the study_cls
+							results_folder, folder_exists = create_folder(_prj, Results_Folder)
+
+							# Create ComTasks and store in parent_study_case_folder (required location)
+							task_automation = create_object(study_case_results_folder, 'ComTasks',
+															'Task_Automation_{}'.format(start1))
 
 							cont_count = 0
 							while cont_count < len(new_contingency_list):
