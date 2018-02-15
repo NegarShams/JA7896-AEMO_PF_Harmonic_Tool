@@ -203,7 +203,7 @@ class PFStudyCase:
 		logger.info('Target result variable should be = {}'.format(self.hldf_results))
 
 		#  hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
-		hrm_scale, hrm_res = retrieve_results(self.hldf.p_resvar, 1)
+		hrm_scale, hrm_res = retrieve_results(self.hldf.p_resvar, 1, logger)
 		hrm_scale.insert(1,"THD")													# Inserts the THD
 		hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
 		hrm_scale.insert(1,"Scale")
