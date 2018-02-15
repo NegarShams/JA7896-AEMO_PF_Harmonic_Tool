@@ -793,13 +793,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																 task_auto=task_automation,
 																 uid=start1)
 								# Add study case to dictionary of projects
-								if project_name in prj_dict.keys():
-									prj_dict[project_name].sc_cases.append(_study_cls)
-								else:
+								if project_name not in prj_dict.keys():
 									prj_dict[project_name] = hast.pf.PFProject(name=project_name,
 																			   prj=_prj,
 																			   res_folder=results_folder,
 																			   task_auto=task_automation)
+
+								# Add study case to file
+								prj_dict[project_name].sc_cases.append(_study_cls)
+
+
 								# #cls_list.append(_study_cls)
 								# TODO: Use enumerator rather than iterating counter
 								cont_count = cont_count + 1
@@ -1104,6 +1107,10 @@ if __name__ == '__main__':
 		# List of projects are created and then a unique list is used to iterate through for running studies in parallel
 		prj_list = []
 
+		# Get and deactivate current project
+		current_prj = app.GetActiveProject()
+		current_prj.Deactivate()
+
 		# #while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
 		t1 = time.clock()
 		for prj_name, prj_cls in dict_of_projects.items():
@@ -1299,20 +1306,23 @@ if __name__ == '__main__':
 			print1('Parallel running of frequency scans and harmonic load flows associated with project {}'
 				.format(prj_cls.name))
 
+			print2(' DEBUG FORCED EXIT ')
+			raise SyntaxError('EXIT')
+
 			# Call Task automation to run studies
 			prj_cls.task_auto.Execute()
 
 			print1('Studies for project {} completed in {:0.2f} seconds'
 				   .format(prj_cls.name, time.clock()-t1_prj_studies))
 
+			# Once studies complete, deactivate project
+			prj_cls.prj.Deactivate()
+
 		print1('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
 
 		# TODO:  At this point the task automation files have been created and will now need to loop through each project
 		# TODO: iteratively to run the commands before then processing the results
 
-
-		print2(' DEBUG FORCED EXIT ')
-		raise SyntaxError('EXIT')
 
 
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
