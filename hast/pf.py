@@ -95,7 +95,7 @@ class PFStudyCase:
 		self.fs_scale = []
 		self.hrm_scale = []
 
-	def create_freq_sweep(self, results_file, settings):
+	def create_freq_sweep(self, results_file, settings, logger=None):
 		"""
 			Create a frequency sweep command in the study_case and return this as a reference
 		:param object results_file:  Reference to the power factory results file for frequency sweep results
@@ -131,7 +131,7 @@ class PFStudyCase:
 		self.frq = frq
 		return self.frq
 
-	def create_harm_load_flow(self, results_file, settings):  # Inputs load flow settings and executes load flow
+	def create_harm_load_flow(self, results_file, settings, logger=None):  # Inputs load flow settings and executes load flow
 		"""
 			Runs harmonic load flow
 		:param object results_file: Results variable provided as an input to the powerfactory harmonic load flow

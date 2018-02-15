@@ -1248,6 +1248,7 @@ if __name__ == '__main__':
 					# #fs_scale = []
 				if HRM_Sim:
 					# Create a results file to store the results from the harmonic load flow
+					# TODO: Issue with results file being set so instead retrieve from original
 					harm = create_results_file(study_cls.res_folder, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
 					# #harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
 					# #trm_count = 0
