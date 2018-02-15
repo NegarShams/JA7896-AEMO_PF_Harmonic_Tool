@@ -262,6 +262,7 @@ class PFProject:
 			sc_cls.sc.Activate()
 			fs_res.extend(sc_cls.process_fs_results(logger, app))
 			sc_cls.sc.Deactivate()
+		return fs_res
 
 	def process_hrlf_results(self, logger, app):
 		""" Loop through each study case cls and process results files
@@ -272,3 +273,4 @@ class PFProject:
 			sc_cls.sc.Activate()
 			hrlf_res.extend(sc_cls.process_hrlf_results(logger, app))
 			sc_cls.sc.Deactivate()
+		return sc_cls

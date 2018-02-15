@@ -1197,31 +1197,35 @@ if __name__ == '__main__':
 				if FS_Sim:
 					# #sweep = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_FS",9)		# Create Results File
 					sweep = create_results_file(study_cls.res_folder, study_cls.name + "_FS", 9)  # Create Results File
-					# #trm_count = 0
-					# #while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
-					# #	add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
-					# #	trm_count = trm_count + 1
-					# #if Excel_Export_Z12:
-					# #	for mut in List_of_Mutual:													# Adds the mutual impedance data to Results File
-					# #		add_vars_res(sweep, mut[2], Mutual_Variables)
+					trm_count = 0
+					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
+						add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
+						trm_count = trm_count + 1
+					if Excel_Export_Z12:
+						for mut in List_of_Mutual:													# Adds the mutual impedance data to Results File
+							add_vars_res(sweep, mut[2], Mutual_Variables)
+					sweep.SetAsDefault()
 
 					# Create command for frequency sweep and add to Task Automation
 					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings, logger=logger)
 					# TODO: seems to link to the wrong results file so instead take the results file and update
-					sweep = freq_sweep.p_resvar
+					# #sweep = freq_sweep.p_resvar
 
-					_ = sweep.Clear()  # Clears Data
-					variable_contents = sweep.GetContents()  # Gets the existing variables
-					for cc in variable_contents:  # Loops through and deletes the existing variables
-						cc.Delete()
+					# #_ = sweep.Clear()  # Clears Data
+					# #variable_contents = sweep.GetContents()  # Gets the existing variables
+					# #for cc in variable_contents:  # Loops through and deletes the existing variables
+					# #	cc.Delete()
 
-					trm_count = 0
-					while trm_count < len(Terminals_index):  # Add terminal variables to the Results file
-						add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
-						trm_count = trm_count + 1
-					if Excel_Export_Z12:
-						for mut in List_of_Mutual:  # Adds the mutual impedance data to Results File
-							add_vars_res(sweep, mut[2], Mutual_Variables)
+					# #logger.info('Results var = {}'.format(sweep))
+					# #raise SyntaxError('STOP')
+
+					# #trm_count = 0
+					# #while trm_count < len(Terminals_index):  # Add terminal variables to the Results file
+					# #	add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
+					# #	trm_count = trm_count + 1
+					# #if Excel_Export_Z12:
+					# #	for mut in List_of_Mutual:  # Adds the mutual impedance data to Results File
+					# #		add_vars_res(sweep, mut[2], Mutual_Variables)
 
 					# Add freq_sweep to task automation
 					study_cls.task_auto.AppendCommand(freq_sweep, 0)
@@ -1251,25 +1255,26 @@ if __name__ == '__main__':
 					# TODO: Issue with results file being set so instead retrieve from original
 					harm = create_results_file(study_cls.res_folder, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
 					# #harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
-					# #trm_count = 0
-					# #while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
-					# #	add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
-					# #	trm_count = trm_count + 1
+					trm_count = 0
+					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
+						add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
+						trm_count = trm_count + 1
+					harm.SetAsDefault()
 
 					# Create command for harmonic load flow and add to Task Automation
 					hldf_command = study_cls.create_harm_load_flow(results_file=harm,
 																   settings=Harmonic_Loadflow_Settings)
-					harm = hldf_command.p_resvar
+					# #harm = hldf_command.p_resvar
 
-					_ = harm.Clear()  # Clears Data
-					variable_contents = harm.GetContents()  # Gets the existing variables
-					for cc in variable_contents:  # Loops through and deletes the existing variables
-						cc.Delete()
+					# #_ = harm.Clear()  # Clears Data
+					# #variable_contents = harm.GetContents()  # Gets the existing variables
+					# #for cc in variable_contents:  # Loops through and deletes the existing variables
+					# #	cc.Delete()
 
-					trm_count = 0
-					while trm_count < len(Terminals_index):  # Add terminal variables to the Results file
-						add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
-						trm_count = trm_count + 1
+					# #trm_count = 0
+					# #while trm_count < len(Terminals_index):  # Add terminal variables to the Results file
+					# #	add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
+					# #	trm_count = trm_count + 1
 
 					study_cls.task_auto.AppendCommand(hldf_command, 0)
 					print1('Harmonic load flow added for study case {}'.format(study_cls.name))
