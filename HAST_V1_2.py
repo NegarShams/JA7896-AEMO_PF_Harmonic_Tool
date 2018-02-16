@@ -1251,6 +1251,14 @@ if __name__ == '__main__':
 					print1('No frequency sweep included for study case {}'.format(study_cls.name))
 					# #fs_scale = []
 				if HRM_Sim:
+
+
+					# TODO:  Issue preventing this from working is that the results variable is not being set in
+					# TODO:  power factory as the results variable to actually write results to.  Need to solve
+					# TODO:  this first and then believe results should be correctly processed.  There are some
+					# TODO: further performance improvements possible to avoid activating / deactivating projects
+					# TODO: etc.
+
 					# Create a results file to store the results from the harmonic load flow
 					# TODO: Issue with results file being set so instead retrieve from original
 					harm = create_results_file(study_cls.res_folder, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
