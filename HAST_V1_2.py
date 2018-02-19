@@ -67,6 +67,9 @@ hast = importlib.reload(hast)
 # GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
 DEBUG_MODE = False
 
+# TODO:  Identify machine running so can adjust target folder appropriately.  May not be required and instead could
+# TODO:  rename inputs file appropriately.
+
 # Functions -----------------------------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 def print1(name, bf=0, af=0):   # Used to print a message to both python, PF and write it to file with double space
