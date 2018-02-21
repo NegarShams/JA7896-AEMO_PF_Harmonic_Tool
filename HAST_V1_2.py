@@ -168,7 +168,7 @@ def deactivate_study_case(): 		# Deactivate Scenario
 		sce = study.Deactivate() 											# Deactivate Study case
 		if sce == 0:
 			pass
-			# TODO: Should add a debug message here
+			logger.debug('Deactivated active study <{}> case successfully'.format(study))
 			# print1(1,"Deactivated Active Study Case Successfully : " + str(Study),0)
 		elif sce > 0:
 			print2('Error Unsuccessfully Deactivated Study Case: {}..............................'.format(study))
@@ -1130,9 +1130,6 @@ if __name__ == '__main__':
 			print1('Creating studies for Study Cases associated with project {}'.format(prj_cls.name))
 
 			for count_studycase, study_cls in enumerate(prj_cls.sc_cases):  # Loop Through (Study Cases, Operational Scenarios)
-				# Results folder created for each project
-				# TODO: Check project isn't already active before activating
-				# #prj = study_cls.prj.Activate()  # Activate Project
 				print1('Creating studies for study case {} with operational scenario {} and contingency {}'
 					   .format(study_cls.sc_name, study_cls.op_name, study_cls.cont_name))
 
@@ -1163,9 +1160,6 @@ if __name__ == '__main__':
 				# #New_Contingency_List, Con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 				Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
 
-				# TODO: Results folder should now be declared above rather than being related to a particular
-				# TODO study case.
-				# #studycase_results_folder, folder_exists1 = create_folder(StudyCase, Results_Folder)
 				# #op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
 				Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
 				if len(Net_Elm1) < 1:
@@ -1198,8 +1192,10 @@ if __name__ == '__main__':
 
 				# TODO: create results file and associated command, save results to results folder and command to study case
 				if FS_Sim:
-					# #sweep = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_FS",9)		# Create Results File
-					sweep = create_results_file(study_cls.res_folder, study_cls.name + "_FS", 9)  # Create Results File
+					# During task automation each process only has access to single study case and therefore results
+					# need to be stored in the study case file.  Once completed they can then be moved to a centralised
+					# results folder
+					sweep = create_results_file(study_cls.sc, study_cls.name + "_FS", 9)  # Create Results File
 					trm_count = 0
 					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
 						add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
@@ -1233,6 +1229,8 @@ if __name__ == '__main__':
 					# Add freq_sweep to task automation
 					study_cls.task_auto.AppendCommand(freq_sweep, 0)
 					print1('Frequency sweep added for study case {}'.format(study_cls.name))
+					raise SyntaxError('STOP')
+
 
 					# #Fsweep_err_cde = freq_sweep(sweep, Fsweep_Settings)								# Carry out Frequency Sweep
 
@@ -1254,16 +1252,9 @@ if __name__ == '__main__':
 					print1('No frequency sweep included for study case {}'.format(study_cls.name))
 					# #fs_scale = []
 				if HRM_Sim:
-
-
-					# TODO:  Issue preventing this from working is that the results variable is not being set in
-					# TODO:  power factory as the results variable to actually write results to.  Need to solve
-					# TODO:  this first and then believe results should be correctly processed.  There are some
-					# TODO: further performance improvements possible to avoid activating / deactivating projects
-					# TODO: etc.
-
-					# Create a results file to store the results from the harmonic load flow
-					# TODO: Issue with results file being set so instead retrieve from original
+					# During task automation each process only has access to single study case and therefore results
+					# need to be stored in the study case file.  Once completed they can then be moved to a centralised
+					# results folder
 					harm = create_results_file(study_cls.res_folder, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
 					# #harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
 					trm_count = 0
@@ -1361,6 +1352,9 @@ if __name__ == '__main__':
 			prj_cls.prj.Deactivate()
 
 		print1('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
+
+		# TODO:  Copy results to a shared results folder (required?)
+
 
 		print1('Processing results into suitable format for extraction to excel')
 		for prj_name, prj_cls in dict_of_projects.items():
