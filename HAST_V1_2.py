@@ -8,6 +8,10 @@ AUTHOR:           Barry O'Connell
 David Mills [DM] from PSC UK rewrote this to improve performance and avoid some errors that seemed to be in the code
 	Code layout is now as per PEP
 
+# TODO:  Mutual impedance data is not beeing included.
+# TODO:  Potentially to do with only being available during the calculation and so needs to be requested as an
+# TODO: an additional result
+
 -------------------------------------------------------------------------------------------------------------------
 IMPORTANT NOTES:
 
@@ -746,8 +750,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							_op_sc_results_folder, _folder_exists2 = create_folder(operation_case_folder,
 																				   Operation_Scenario_Folder)
 
-							# Create a results folder for each project so that the reference can be included in the study_cls
-							results_folder, folder_exists = create_folder(_prj, Results_Folder)
+							# #Not required since no results stored in this results folder
+							# # Create a results folder for each project so that the reference can be included in the study_cls
+							# #results_folder, folder_exists = create_folder(_prj, Results_Folder)
 
 							# Create ComTasks and store in parent_study_case_folder (required location)
 							task_automation = create_object(study_case_results_folder, 'ComTasks',
@@ -758,7 +763,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								print1('Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
 									   bf=2, af=0)
 								deactivate_scenario()																# Can't copy activated Scenario so deactivate it
-								# Can't copy activated studu case so deactivate it
+								# Can't copy activated study case so deactivate it
 								deactivate_study_case()
 								cont_name = '{}_{}'.format(List_of_Studycases[_count_studycase][0],
 														   new_contingency_list[cont_count][0])
@@ -769,6 +774,11 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								_new_scenario = add_copy(_op_sc_results_folder, scenario,
 														 cont_name)	# Copies the base scenario
 								_new_study_case.Activate()
+
+								# Create new folder to store the mutual impedance data
+								res_mutual_imped_folder, _ = create_folder(_new_study_case,
+																		   'Mutual_Impedance_{}'.format(start1))
+
 								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
 									# Take outages described for contingency
@@ -792,14 +802,13 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																 sc=_new_study_case,
 																 op=_new_scenario,
 																 prj=_prj,
-																 res_folder=results_folder,
 																 task_auto=task_automation,
-																 uid=start1)
+																 uid=start1,
+																 mut_imped_folder=res_mutual_imped_folder)
 								# Add study case to dictionary of projects
 								if project_name not in prj_dict.keys():
 									prj_dict[project_name] = hast.pf.PFProject(name=project_name,
 																			   prj=_prj,
-																			   res_folder=results_folder,
 																			   task_auto=task_automation)
 
 								# Add study case to file
@@ -1162,17 +1171,18 @@ if __name__ == '__main__':
 				Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
 
 				# #op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
+				# Add mutual impedance elements
 				Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
 				if len(Net_Elm1) < 1:
 					print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
 				if len(Terminals_index) > 1 and Excel_Export_Z12:
-					# TODO: Move mutual folder to central study case results folder
-					studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
-					List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
+					# Results are now stored in a folder associated with the study case specifically
+					# #studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
+					List_of_Mutual = create_mutual_impedance_list(study_cls.mut_imped_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
 				else:
 					Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
 					List_of_Mutual = []
-					studycase_mutual_folder = ''
+					# #studycase_mutual_folder = ''
 				# #count = 0
 
 				# No need to loop through contingencies any more since each study case is contingency specific
@@ -1191,7 +1201,6 @@ if __name__ == '__main__':
 				# #			switch_coup(switch[0],switch[1])
 				# #	save_active_scenario()
 
-				# TODO: create results file and associated command, save results to results folder and command to study case
 				if FS_Sim:
 					# During task automation each process only has access to single study case and therefore results
 					# need to be stored in the study case file.  Once completed they can then be moved to a centralised
@@ -1208,8 +1217,6 @@ if __name__ == '__main__':
 
 					# Create command for frequency sweep and add to Task Automation
 					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings, logger=logger)
-					# TODO: seems to link to the wrong results file so instead take the results file and update
-					# #sweep = freq_sweep.p_resvar
 
 					# #_ = sweep.Clear()  # Clears Data
 					# #variable_contents = sweep.GetContents()  # Gets the existing variables
@@ -1236,7 +1243,6 @@ if __name__ == '__main__':
 					# #Fsweep_err_cde = freq_sweep(sweep, Fsweep_Settings)								# Carry out Frequency Sweep
 
 
-					# #TODO: results processing needs to happen later once parallel processing has been completed
 					# #if Fsweep_err_cde == 0:															# Skips the contingency if Frequency Sweep doesn't solve
 					# #	fs_scale, fs_res = retrieve_results(sweep,0)
 					# #	fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
@@ -1256,7 +1262,7 @@ if __name__ == '__main__':
 					# During task automation each process only has access to single study case and therefore results
 					# need to be stored in the study case file.  Once completed they can then be moved to a centralised
 					# results folder
-					harm = create_results_file(study_cls.res_folder, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
+					harm = create_results_file(study_cls.sc, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
 					# #harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
 					trm_count = 0
 					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
@@ -1281,7 +1287,6 @@ if __name__ == '__main__':
 
 					study_cls.task_auto.AppendCommand(hldf_command, 0)
 					print1('Harmonic load flow added for study case {}'.format(study_cls.name))
-					# #TODO: Results processing needs to happen elsewhere
 					# #Harm_err_cde = harm_load_flow(harm, Harmonic_Loadflow_Settings)
 					# #if Harm_err_cde == 0:
 					# #	hrm_scale, hrm_res = retrieve_results(harm,1)
@@ -1303,7 +1308,6 @@ if __name__ == '__main__':
 					# #		elif thd2[0] is not None or thdz == False:
 					# #			THD = "NA"
 					# #		#thd4 = app.SearchObjectByForeignKey(thd1[11] + ".ElmSubstat")
-					# #		# TODO: THD recognised as undeclared which will be solved by wrapping into function
 					# #		res12.insert(2, THD)														# Insert THD
 					# #		res12.insert(2, New_Contingency_List[count][0])							# Op scenario
 					# #		res12.insert(2, List_of_Studycases1[count_studycase][0])					# Study case description
@@ -1322,7 +1326,6 @@ if __name__ == '__main__':
 				# #Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate the base case scenario this just ensures that when the script finishes using PF that it goes back to a regular case
 				# #count_studycase = count_studycase + 1
 				# #print1("", bf=2, af=0)
-				# TODO: Delete folders once created, if requested to do so in settings
 				# #if Delete_Created_Folders:
 				# #	delete_object(studycase_results_folder)
 				# #	delete_object(op_sc_results_folder)
@@ -1353,8 +1356,6 @@ if __name__ == '__main__':
 			prj_cls.prj.Deactivate()
 
 		print1('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
-
-		# TODO:  Copy results to a shared results folder (required?)
 
 
 		print1('Processing results into suitable format for extraction to excel')

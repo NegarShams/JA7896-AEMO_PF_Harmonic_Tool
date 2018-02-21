@@ -59,7 +59,6 @@ class Excel:
 		self.log_info('Excel instance initialised')
 		return self
 
-
 	def __exit__(self, exc_type, exc_value, traceback):
 		"""
 			Function deals with closing the excel instance once its been created
@@ -261,7 +260,12 @@ class Excel:
 		if fs_sim:
 			# Exporting of frequency vs impedance data to excel
 			if excel_export_rx or excel_export_z or excel_export_z12:  # Prints the FS Scale
-				endrow = startrow + len(fs_results[0]) - 1
+				# End row originally defined based on length of fs_results but since HRLF harmonic results are included
+				# up to the 40th harmonic need to take into consideration the max length of those results as well
+				if excel_export_hrm:
+					endrow = startrow + max(len(fs_results[0]), len(hrm_results[0])) -1
+				else:
+					endrow = startrow + len(fs_results[0]) - 1
 				# Plots the Scale_______________________________________________________________________________________
 				scale = fs_results[0]
 				scale_end = scale[-1]

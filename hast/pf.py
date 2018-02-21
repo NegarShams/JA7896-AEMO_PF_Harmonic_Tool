@@ -3,6 +3,7 @@
 """
 
 import re
+import math
 
 def create_object(location, pfclass, name):			# Creates a database object in a specified location of a specified class
 	"""
@@ -27,12 +28,9 @@ def retrieve_results(elmres, res_type, logger):			# Reads results into python li
 	# The first column is usually the scale ie timestep, frequency etc.
 	# The columns are made up of Objects from left to right (ElmTerm, ElmLne)
 	# The Objects then have sub variables (m:R, m:X etc)
-	logger.info('ElmRes = {}'.format(elmres))
 	elmres.Load()
 	cno = elmres.GetNumberOfColumns()	# Returns number of Columns
 	rno = elmres.GetNumberOfRows()		# Returns number of Rows in File
-	logger.info('Number of columns = {}'.format(cno))
-	logger.info('Number of rows = {}'.format(rno))
 	results = []
 	for i in range(cno):
 		column = []
@@ -49,7 +47,6 @@ def retrieve_results(elmres, res_type, logger):			# Reads results into python li
 		results.append(column)
 	if res_type == 1:
 		results = results[:-1]
-	logger.info('Results length = {}'.format(len(results)))
 	scale = results[-1:]
 	results = results[:-1]
 	elmres.Release()
@@ -58,7 +55,7 @@ def retrieve_results(elmres, res_type, logger):			# Reads results into python li
 
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
-	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, res_folder, task_auto, uid):
+	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid, mut_imped_folder):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str full_name:  Full name of study case continaining base case and contingency
@@ -67,9 +64,9 @@ class PFStudyCase:
 		:param object sc:  Handle to newly created study case
 		:param object op:  Handle to newly created operational scenario
 		:param object prj:  Handle to project in which this study case is contained
-		:param object res_folder:  Handle to the folder which will contain all the results created as part of this project
 		:param object task_auto:  Handle to the Task Automation object created for this project studies
 		:param string uid:  Unique identifier time added to new files created
+		:param object mut_imped_folder:  Folder into which all the mutual impedances will be saved relevant to this sc
 		"""
 		# Strings that are used to store
 		self.name = full_name
@@ -84,8 +81,8 @@ class PFStudyCase:
 		self.sc = sc
 		self.op = op
 		self.prj = prj
-		self.res_folder = res_folder
 		self.task_auto = task_auto
+		self.mut_imped_folder = mut_imped_folder
 
 		# Attributes set during study completion
 		self.frq = None
@@ -201,25 +198,42 @@ class PFStudyCase:
 		hrm_scale.pop(4)															# Takes out the 50 Hz
 		hrm_scale.pop(4)
 		for res12 in hrm_res:
-			thd1 = re.split(r'[\\.]', res12[1])
-			logger.info('thd1[11] = {}.ElmSubstat'.format(thd1[11]))
-			thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
-			thdz = False
-			if thd2[0] is not None:
-				thd3 = thd2[0].GetContents()
-				for thd4 in thd3:
-					if (thd1[13] + ".ElmTerm") in str(thd4):
-						logger.info('thd4 = {}'.format(thd4))
-						str_thd = thd4.GetAttribute('m:THD')
-						thdz = True
-			elif thd2[0] is not None or thdz == False:
-				str_thd = "NA"
-			res12.insert(2, str_thd)														# Insert THD
+			# Rather than retrieving THD from the calculated parameters in PowerFactory it is calculated from the
+			# calculated harmonic distortion.  This will be calculated upto and including the upper limits set in the
+			# inputs for the harmonic load flow study
+
+			# Try / except statement to allow error catching if a poor result is returned and will then be alerted
+			# to user
+			try:
+				# res12[3:] used since at this stage the res12 format is:
+				# [result type (i.e. m:HD), terminal (i.e. *.ElmTerm), H1, H2, H3, ..., Hx]
+				thd = math.sqrt(sum(i*i for i in res12[3:]))
+
+			except TypeError:
+				logger.error(('Unable to calculate the THD since harmonic results retrieved from results variable {} ' +
+							 ' have come out in an unexpected order and now contain a string \n' +
+							 'The returned results <res12> are {}').format(self.hldf_results, res12))
+				thd = 'NA'
+
+			# #thd1 = re.split(r'[\\.]', res12[1])
+			# #logger.info('thd1[11] = {}.ElmSubstat'.format(thd1[11]))
+			# #thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
+			# #thdz = False
+			# #if thd2[0] is not None:
+			# #	thd3 = thd2[0].GetContents()
+			# #	for thd4 in thd3:
+			# #		if (thd1[13] + ".ElmTerm") in str(thd4):
+			# #			logger.info('thd4 = {}'.format(thd4))
+			# #			str_thd = thd4.GetAttribute('m:THD')
+			# #			thdz = True
+			# #elif thd2[0] is not None or thdz == False:
+			# #	str_thd = "NA"
+			# #res12.insert(2, str_thd)														# Insert THD
+			res12.insert(2, thd)															# Insert THD
 			# #res12.insert(2, New_Contingency_List[count][0])							# Op scenario
 			res12.insert(2, self.cont_name)												# Op scenario
 			res12.insert(2, self.sc_name)												# Study case description
 			res12.pop(5)
-
 
 		self.hrm_scale = hrm_scale
 
@@ -228,7 +242,7 @@ class PFStudyCase:
 
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
-	def __init__(self, name, prj, res_folder, task_auto):
+	def __init__(self, name, prj, task_auto):
 		"""
 			Initialise class
 		:param str name:  project name
@@ -238,7 +252,6 @@ class PFProject:
 		"""
 		self.name = name
 		self.prj = prj
-		self.res_folder = res_folder
 		self.task_auto = task_auto
 		self.sc_cases = []
 
@@ -248,9 +261,9 @@ class PFProject:
 		"""
 		fs_res = []
 		for sc_cls in self.sc_cases:
-			sc_cls.sc.Activate()
+			# #sc_cls.sc.Activate()
 			fs_res.extend(sc_cls.process_fs_results(logger, app))
-			sc_cls.sc.Deactivate()
+			# #sc_cls.sc.Deactivate()
 		return fs_res
 
 	def process_hrlf_results(self, logger, app):
@@ -259,7 +272,7 @@ class PFProject:
 		"""
 		hrlf_res = []
 		for sc_cls in self.sc_cases:
-			sc_cls.sc.Activate()
+			# #sc_cls.sc.Activate()
 			hrlf_res.extend(sc_cls.process_hrlf_results(logger, app))
-			sc_cls.sc.Deactivate()
-		return sc_cls
+			# #sc_cls.sc.Deactivate()
+		return hrlf_res
