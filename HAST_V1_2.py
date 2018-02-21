@@ -1012,7 +1012,8 @@ if __name__ == '__main__':
 	# Enter what Variables you want to look at for terminals
 	FS_Terminal_Variables = ["m:R", "m:X", "m:Z", "m:phiz"]
 	Mutual_Variables = ["c:Z_12"]
-	HRM_Terminal_Variables = ["m:HD"]
+	# THD attribute was not previously included
+	HRM_Terminal_Variables = ['m:HD', 'm:THD']
 	# Import Excel
 	Import_Workbook = filelocation + "HAST_V1_2_Inputs.xlsx"					# Gets the CWD current working directory
 	Variation_Name = "Temporary_Variation" + start1
@@ -1357,6 +1358,7 @@ if __name__ == '__main__':
 
 
 		print1('Processing results into suitable format for extraction to excel')
+		# Following loop extracts all the results from the different projects into excel
 		for prj_name, prj_cls in dict_of_projects.items():
 			# TODO: Confirm if project needs to be activated for .GetCalcRelevantObjects to work (in pf.py)
 			# TODO: If it is then reorder if staments to avoid activating and deactivating study cases multiple times

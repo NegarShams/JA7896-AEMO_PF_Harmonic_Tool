@@ -174,10 +174,7 @@ class PFStudyCase:
 			Function extracts and prodcesses the load flow results for this study case
 		:return list fs_res
 		"""
-		logger.info('Result variable in frq is = {}'.format(self.frq.p_resvar))
-		logger.info('Target result variable should be = {}'.format(self.fs_results))
-		fs_scale, fs_res = retrieve_results(self.frq.p_resvar, 0, logger)
-		# #fs_scale, fs_res = retrieve_results(self.fs_results, 0, logger)
+		fs_scale, fs_res = retrieve_results(self.fs_results, 0, logger)
 		fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
 		fs_scale.insert(1,"Scale")
 		fs_scale.pop(3)
@@ -186,9 +183,6 @@ class PFStudyCase:
 			tope.insert(1, self.cont_name)											# Contingency name
 			# #tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
 			tope.insert(1, self.sc_name)					# Study case description
-
-			# TODO: Figure out how to return results
-			# #FS_Contingency_Results.append(tope)										# Results
 
 		self.fs_scale = fs_scale
 
@@ -199,11 +193,8 @@ class PFStudyCase:
 			Process the hrlf results ready for inclusion into spreadsheet
 		:return hrm_res
 		"""
-		logger.info('Result variable in hldf is = {}'.format(self.hldf.p_resvar))
-		logger.info('Target result variable should be = {}'.format(self.hldf_results))
+		hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1, logger)
 
-		#  hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
-		hrm_scale, hrm_res = retrieve_results(self.hldf.p_resvar, 1, logger)
 		hrm_scale.insert(1,"THD")													# Inserts the THD
 		hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
 		hrm_scale.insert(1,"Scale")
@@ -229,8 +220,6 @@ class PFStudyCase:
 			res12.insert(2, self.sc_name)												# Study case description
 			res12.pop(5)
 
-			# TODO: Figure out how to return results
-			# #HRM_Contingency_Results.append(res12)									# Results
 
 		self.hrm_scale = hrm_scale
 
