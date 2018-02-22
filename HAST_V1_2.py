@@ -1056,7 +1056,7 @@ if __name__ == '__main__':
 		app.EchoOff()
 	else:
 		logger.info('Running in debug mode and so output / screen updating is not disabled')
-		
+
 
 	# Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
 	Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
