@@ -55,7 +55,7 @@ def retrieve_results(elmres, res_type, logger):			# Reads results into python li
 
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
-	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid, mut_imped_folder):
+	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str full_name:  Full name of study case continaining base case and contingency
@@ -66,7 +66,6 @@ class PFStudyCase:
 		:param object prj:  Handle to project in which this study case is contained
 		:param object task_auto:  Handle to the Task Automation object created for this project studies
 		:param string uid:  Unique identifier time added to new files created
-		:param object mut_imped_folder:  Folder into which all the mutual impedances will be saved relevant to this sc
 		"""
 		# Strings that are used to store
 		self.name = full_name
@@ -82,7 +81,6 @@ class PFStudyCase:
 		self.op = op
 		self.prj = prj
 		self.task_auto = task_auto
-		self.mut_imped_folder = mut_imped_folder
 
 		# Attributes set during study completion
 		self.frq = None

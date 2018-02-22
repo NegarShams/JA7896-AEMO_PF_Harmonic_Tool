@@ -775,10 +775,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 														 cont_name)	# Copies the base scenario
 								_new_study_case.Activate()
 
-								# Create new folder to store the mutual impedance data
-								res_mutual_imped_folder, _ = create_folder(_new_study_case,
-																		   'Mutual_Impedance_{}'.format(start1))
-
 								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
 									# Take outages described for contingency
@@ -803,8 +799,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																 op=_new_scenario,
 																 prj=_prj,
 																 task_auto=task_automation,
-																 uid=start1,
-																 mut_imped_folder=res_mutual_imped_folder)
+																 uid=start1)
 								# Add study case to dictionary of projects
 								if project_name not in prj_dict.keys():
 									prj_dict[project_name] = hast.pf.PFProject(name=project_name,
@@ -1176,9 +1171,9 @@ if __name__ == '__main__':
 				if len(Net_Elm1) < 1:
 					print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
 				if len(Terminals_index) > 1 and Excel_Export_Z12:
-					# Results are now stored in a folder associated with the study case specifically
-					# #studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
-					List_of_Mutual = create_mutual_impedance_list(study_cls.mut_imped_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
+					# Results for mutual impedance have to be stored in the Network Folder
+					studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
+					List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
 				else:
 					Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
 					List_of_Mutual = []
