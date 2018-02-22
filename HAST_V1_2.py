@@ -417,9 +417,9 @@ def load_flow(load_flow_settings):		# Inputs load flow settings and executes loa
 	ldf.iopt_prot = load_flow_settings[53]        		# Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
 	ldf.ign_comp = load_flow_settings[54]             	# Ignore Composite Elements
 
-	print2('DEBUG - Load flow started')
+	# #print2('DEBUG - Load flow started')
 	error_code = ldf.Execute()
-	print2('DEBUG - Load flow completed')
+	# #print2('DEBUG - Load flow completed')
 	t2 = time.clock() - t1
 	if error_code == 0:
 		print1('Load Flow calculation successful, time taken: {:.2f} seconds'.format(t2), bf=1, af=0)
@@ -857,7 +857,8 @@ def check_terminals(list_of_points): 		# This checks and creates the list of ter
 											t2])					# Appends Terminals ( Name, Terminal Name, Terminal object data)
 					terminal_exists = True											# Marks that it found the terminal
 			if not terminal_exists:
-				print2("Python Entry does not exist in case: " + list_of_points[tm_count][2] + ".ElmTerm ..............................................")
+				logger.error('Terminal does not exist in case: {} - {}'
+							 .format(list_of_points[tm_count][1], list_of_points[tm_count][2]))
 				terminals_ok = 1
 		tm_count = tm_count + 1
 	print1("Terminals Used for Analysis: ", bf=2, af=0)
