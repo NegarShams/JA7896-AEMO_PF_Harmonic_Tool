@@ -803,8 +803,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																			   prj=_prj,
 																			   task_auto=task_automation,
 																			   folders=[
-																				   study_case_folder,
-																				   operation_case_folder,
+																				   study_case_results_folder,
+																				   _op_sc_results_folder,
 																			   ])
 
 								# Add study case to file
@@ -1000,6 +1000,7 @@ if __name__ == '__main__':
 	# Power factory commands
 	# --------------------------------------------------------------------------------------------------------------------
 	app = powerfactory.GetApplication()  # Start PowerFactory  in engine  mode
+
 	# help("powerfactory")
 	user = app.GetCurrentUser()  # Get the current active user
 	ldf = app.GetFromStudyCase("ComLdf")  # Get load flow command
@@ -1047,6 +1048,15 @@ if __name__ == '__main__':
 								pth_progress_log=Progress_Log,
 								pth_error_log=Error_Log,
 								app=app)
+
+	# Disable graphic updating
+	if not DEBUG_MODE:
+		logger.info('Graphic updating and load flow results will not be shown')
+		app.SetGraphicUpdate(0)
+		app.EchoOff()
+	else:
+		logger.info('Running in debug mode and so output / screen updating is not disabled')
+		
 
 	# Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
 	Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
@@ -1251,9 +1261,6 @@ if __name__ == '__main__':
 					# #for cc in variable_contents:  # Loops through and deletes the existing variables
 					# #	cc.Delete()
 
-					# #logger.info('Results var = {}'.format(sweep))
-					# #raise SyntaxError('STOP')
-
 					# #trm_count = 0
 					# #while trm_count < len(Terminals_index):  # Add terminal variables to the Results file
 					# #	add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
@@ -1265,7 +1272,6 @@ if __name__ == '__main__':
 					# Add freq_sweep to task automation
 					study_cls.task_auto.AppendCommand(freq_sweep, 0)
 					print1('Frequency sweep added for study case {}'.format(study_cls.name))
-					raise SyntaxError('STOP')
 
 
 					# #Fsweep_err_cde = freq_sweep(sweep, Fsweep_Settings)								# Carry out Frequency Sweep
@@ -1481,15 +1487,19 @@ if __name__ == '__main__':
 		for project, prj_cls in dict_of_projects.items():
 			logger.debug('Deleting items for project: {}'.format(prj_cls.name))
 			# Activate project
-			prj_cls.Activate()
+			prj_cls.prj.Activate()
 			# Deactivate currently active study case so that items from project can be deleted
 			deactivate_study_case()
 			# Loop through each folder and try to delete
 			for folder in prj_cls.folders:
 				delete_object(folder)
+			prj_cls.prj.Deactivate
 		logger.info('Deletion of created items completed in {:.2f} seconds'.format(time.clock() - t_start_delete))
 
-
+	# Graphic updating enabled
+	logger.info('Graphic updating and load flow results will not be shown')
+	app.SetGraphicUpdate(1)
+	app.EchoOn()
 
 	print1('Total Time: {:.2f}'.format(time.clock() - start),
 		   bf=1, af=0)
