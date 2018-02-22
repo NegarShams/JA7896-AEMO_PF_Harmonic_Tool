@@ -59,9 +59,6 @@ import importlib
 
 import powerfactory 					# Power factory module see notes above
 import time                          	# Time
-import ctypes                        	# For creating startup message box
-import re								# Used for stripping text strings
-import unittest							# Used to include test functions for error checking of code
 
 # HAST module package requires reload during code development since python does not reload itself
 # HAST module package used as functions start to be transferred for efficiency
@@ -804,7 +801,11 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								if project_name not in prj_dict.keys():
 									prj_dict[project_name] = hast.pf.PFProject(name=project_name,
 																			   prj=_prj,
-																			   task_auto=task_automation)
+																			   task_auto=task_automation,
+																			   folders=[
+																				   study_case_folder,
+																				   operation_case_folder,
+																			   ])
 
 								# Add study case to file
 								prj_dict[project_name].sc_cases.append(_study_cls)
@@ -1121,6 +1122,9 @@ if __name__ == '__main__':
 
 		# #while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
 		t1 = time.clock()
+		# TODO: If running studies on multiple_projects the studies may need to be grouped and run at a project level
+		if len(dict_of_projects.keys()) > 1:
+			logger.error('\n\n Currently the script is not reliable when working on multiple PF project files \n\n')
 		for prj_name, prj_cls in dict_of_projects.items():
 			# Activate project
 			prj_activation_failed = prj_cls.prj.Activate()
@@ -1134,7 +1138,34 @@ if __name__ == '__main__':
 			t1_prj_start = time.clock()
 			print1('Creating studies for Study Cases associated with project {}'.format(prj_cls.name))
 
-			for count_studycase, study_cls in enumerate(prj_cls.sc_cases):  # Loop Through (Study Cases, Operational Scenarios)
+			# Determine the terminals and mutual impedance data requested and check they exist within this project case
+			# TODO: What happens if terminal is only present in one study_case due to variation
+			# TODO: Convert all print1 commands to logger outputs
+			logger.info('Checking all terminals and producing mutual impedance data')
+			# Checks to see if all the terminals are in the project and skips any that aren't
+			Terminals_index, Term_ok = check_terminals(List_of_Points)
+
+			# Add mutual impedance elements
+			Net_Elm1 = get_object(Net_Elm)  # Gets the Network Elements ElmNet folder
+			if len(Net_Elm1) < 1:
+				logger.error('Could not find Network Element folder, Note: this is case sensitive : {}'.format(Net_Elm))
+			# Add mutual_impedance links to the study folders
+			if len(Terminals_index) > 1 and Excel_Export_Z12:
+				# Results for mutual impedance have to be stored in the Network Folder
+				# Create folder for mutual elements
+				studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)
+				# Newly created folder is added to list of folders created so can be deleted at end of study
+				prj_cls.folders.append(studycase_mutual_folder)
+				# Create list of mutual impedances between the terminals in the folder requested
+				List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)
+			else:
+				# Can't Export mutual impedances if you give it only one bus
+				Excel_Export_Z12 = False
+				List_of_Mutual = []
+
+			# Loop Through each study case defined in the prj_cls where each study_cls represents a
+			# Study Cases + Operational Scenario
+			for count_studycase, study_cls in enumerate(prj_cls.sc_cases):
 				print1('Creating studies for study case {} with operational scenario {} and contingency {}'
 					   .format(study_cls.sc_name, study_cls.op_name, study_cls.cont_name))
 
@@ -1163,21 +1194,23 @@ if __name__ == '__main__':
 				# #activate_variation(Variation)
 				# #Stage = create_stage(Variation,"IntSstage",Variation_Name)
 				# #New_Contingency_List, Con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
-				Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
+
+				# Terminals_index, etc. now defined at Project Level
+				# #Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
 
 				# #op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
 				# Add mutual impedance elements
-				Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
-				if len(Net_Elm1) < 1:
-					print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
-				if len(Terminals_index) > 1 and Excel_Export_Z12:
-					# Results for mutual impedance have to be stored in the Network Folder
-					studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
-					List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
-				else:
-					Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
-					List_of_Mutual = []
-					# #studycase_mutual_folder = ''
+				# #Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
+				# #if len(Net_Elm1) < 1:
+				# #	print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
+				# #if len(Terminals_index) > 1 and Excel_Export_Z12:
+				# #	# Results for mutual impedance have to be stored in the Network Folder
+				# #	studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
+				# #	List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
+				# #else:
+				# #	Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
+				# #	List_of_Mutual = []
+				# #	# #studycase_mutual_folder = ''
 				# #count = 0
 
 				# No need to loop through contingencies any more since each study case is contingency specific
@@ -1211,7 +1244,7 @@ if __name__ == '__main__':
 					sweep.SetAsDefault()
 
 					# Create command for frequency sweep and add to Task Automation
-					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings, logger=logger)
+					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings)
 
 					# #_ = sweep.Clear()  # Clears Data
 					# #variable_contents = sweep.GetContents()  # Gets the existing variables
@@ -1361,11 +1394,11 @@ if __name__ == '__main__':
 			prj_cls.prj.Activate()
 			# If frequency scan results were carried out process those
 			if FS_Sim:
-				FS_Contingency_Results.extend(prj_cls.process_fs_results(logger, app))
+				FS_Contingency_Results.extend(prj_cls.process_fs_results())
 				# Is it possible that the fs_scale could be different for different results
 				fs_scale = prj_cls.sc_cases[0].fs_scale
 			if HRM_Sim:
-				HRM_Contingency_Results.extend(prj_cls.process_hrlf_results(logger, app))
+				HRM_Contingency_Results.extend(prj_cls.process_hrlf_results(logger=logger))
 				# TODO: Is it possible that the hrm_scale could be different for different sets of results
 				hrm_scale = prj_cls.sc_cases[0].hrm_scale
 
@@ -1440,6 +1473,23 @@ if __name__ == '__main__':
 				# #close_workbook(_wb=wb, workbookname=Excel_Results, _xl=xl)																# Closes and saves the workbook
 				print1("Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",
 					   bf=1, af=0)	# Returns the Total Export time
+
+	# Deleting newly created folders which will include study_cases and operational_scenarios
+	if Delete_Created_Folders:
+		t_start_delete = time.clock()
+		logger.info('Deleting newly created folders as part of this study')
+		for project, prj_cls in dict_of_projects.items():
+			logger.debug('Deleting items for project: {}'.format(prj_cls.name))
+			# Activate project
+			prj_cls.Activate()
+			# Deactivate currently active study case so that items from project can be deleted
+			deactivate_study_case()
+			# Loop through each folder and try to delete
+			for folder in prj_cls.folders:
+				delete_object(folder)
+		logger.info('Deletion of created items completed in {:.2f} seconds'.format(time.clock() - t_start_delete))
+
+
 
 	print1('Total Time: {:.2f}'.format(time.clock() - start),
 		   bf=1, af=0)

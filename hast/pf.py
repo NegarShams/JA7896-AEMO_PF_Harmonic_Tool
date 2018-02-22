@@ -2,7 +2,6 @@
 	Classes containing details needed for pf extract
 """
 
-import re
 import math
 
 def create_object(location, pfclass, name):			# Creates a database object in a specified location of a specified class
@@ -17,7 +16,7 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 	_new_object = location.CreateObject(pfclass, name)
 	return _new_object
 
-def retrieve_results(elmres, res_type, logger):			# Reads results into python lists from results file
+def retrieve_results(elmres, res_type):			# Reads results into python lists from results file
 	"""
 		Reads results into python lists from results file for processing to add to Excel
 	:param powerfactory.Results elmres: handle for powerfactory results file 
@@ -90,7 +89,7 @@ class PFStudyCase:
 		self.fs_scale = []
 		self.hrm_scale = []
 
-	def create_freq_sweep(self, results_file, settings, logger=None):
+	def create_freq_sweep(self, results_file, settings):
 		"""
 			Create a frequency sweep command in the study_case and return this as a reference
 		:param object results_file:  Reference to the power factory results file for frequency sweep results
@@ -126,7 +125,7 @@ class PFStudyCase:
 		self.frq = frq
 		return self.frq
 
-	def create_harm_load_flow(self, results_file, settings, logger=None):  # Inputs load flow settings and executes load flow
+	def create_harm_load_flow(self, results_file, settings):  # Inputs load flow settings and executes load flow
 		"""
 			Runs harmonic load flow
 		:param object results_file: Results variable provided as an input to the powerfactory harmonic load flow
@@ -164,12 +163,12 @@ class PFStudyCase:
 		self.hldf = hldf
 		return self.hldf
 
-	def process_fs_results(self, logger, app):
+	def process_fs_results(self):
 		"""
-			Function extracts and prodcesses the load flow results for this study case
+			Function extracts and processes the load flow results for this study case
 		:return list fs_res
 		"""
-		fs_scale, fs_res = retrieve_results(self.fs_results, 0, logger)
+		fs_scale, fs_res = retrieve_results(self.fs_results, 0)
 		fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
 		fs_scale.insert(1,"Scale")
 		fs_scale.pop(3)
@@ -183,12 +182,12 @@ class PFStudyCase:
 
 		return fs_res
 
-	def process_hrlf_results(self, logger, app):
+	def process_hrlf_results(self, logger):
 		"""
 			Process the hrlf results ready for inclusion into spreadsheet
 		:return hrm_res
 		"""
-		hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1, logger)
+		hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
 
 		hrm_scale.insert(1,"THD")													# Inserts the THD
 		hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
@@ -240,37 +239,38 @@ class PFStudyCase:
 
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
-	def __init__(self, name, prj, task_auto):
+	def __init__(self, name, prj, task_auto, folders):
 		"""
 			Initialise class
 		:param str name:  project name
 		:param object prj:  project reference
-		:param object res_folder:  folder reference
 		:param object task_auto:  task automation reference
+		:param list folders:  List of folders created as part of project, these will be deleted at end of study
 		"""
 		self.name = name
 		self.prj = prj
 		self.task_auto = task_auto
 		self.sc_cases = []
+		self.folders = folders
 
-	def process_fs_results(self, logger, app):
+	def process_fs_results(self):
 		""" Loop through each study case cls and process results files
 		:return list fs_res
 		"""
 		fs_res = []
 		for sc_cls in self.sc_cases:
 			# #sc_cls.sc.Activate()
-			fs_res.extend(sc_cls.process_fs_results(logger, app))
+			fs_res.extend(sc_cls.process_fs_results())
 			# #sc_cls.sc.Deactivate()
 		return fs_res
 
-	def process_hrlf_results(self, logger, app):
+	def process_hrlf_results(self, logger):
 		""" Loop through each study case cls and process results files
 		:return list hrlf_res:
 		"""
 		hrlf_res = []
 		for sc_cls in self.sc_cases:
 			# #sc_cls.sc.Activate()
-			hrlf_res.extend(sc_cls.process_hrlf_results(logger, app))
+			hrlf_res.extend(sc_cls.process_hrlf_results(logger))
 			# #sc_cls.sc.Deactivate()
 		return hrlf_res
