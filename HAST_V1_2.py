@@ -736,7 +736,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
-							terminals_index, term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
+							# #terminals_index, term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
 							# Adjusted to create new study_case for each op_scenario
 
 							study_case_folder = app.GetProjectFolder('study')
@@ -751,9 +751,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							# # Create a results folder for each project so that the reference can be included in the study_cls
 							# #results_folder, folder_exists = create_folder(_prj, Results_Folder)
 
-							# Create ComTasks and store in parent_study_case_folder (required location)
-							task_automation = create_object(study_case_results_folder, 'ComTasks',
-															'Task_Automation_{}'.format(start1))
+							# Check if folder already exists
+							task_auto_name = 'Task_Automation_{}'.format(start1)
+							_exists, _task_auto_handle = check_if_object_exists(location=study_case_results_folder,
+																				name=task_auto_name + '.ComTasks')
+							if _exists:
+								task_automation = _task_auto_handle[0]
+							else:
+								# Create ComTasks and store in parent_study_case_folder (required location)
+								task_automation = create_object(study_case_results_folder, 'ComTasks',
+																'Task_Automation_{}'.format(start1))
 
 							cont_count = 0
 							while cont_count < len(new_contingency_list):
