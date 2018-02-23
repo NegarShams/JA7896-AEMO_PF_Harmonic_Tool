@@ -113,7 +113,8 @@ class Logger:
 		# delay=True prevents the file being created until a write event occurs
 
 
-		handler = logging.FileHandler(filename=pth, mode='w', delay=True)
+		# TODO: Check if error with logger, could be due to use of append command
+		handler = logging.FileHandler(filename=pth, mode='a', delay=True)
 		self.file_handlers.append(handler)
 
 		# Add formatter to log handler
@@ -168,6 +169,11 @@ class Logger:
 			except AttributeError:
 				pass
 		self.logger.critical('function <{}> reported {}'.format(caller, msg))
+
+	def flush(self):
+		""" Flush all loggers to file before continuing """
+		self.handler_progress_log.flush()
+		self.handler_error_log.flush()
 
 
 #  ----- UNIT TESTS -----

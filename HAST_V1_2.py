@@ -698,6 +698,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	:param list list_to_check: List of items to check 
 	:return dict prj_dict:  Dictionary of projects where the study cases associated with each project are contained within 
 	"""
+	time_sc_check = time.clock()
 	# TODO: Check function since there are a lot of unresolved references
 	print1('___________________________________________________________________________________________________', bf=2, af=0)
 	print1(('Checking all Projects, Study Cases and Scenarios Solve for Load Flow, it will also check N-1 and create ' +
@@ -734,6 +735,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 						# TODO: At this point could create just a list that references the newly created study case and return that,
 						# TODO: The newly created study cases can then just be activated and deactivated as appropriate.
 
+						# TODO: If no pre-case check then nothing will be run, need to add in alternative options here
+
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 							# #terminals_index, term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
@@ -764,6 +767,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 							cont_count = 0
 							while cont_count < len(new_contingency_list):
+								# TODO:  Adding in contingencies even if their load flow does not converge
+								# TODO:  This may need to be adjusted
 								print1('Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
 									   bf=2, af=0)
 								deactivate_scenario()																# Can't copy activated Scenario so deactivate it
@@ -787,35 +792,42 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 								save_active_scenario()
 
-								# TODO: This load flow may be unnecessary
-								_ = load_flow(Load_Flow_Setting)															# Carry out load flow
+								# Determine if load flow successful and if not then don't include _study_cls in results
+								lf_error = load_flow(Load_Flow_Setting)
 
 								# Deactivate new study case and reactivate old study case
 								_new_study_case.Deactivate()
 								study_case.Activate()
 
-								# Create new class reference with all the details for this contingency and then add to
-								# list to be returned
-								_study_cls = hast.pf.PFStudyCase(full_name=cont_name,
-																 list_parameters=list_to_check[_count_studycase],
-																 cont_name=new_contingency_list[cont_count][0],
-																 sc=_new_study_case,
-																 op=_new_scenario,
-																 prj=_prj,
-																 task_auto=task_automation,
-																 uid=start1)
-								# Add study case to dictionary of projects
-								if project_name not in prj_dict.keys():
-									prj_dict[project_name] = hast.pf.PFProject(name=project_name,
-																			   prj=_prj,
-																			   task_auto=task_automation,
-																			   folders=[
-																				   study_case_results_folder,
-																				   _op_sc_results_folder,
-																			   ])
+								# Only add load flow to study case list and project list if load_flow successful, will still
+								# remain in folder of study cases but will be skipped in freq_scan and harmonic lf
+								if lf_error == 0:
+									# Create new class reference with all the details for this contingency and then add to
+									# list to be returned
+									_study_cls = hast.pf.PFStudyCase(full_name=cont_name,
+																	 list_parameters=list_to_check[_count_studycase],
+																	 cont_name=new_contingency_list[cont_count][0],
+																	 sc=_new_study_case,
+																	 op=_new_scenario,
+																	 prj=_prj,
+																	 task_auto=task_automation,
+																	 uid=start1)
+									# Add study case to dictionary of projects
+									if project_name not in prj_dict.keys():
+										prj_dict[project_name] = hast.pf.PFProject(name=project_name,
+																				   prj=_prj,
+																				   task_auto=task_automation,
+																				   folders=[
+																					   study_case_results_folder,
+																					   _op_sc_results_folder,
+																				   ])
 
-								# Add study case to file
-								prj_dict[project_name].sc_cases.append(_study_cls)
+									# Add study case to file
+									prj_dict[project_name].sc_cases.append(_study_cls)
+								else:
+									logger.error(('Load flow for study case {} not successful and so frequency scans ' +
+												 ' and harmonic load flows will not be run for this case')
+												 .format(_new_study_case))
 
 
 								# #cls_list.append(_study_cls)
@@ -832,7 +844,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 			print2('Problem Activating Project: {} {}'
 				   .format(list_to_check[_count_studycase][0], list_to_check[_count_studycase][1]))
 		_count_studycase += 1
-	print1("Finished Checking Study Cases", bf=1, af=0)
+	print1('Finished Checking Study Cases in {:.2f}'.format(time.clock() - time_sc_check), bf=1, af=0)
 	print1("___________________________________________________________________________________________________",
 		   bf=2,af=2)
 	# #return new_list
@@ -1388,8 +1400,18 @@ if __name__ == '__main__':
 			print1('Parallel running of frequency scans and harmonic load flows associated with project {}'
 				.format(prj_cls.name))
 
+			# Task Auto Execute seems to break logger so flush progress and error
+			# log commands here and then retrieve again
+			logger.flush()
+
 			# Call Task automation to run studies
+			# TODO:  Sometimes seem to hit an error where license does not allow this to run.  Need to check why that
+			# TODO: is occurring and figure out how to avoid.  Potential would be to close / open PF
 			prj_cls.task_auto.Execute()
+
+			# Re setup logger since seems to get closed during task_auto
+			# TODO: Check logger is still functioning correctly at this point
+
 
 			print1('Studies for project {} completed in {:0.2f} seconds'
 				   .format(prj_cls.name, time.clock()-t1_prj_studies))
@@ -1501,7 +1523,7 @@ if __name__ == '__main__':
 			# Loop through each folder and try to delete
 			for folder in prj_cls.folders:
 				delete_object(folder)
-			prj_cls.prj.Deactivate
+			prj_cls.prj.Deactivate()
 		logger.info('Deletion of created items completed in {:.2f} seconds'.format(time.clock() - t_start_delete))
 
 	# Graphic updating enabled
@@ -1513,4 +1535,5 @@ if __name__ == '__main__':
 		   bf=1, af=0)
 
 	# Close the logger since script has now completed and this forces flushing of the open logs before script exits
+	logger.flush()
 	logger.close_logging()
