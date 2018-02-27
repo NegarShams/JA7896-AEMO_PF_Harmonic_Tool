@@ -874,7 +874,9 @@ class Excel:
 		:return:
 		"""
 		self.log_info('Closing and Saving Workbook: {}'.format(workbookname))
-		wb.SaveAs(workbookname)  # Save Workbook"""
+		#SaveAs seems to throw an error so using .Save() instead since workbookname has already been set
+		#wb.SaveAs(workbookname)  # Save Workbook"""
+		wb.Save()
 		wb.Close()  # Close Workbook
 		return None
 
