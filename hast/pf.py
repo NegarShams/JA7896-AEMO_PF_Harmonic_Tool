@@ -51,6 +51,17 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 	elmres.Release()
 	return scale[0], results
 
+def remove_string_endings(astring, trailing):
+	"""
+		Function to strip the end from a string if it exists, used to remove .IntCase
+	:param str astring:  Initial string
+	:param str trailing:  Trailing string to be removed if exists
+	:return str astring:  String returned without trail if it has been removed
+	"""
+	if astring.endswith(trailing):
+		return astring[:-len(trailing)]
+	return astring
+
 
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
@@ -70,8 +81,9 @@ class PFStudyCase:
 		self.name = full_name
 		self.base_name = list_parameters[0]
 		self.prj_name = list_parameters[1]
-		self.sc_name = list_parameters[2]
-		self.op_name = list_parameters[3]
+		# #self.sc_name = list_parameters[2]
+		self.sc_name = remove_string_endings(astring=list_parameters[2], trailing='.IntCase')
+		self.op_name = remove_string_endings(astring=list_parameters[3], trailing='.IntScenario')
 		self.cont_name = cont_name
 		self.uid = uid
 
@@ -176,7 +188,9 @@ class PFStudyCase:
 			# #tope.insert(1, New_Contingency_List[count][0])							# Op scenario
 			tope.insert(1, self.cont_name)											# Contingency name
 			# #tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
-			tope.insert(1, self.sc_name)					# Study case description
+			# # tope.insert(1, self.sc_name)											# Study case description
+			# Added in to include scenario name as well
+			tope.insert(1, '{}_{}'.format(self.sc_name, self.op_name))  # Study case description
 
 		self.fs_scale = fs_scale
 

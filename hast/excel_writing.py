@@ -53,6 +53,8 @@ class Excel:
 		# Launch  new excel instance
 		self.xl = win32com.client.DispatchEx('Excel.Application')
 		# Following code ensures that makepy has been run to obtain the excel constants and defines them
+		# TODO: Need to do something to ensure that a new instance is always created so that if excel is opened
+		# TODO: whilst that instance is already active it does not get closed.
 		_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
 		self.excel_constants = win32com.client.constants
 		del _xl
