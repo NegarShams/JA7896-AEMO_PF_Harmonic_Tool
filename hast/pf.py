@@ -190,7 +190,10 @@ class PFStudyCase:
 			# #tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
 			# # tope.insert(1, self.sc_name)											# Study case description
 			# Added in to include scenario name as well
-			tope.insert(1, '{}_{}'.format(self.sc_name, self.op_name))  # Study case description
+			# # tope.insert(1, '{}_{}'.format(self.sc_name, self.op_name))  # Study case description
+			# Using base_name as description of study_case
+			tope.insert(1, self.base_name)  # Study case description
+
 
 		self.fs_scale = fs_scale
 
