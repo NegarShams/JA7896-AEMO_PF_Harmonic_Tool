@@ -1464,16 +1464,47 @@ if __name__ == '__main__':
 								FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
 						#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
 						if Excel_Export_Z12:
+							# Implementing performance improvement by avoiding repetative loops, list comprehension is significantly faster
 							start5 = time.clock()
-							for results35 in FS_Contingency_Results:								# Adds each contingency to the terminal results
-								for tgb in List_of_Mutual:
-									if Terminals_index[trm1_count][3] == tgb[3]:
-										if str(tgb[2]) == str(results35[3]):						# Checks it it the right terminal and adds it
-											results35.pop(3)										# Takes out the terminal  PF object (big long string)
-											results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
-											FS_Terminal_Results.append(results35)					# If it is the right terminal append
-							print1("Process Results Z12 in Python: " + str(round((time.clock() - start5),2)) + " Seconds",
-								   bf=1, af=0)		# Returns python results processing time
+
+							# TODO: Improvement possible here by avoiding looping so much, should be looking up results for each terminal
+							res = [[tgb[1:2] + results35[:3] + results35[4:] for tgb in List_of_Mutual if
+									str(tgb[2]) == str(results35[3]) and Terminals_index[trm1_count][3] == tgb[3]] for
+								   results35 in FS_Contingency_Results]
+							res = [x[0] for x in res if x != []]
+							# print1(res)
+							# res = [tgb[1:2] + dict_results[str(tgb[2])] for tgb in List_of_Mutual if Terminals_index[trm1_count][3] == tgb[3]]
+							# print1(res)
+							# print1(res)
+
+							# for results35 in FS_Contingency_Results:								# Adds each contingency to the terminal results
+							#	print1('Res 2 = \n')
+							# 	res2 = [tgb[1:2] + results35[:3] + results35[4:] for tgb in List_of_Mutual if str(tgb[2]) == str(results35[3]) and Terminals_index[trm1_count][3] == tgb[3]]
+							# 	print1(res2)
+							# 	for tgb in List_of_Mutual:
+							# 		res = []
+							# 		if Terminals_index[trm1_count][3] == tgb[3]:
+							# 			if str(tgb[2]) == str(results35[3]):						# Checks it it the right terminal and adds it
+							# 				results35.pop(3)										# Takes out the terminal  PF object (big long string)
+							# 				results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
+							# 				FS_Terminal_Results.append(results35)					# If it is the right terminal append
+							# 	# Loops through every entry in Terminals_index to find those where the terminals match
+							# 	# the selected results and then includes the relevant components
+							# 	# res = [tgb[1:2] + results35[:2] + results35[3:] for tgb in List_of_Mutual if (
+							# 	# 	str(tgb[2]) == str(results35[3]) and
+							# 	# 	Terminals_index[trm1_count][3] == tgb[3])]
+							# print1(FS_Terminal_Results)
+							# res = [[tgb[1:2] + results35[:2] + results35[3:] for tgb in List_of_Mutual if (
+							# 		str(tgb[2]) == str(results35[3]) and
+							# 		Terminals_index[trm1_count][3] == tgb[3])] for results35 in FS_Contingency_Results]
+							# res = [x for x in res if x != []]
+							# print1('NEXT\n\n')
+							# print1(res)
+							FS_Terminal_Results.extend(res)
+							print1(
+								"Process Results Z12 in Python: " + str(round((time.clock() - start5), 2)) + " Seconds",
+								bf=1, af=0)  # Returns python results processing time
+
 					HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
 					if HRM_Sim:
 						start6 = time.clock()
