@@ -101,6 +101,9 @@ class PFStudyCase:
 		self.fs_scale = []
 		self.hrm_scale = []
 
+		# Disctionary for looking up frequency scan results
+		self.fs_res = dict()
+
 	def create_freq_sweep(self, results_file, settings):
 		"""
 			Create a frequency sweep command in the study_case and return this as a reference
@@ -193,7 +196,6 @@ class PFStudyCase:
 			# # tope.insert(1, '{}_{}'.format(self.sc_name, self.op_name))  # Study case description
 			# Using base_name as description of study_case
 			tope.insert(1, self.base_name)  # Study case description
-
 
 		self.fs_scale = fs_scale
 

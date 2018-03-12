@@ -1441,6 +1441,15 @@ if __name__ == '__main__':
 			# TODO: Only required if project activated above
 			prj_cls.prj.Deactivate()
 
+		# Convert frequency scan results into a dictionary for fast lookup
+		dict_res = dict()
+		for res in FS_Contingency_Results:
+			s_results_name = str(res.pop(3))
+			try:
+				dict_res[s_results_name].append(res)
+			except KeyError:
+				dict_res[s_results_name] = [res]
+
 		# TODO:  At this point the task automation files have been created and will now need to loop through each project
 		# TODO: iteratively to run the commands before then processing the results
 
@@ -1458,20 +1467,31 @@ if __name__ == '__main__':
 					if FS_Sim:
 						start4 = time.clock()
 						FS_Terminal_Results.append(fs_scale)										# Adds the scale to terminal
-						for results34 in FS_Contingency_Results:									# Adds each contingency to the terminal results
-							if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
-								results34.pop(3)													# Takes out the terminal  PF object (big long string)
-								FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
+						# for results34 in FS_Contingency_Results:									# Adds each contingency to the terminal results
+						# 	if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
+						#			results34.pop(3)													# Takes out the terminal  PF object (big long string)
+						#		FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
+						# Using dictionary to find results since should bring speed perofrmance
+						FS_Terminal_Results.extend([str(Terminals_index[trm1_count][3])])
+
 						#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
 						if Excel_Export_Z12:
 							# Implementing performance improvement by avoiding repetative loops, list comprehension is significantly faster
 							start5 = time.clock()
 
+							# Performance improvement by using dictionaries
+							for tgb in List_of_Mutual:
+								if Terminals_index[trm1_count][3] == tgb[3]:
+									res = dict_res[str(tgb[2])]
+									res.insert(0, tgb[1])
+									FS_Terminal_Results.append(res)					# If it is the right terminal append
+
+
 							# TODO: Improvement possible here by avoiding looping so much, should be looking up results for each terminal
-							res = [[tgb[1:2] + results35[:3] + results35[4:] for tgb in List_of_Mutual if
-									str(tgb[2]) == str(results35[3]) and Terminals_index[trm1_count][3] == tgb[3]] for
-								   results35 in FS_Contingency_Results]
-							res = [x[0] for x in res if x != []]
+							#res = [[tgb[1:2] + results35[:3] + results35[4:] for tgb in List_of_Mutual if
+							#		str(tgb[2]) == str(results35[3]) and Terminals_index[trm1_count][3] == tgb[3]] for
+							#	   results35 in FS_Contingency_Results]
+							#res = [x[0] for x in res if x != []]
 							# print1(res)
 							# res = [tgb[1:2] + dict_results[str(tgb[2])] for tgb in List_of_Mutual if Terminals_index[trm1_count][3] == tgb[3]]
 							# print1(res)
@@ -1500,7 +1520,7 @@ if __name__ == '__main__':
 							# res = [x for x in res if x != []]
 							# print1('NEXT\n\n')
 							# print1(res)
-							FS_Terminal_Results.extend(res)
+							#FS_Terminal_Results.extend(res)
 							print1(
 								"Process Results Z12 in Python: " + str(round((time.clock() - start5), 2)) + " Seconds",
 								bf=1, af=0)  # Returns python results processing time
