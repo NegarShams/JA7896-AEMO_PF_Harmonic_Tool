@@ -8,10 +8,6 @@ AUTHOR:           Barry O'Connell
 David Mills [DM] from PSC UK rewrote this to improve performance and avoid some errors that seemed to be in the code
 	Code layout is now as per PEP
 
-# TODO:  Mutual impedance data is not beeing included.
-# TODO:  Potentially to do with only being available during the calculation and so needs to be requested as an
-# TODO: an additional result
-
 -------------------------------------------------------------------------------------------------------------------
 IMPORTANT NOTES:
 
@@ -1127,19 +1123,8 @@ if __name__ == '__main__':
 	# scenario objects that require activating.
 	dict_of_projects = check_list_of_studycases(List_of_Studycases)
 
-	# TODO: Find the points at which frequency sweeps are being run and instead create a ComFreqSweep and ComHLF within
-	# TODO: each study case.
-	# TODO: These can then be added to the ComTaskAutomation to run 3+ processes at a time.
-
 	# Excel export contained within this loop
-	# TODO: This section needs splitting up to firstly loop through creating the results folders and frequency sweeps,
-	# TODO: these should be assigned to a task automation
-	# TODO: Second stage is that these automated tasks are run
-	# TODO: Third stage is that the results are retrieved
-	# TODO: Comments have been put in below with the relevant locations which need looking into
 	if FS_Sim or HRM_Sim:
-		# TODO: Create task automation command and store it in general studies folder (ComTasks)
-
 		FS_Contingency_Results, HRM_Contingency_Results = [], []
 		count_studycase = 0
 
@@ -1170,7 +1155,6 @@ if __name__ == '__main__':
 
 			# Determine the terminals and mutual impedance data requested and check they exist within this project case
 			# TODO: What happens if terminal is only present in one study_case due to variation
-			# TODO: Convert all print1 commands to logger outputs
 			logger.info('Checking all terminals and producing mutual impedance data')
 			# Checks to see if all the terminals are in the project and skips any that aren't
 			Terminals_index, Term_ok = check_terminals(List_of_Points)
@@ -1217,6 +1201,7 @@ if __name__ == '__main__':
 				Scenario.Activate()
 				Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
 				Operation_Case_Folder = app.GetProjectFolder("scen")
+
 				# #Variations_Folder = app.GetProjectFolder("scheme")
 				# TODO: Clarify purpose of variation
 				# #Active_variations = get_active_variations()
@@ -1441,17 +1426,15 @@ if __name__ == '__main__':
 			# TODO: Only required if project activated above
 			prj_cls.prj.Deactivate()
 
-		# Convert frequency scan results into a dictionary for fast lookup
-		dict_res = dict()
+		# Convert frequency scan results into a dictionary for faster lookup
+		# TODO:  Performance improvement if just returned as dictionary from fs_results and then dictionaries combined
+		dict_fs_res = dict()
 		for res in FS_Contingency_Results:
 			s_results_name = str(res.pop(3))
 			try:
-				dict_res[s_results_name].append(res)
+				dict_fs_res[s_results_name].append(res)
 			except KeyError:
-				dict_res[s_results_name] = [res]
-
-		# TODO:  At this point the task automation files have been created and will now need to loop through each project
-		# TODO: iteratively to run the commands before then processing the results
+				dict_fs_res[s_results_name] = [res]
 
 		if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
 			print1("\nProcessing Results and output to Excel", bf=1, af=0)
@@ -1471,18 +1454,25 @@ if __name__ == '__main__':
 						# 	if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
 						#			results34.pop(3)													# Takes out the terminal  PF object (big long string)
 						#		FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
-						# Using dictionary to find results since should bring speed perofrmance
-						FS_Terminal_Results.extend([str(Terminals_index[trm1_count][3])])
+
+						# Results are now stored in dictionaries and so results are just looked up rather than
+						# searching through the different results.
+						FS_Terminal_Results.extend(dict_fs_res[str(Terminals_index[trm1_count][3])])
 
 						#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
 						if Excel_Export_Z12:
 							# Implementing performance improvement by avoiding repetative loops, list comprehension is significantly faster
 							start5 = time.clock()
 
-							# Performance improvement by using dictionaries
+							# Performance improvement by using dictionaries to look up results rather than search
+							# through lists of results.  Can be improved further if the terminal and result name is
+							# included in the dictionary key to avoid this loop
 							for tgb in List_of_Mutual:
 								if Terminals_index[trm1_count][3] == tgb[3]:
-									res = dict_res[str(tgb[2])]
+									# Dictionaries are stored in list to allow capturing of R and X data
+									res = dict_fs_res[str(tgb[2])]
+									# Insert contingency name to top of each result
+									res = [[tgb[1]] + x for x in res]
 									res.insert(0, tgb[1])
 									FS_Terminal_Results.append(res)					# If it is the right terminal append
 
