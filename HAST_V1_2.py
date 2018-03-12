@@ -799,6 +799,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 										switch_coup(_switch[0], _switch[1])
 
 								save_active_scenario()
+								# FORCE UPDDATE
 
 								# Determine if load flow successful and if not then don't include _study_cls in results
 								lf_error = load_flow(Load_Flow_Setting)
