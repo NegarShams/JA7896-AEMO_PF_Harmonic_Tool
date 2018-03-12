@@ -266,6 +266,10 @@ class PFProject:
 		:param object task_auto:  task automation reference
 		:param list folders:  List of folders created as part of project, these will be deleted at end of study
 		"""
+
+		# TODO: When initialising find the initial study case, operating scenario and variations
+		# TODO: So that they can be restored when the project folders are deleted
+
 		self.name = name
 		self.prj = prj
 		self.task_auto = task_auto

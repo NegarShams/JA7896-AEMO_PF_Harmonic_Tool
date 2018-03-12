@@ -1495,7 +1495,7 @@ if __name__ == '__main__':
 									# Insert contingency name to top of each result
 									res = [[tgb[1]] + x for x in res]
 									res.insert(0, tgb[1])
-									FS_Terminal_Results.append(res)					# If it is the right terminal append
+									FS_Terminal_Results.extend(res)					# If it is the right terminal append
 
 
 							# TODO: Improvement possible here by avoiding looping so much, should be looking up results for each terminal
@@ -1585,6 +1585,9 @@ if __name__ == '__main__':
 			# Loop through each folder and try to delete
 			for folder in prj_cls.folders:
 				delete_object(folder)
+
+			# TODO: After deleting folders will be useful to reactivate original study case, operating scenario and
+			# TODO: variations.
 			prj_cls.prj.Deactivate()
 		logger.info('Deletion of created items completed in {:.2f} seconds'.format(time.clock() - t_start_delete))
 
