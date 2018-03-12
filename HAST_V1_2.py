@@ -746,6 +746,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							_op_sc_results_folder, _folder_exists2 = create_folder(operation_case_folder,
 																				   Operation_Scenario_Folder)
 
+							# Create a variations folder for this project so that new mutual impedances created
+							# during running can be deleted easily.
+							# Create new variation within variations_folder
+							variations_folder = app.GetProjectFolder("scheme")
+							variation = create_variation(variations_folder, "IntScheme", Variation_Name)
+							activate_variation(variation)
+							# Create and activate recording stage within variation
+							_ = create_stage(variation, "IntSstage", Variation_Name)
+
+
 							# #Not required since no results stored in this results folder
 							# # Create a results folder for each project so that the reference can be included in the study_cls
 							# #results_folder, folder_exists = create_folder(_prj, Results_Folder)
@@ -808,15 +818,21 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																	 prj=_prj,
 																	 task_auto=task_automation,
 																	 uid=start1)
+
+
+
 									# Add study case to dictionary of projects
 									if project_name not in prj_dict.keys():
+										# Create a new project and add these objects so that they will be deleted once
+										# the study has been completed
+										# Variation isn't strictly a folder but will still be deleted
+										objects_to_delete = [study_case_results_folder,
+															 _op_sc_results_folder,
+															 variation]
 										prj_dict[project_name] = hast.pf.PFProject(name=project_name,
 																				   prj=_prj,
 																				   task_auto=task_automation,
-																				   folders=[
-																					   study_case_results_folder,
-																					   _op_sc_results_folder,
-																				   ])
+																				   folders=objects_to_delete)
 
 									# Add study case to file
 									prj_dict[project_name].sc_cases.append(_study_cls)
@@ -1202,12 +1218,14 @@ if __name__ == '__main__':
 				Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
 				Operation_Case_Folder = app.GetProjectFolder("scen")
 
-				# #Variations_Folder = app.GetProjectFolder("scheme")
-				# TODO: Clarify purpose of variation
-				# #Active_variations = get_active_variations()
-				# #Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
-				# #activate_variation(Variation)
-				# #Stage = create_stage(Variation,"IntSstage",Variation_Name)
+				# Variations are used to ensure any changes made such as new variables and mutual impedances
+				# created during the study can be deleted and the record of doing so is then also deleted
+				# with the variation folder
+				# Variations_Folder = app.GetProjectFolder("scheme")
+				# Active_variations = get_active_variations()
+				# Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
+				# activate_variation(Variation)
+				# Stage = create_stage(Variation,"IntSstage",Variation_Name)
 				# #New_Contingency_List, Con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 
 				# Terminals_index, etc. now defined at Project Level
