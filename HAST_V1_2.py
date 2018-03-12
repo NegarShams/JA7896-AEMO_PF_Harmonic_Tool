@@ -1187,7 +1187,8 @@ if __name__ == '__main__':
 				# Create folder for mutual elements
 				studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)
 				# Newly created folder is added to list of folders created so can be deleted at end of study
-				prj_cls.folders.append(studycase_mutual_folder)
+				# No longer required since Variation deleted which includes the mutual folder
+				# #prj_cls.folders.append(studycase_mutual_folder)
 				# Create list of mutual impedances between the terminals in the folder requested
 				List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)
 			else:
