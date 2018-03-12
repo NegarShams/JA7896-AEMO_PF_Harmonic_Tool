@@ -734,6 +734,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 						# TODO: If no pre-case check then nothing will be run, need to add in alternative options here
 
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
+							# TODO: Requires pre_case check for this to be created when these need to be created anyway
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 							# #terminals_index, term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
 							# Adjusted to create new study_case for each op_scenario
@@ -749,6 +750,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							# Create a variations folder for this project so that new mutual impedances created
 							# during running can be deleted easily.
 							# Create new variation within variations_folder
+
 							variations_folder = app.GetProjectFolder("scheme")
 							variation = create_variation(variations_folder, "IntScheme", Variation_Name)
 							activate_variation(variation)
