@@ -942,7 +942,7 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 								else:
 									print2("Contingency entry: " + item[0] + ". Coupler in Substation: " + aa[0] +  " " + aa[1] + " could not carry out: " + aa[2] + " ..............................................")
 
-						coupler_exists = True										# Marks that it found the terminal		
+								coupler_exists = True										# Marks that it found the terminal
 					if not coupler_exists:
 						print2("Contingency entry: " + item[0] + ". Coupler does not exist in Substation: " + aa[0] +  " " + aa[1] + " ..............................................")
 						print2("Skipping Contingency")
