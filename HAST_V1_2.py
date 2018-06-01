@@ -1,12 +1,20 @@
 """
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-NAME:             HAST Harmonics Automated Simulation Tool
-VERSION:          1.2 [24 April 2017]
-AUTHOR:           Barry O'Connell
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#######################################################################################################################
+###											HAST_V1_2																###
+###		Script initially produced by EirGrid for Harmonics Automated Simulation Tool and further developed by		###
+###		David Mills to improve performance, extracting of data to Excel and solve some errors present in the code.	###
+###		The script now makes use of PowerFactory parallel processing and will require that the Parallel Processing	###
+###		function in PowerFactory has been enabled and the number of cores has been set to N-1						###
+###																													###
+###		Code layout has been updated to align with PEP																###
+###																													###
+###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
+###		project JI6973 for EirGrid project PSPF010 - Specialise Support in Power Quality Analysis during 2018		###
+###																													###
+#######################################################################################################################
 
-David Mills [DM] from PSC UK rewrote this to improve performance and avoid some errors that seemed to be in the code
-	Code layout is now as per PEP
+DEVELOPMENT CODE:  This code is still in development since has not been produced to account for use of Harmonic Load
+Flow or extraction of ConvexHull data to excel.
 
 -------------------------------------------------------------------------------------------------------------------
 IMPORTANT NOTES:
@@ -40,10 +48,6 @@ to determine that the code in principal works correctly.
 SIGNIFICANT UPDATES
 - Converted to us a logging system that is stored in hast.logger which will avoid writing to a log file every time
 something happens
-
-- Working on:
-	1. Using win32com to write to named chart rather than active chart to speed up chart performance
-
 
 """
 
@@ -280,7 +284,6 @@ def create_variation(folder, pfclass, name):
 	# Change color of variation
 	variation.icolor = 1
 	print1('Variation {} created'.format(variation))
-	# #app.PrintPlain(variation)
 	return variation
 
 
@@ -413,9 +416,7 @@ def load_flow(load_flow_settings):		# Inputs load flow settings and executes loa
 	ldf.iopt_prot = load_flow_settings[53]        		# Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
 	ldf.ign_comp = load_flow_settings[54]             	# Ignore Composite Elements
 
-	# #print2('DEBUG - Load flow started')
 	error_code = ldf.Execute()
-	# #print2('DEBUG - Load flow completed')
 	t2 = time.clock() - t1
 	if error_code == 0:
 		print1('Load Flow calculation successful, time taken: {:.2f} seconds'.format(t2), bf=1, af=0)
@@ -571,7 +572,6 @@ def create_mutual_impedance_list(location, terminal_list):
 	print1('Creating: Mutual Impedance List of Terminals', bf=1, af=0)
 	terminal_list1 = list(terminal_list)
 	list_of_mutual = []
-	# # count = 0
 	# TODO: Improve since this is a loop of loops
 	for y in terminal_list1:
 		for x in terminal_list1:
@@ -709,7 +709,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	prj_dict = dict()
 	while _count_studycase < len(list_to_check):
 		# ERROR: Previously was not actually looking at the list passed to function
-		# # prj = activate_project(List_of_Studycases[_count_studycase][1])												# Activate Project
 		# TODO: Efficieny - This is activating a new project even if it is the same
 		project_name = list_to_check[_count_studycase][1]
 		_prj = activate_project(project_name)  # Activate Project
@@ -736,7 +735,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
 							# TODO: Requires pre_case check for this to be created when these need to be created anyway
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
-							# #terminals_index, term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
 							# Adjusted to create new study_case for each op_scenario
 
 							study_case_folder = app.GetProjectFolder('study')
@@ -756,11 +754,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							activate_variation(variation)
 							# Create and activate recording stage within variation
 							_ = create_stage(variation, "IntSstage", Variation_Name)
-
-
-							# #Not required since no results stored in this results folder
-							# # Create a results folder for each project so that the reference can be included in the study_cls
-							# #results_folder, folder_exists = create_folder(_prj, Results_Folder)
 
 							# Check if folder already exists
 							task_auto_name = 'Task_Automation_{}'.format(start1)
@@ -787,7 +780,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								_new_study_case = add_copy(study_case_results_folder,
 														   study_case,
 														   cont_name)
-								# #print2(_new_study_case)
+
 								_new_scenario = add_copy(_op_sc_results_folder, scenario,
 														 cont_name)	# Copies the base scenario
 								_new_study_case.Activate()
@@ -843,8 +836,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 												 ' and harmonic load flows will not be run for this case')
 												 .format(_new_study_case))
 
-
-								# #cls_list.append(_study_cls)
 								# TODO: Use enumerator rather than iterating counter
 								cont_count = cont_count + 1
 					else:
@@ -861,8 +852,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	print1('Finished Checking Study Cases in {:.2f}'.format(time.clock() - time_sc_check), bf=1, af=0)
 	print1("___________________________________________________________________________________________________",
 		   bf=2,af=2)
-	# #return new_list
-	# Get unique list of projects
 	return prj_dict
 
 
@@ -914,7 +903,6 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 		skip_contingency = False
 		list_of_couplers = []
 		if item[0] == "Base_Case":														# Skips the base case
-			# # NOT USED - coupler_exists = True
 			list_of_couplers.append("Base_Case")
 			list_of_couplers.append(0)
 		else:
@@ -1136,7 +1124,6 @@ if __name__ == '__main__':
 			   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
 	# Check all study cases converge, etc. and produce a new study case + operational scenario for each one
-	# #List_of_Studycases1 = check_list_of_studycases(List_of_Studycases)			# This loops through all the studycases and operational scenarios listed and checks them skips any ones which don't solve
 	# Adjusted to now return a list of handles to class <hast.pf.PF_Study_Case> which contain handles for the powerfactory
 	# scenario objects that require activating.
 	dict_of_projects = check_list_of_studycases(List_of_Studycases)
@@ -1153,7 +1140,6 @@ if __name__ == '__main__':
 		current_prj = app.GetActiveProject()
 		current_prj.Deactivate()
 
-		# #while count_studycase < len(List_of_Studycases1):												# Loop Through (Study Cases, Operational Scenarios)
 		t1 = time.clock()
 		# TODO: If running studies on multiple_projects the studies may need to be grouped and run at a project level
 		if len(dict_of_projects.keys()) > 1:
@@ -1188,7 +1174,6 @@ if __name__ == '__main__':
 				studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)
 				# Newly created folder is added to list of folders created so can be deleted at end of study
 				# No longer required since Variation deleted which includes the mutual folder
-				# #prj_cls.folders.append(studycase_mutual_folder)
 				# Create list of mutual impedances between the terminals in the folder requested
 				List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)
 			else:
@@ -1202,11 +1187,7 @@ if __name__ == '__main__':
 				print1('Creating studies for study case {} with operational scenario {} and contingency {}'
 					   .format(study_cls.sc_name, study_cls.op_name, study_cls.cont_name))
 
-				# #MOVED - prj = activate_project(List_of_Studycases1[count_studycase][1])								# Activate Project
-				# #if len(str(prj)) > 0:
-
 				# TODO: Need to add back in error checking
-				# #StudyCase, study_error = activate_study_case(List_of_Studycases1[count_studycase][2])		# Activate Study Case in List
 				# Activate Study Case
 				StudyCase = study_cls.sc
 				StudyCase.Activate()
@@ -1214,56 +1195,11 @@ if __name__ == '__main__':
 				# Add study case to task automation
 				study_cls.task_auto.AppendStudyCase(study_cls.sc)
 
-				# #Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate corresponding operational Scenario
 				# Activate Scenario
 				Scenario = study_cls.op
 				Scenario.Activate()
 				Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
 				Operation_Case_Folder = app.GetProjectFolder("scen")
-
-				# Variations are used to ensure any changes made such as new variables and mutual impedances
-				# created during the study can be deleted and the record of doing so is then also deleted
-				# with the variation folder
-				# Variations_Folder = app.GetProjectFolder("scheme")
-				# Active_variations = get_active_variations()
-				# Variation = create_variation(Variations_Folder,"IntScheme",Variation_Name)
-				# activate_variation(Variation)
-				# Stage = create_stage(Variation,"IntSstage",Variation_Name)
-				# #New_Contingency_List, Con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
-
-				# Terminals_index, etc. now defined at Project Level
-				# #Terminals_index, Term_ok = check_terminals(List_of_Points)								# Checks to see if all the terminals are in the case file skips any that aren't
-
-				# #op_sc_results_folder, folder_exists2 = create_folder(Operation_Case_Folder, Operation_Scenario_Folder)
-				# Add mutual impedance elements
-				# #Net_Elm1 = get_object(Net_Elm)															# Gets the Network Elements ElmNet folder
-				# #if len(Net_Elm1) < 1:
-				# #	print2("Could not find Network Element folder, Note: this is case sensitive :" + str(Net_Elm))
-				# #if len(Terminals_index) > 1 and Excel_Export_Z12:
-				# #	# Results for mutual impedance have to be stored in the Network Folder
-				# #	studycase_mutual_folder, folder_exists3 = create_folder(Net_Elm1[0], Mut_Elm_Fld)		# Create Folder for Mutual Elements
-				# #	List_of_Mutual = create_mutual_impedance_list(studycase_mutual_folder, Terminals_index)	# Create List of mutual impedances between the terminals in the folder
-				# #else:
-				# #	Excel_Export_Z12 = False															# Can't Export mutual impedances if you give it only one bus
-				# #	List_of_Mutual = []
-				# #	# #studycase_mutual_folder = ''
-				# #count = 0
-
-				# No need to loop through contingencies any more since each study case is contingency specific
-				# #while count < len(New_Contingency_List):												# Loop Through Contingency list
-				# #	print1("Carrying out Contingency: " + New_Contingency_List[count][0], bf=2, af=0)
-				# # deactivate_scenario()																# Can't copy activated Scenario so deactivate it
-
-				# #	object_exists, new_object = check_if_object_exists(op_sc_results_folder, List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0] + ".IntScenario"))
-				# #	if object_exists == 0:
-				# #		new_scenario = add_copy(op_sc_results_folder,Scenario,List_of_Studycases1[count_studycase][0] + str("_" + New_Contingency_List[count][0]))	# Copies the base scenario
-				# #	else:
-				# #		new_scenario = new_object[0]
-				# #	scen_error = activate_scenario1(new_scenario)										# Activates the base scenario
-				# #	if New_Contingency_List[count][0] != "Base_Case":									# Apply Contingencies if it is not the base case
-				# #		for switch in New_Contingency_List[count][1:]:
-				# #			switch_coup(switch[0],switch[1])
-				# #	save_active_scenario()
 
 				if FS_Sim:
 					# During task automation each process only has access to single study case and therefore results
@@ -1282,48 +1218,18 @@ if __name__ == '__main__':
 					# Create command for frequency sweep and add to Task Automation
 					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings)
 
-					# #_ = sweep.Clear()  # Clears Data
-					# #variable_contents = sweep.GetContents()  # Gets the existing variables
-					# #for cc in variable_contents:  # Loops through and deletes the existing variables
-					# #	cc.Delete()
-
-					# #trm_count = 0
-					# #while trm_count < len(Terminals_index):  # Add terminal variables to the Results file
-					# #	add_vars_res(sweep, Terminals_index[trm_count][3], FS_Terminal_Variables)
-					# #	trm_count = trm_count + 1
-					# #if Excel_Export_Z12:
-					# #	for mut in List_of_Mutual:  # Adds the mutual impedance data to Results File
-					# #		add_vars_res(sweep, mut[2], Mutual_Variables)
-
 					# Add freq_sweep to task automation
 					study_cls.task_auto.AppendCommand(freq_sweep, 0)
 					print1('Frequency sweep added for study case {}'.format(study_cls.name))
 
-
-					# #Fsweep_err_cde = freq_sweep(sweep, Fsweep_Settings)								# Carry out Frequency Sweep
-
-
-					# #if Fsweep_err_cde == 0:															# Skips the contingency if Frequency Sweep doesn't solve
-					# #	fs_scale, fs_res = retrieve_results(sweep,0)
-					# #	fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
-					# #	fs_scale.insert(1,"Scale")
-					# #	fs_scale.pop(3)
-					# #	for tope in fs_res:															# Adds the additional information to the results file
-					# #		tope.insert(1,New_Contingency_List[count][0])							# Op scenario
-					# #		tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
-					# #		FS_Contingency_Results.append(tope)										# Results
-					# #else:
-					# #	print2("Error with Frequency Sweep Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
 				else:
 					# Frequency sweep not carried out so no need to add to task automation
 					print1('No frequency sweep included for study case {}'.format(study_cls.name))
-					# #fs_scale = []
 				if HRM_Sim:
 					# During task automation each process only has access to single study case and therefore results
 					# need to be stored in the study case file.  Once completed they can then be moved to a centralised
 					# results folder
 					harm = create_results_file(study_cls.sc, study_cls.name + "_HLF", 6)		# Creates the Harmonic Results File
-					# #harm = create_results_file(studycase_results_folder, New_Contingency_List[count][0] + "_HLF",6)		# Creates the Harmonic Results File
 					trm_count = 0
 					while trm_count < len(Terminals_index):											# Add terminal variables to the Results file
 						add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
@@ -1333,71 +1239,11 @@ if __name__ == '__main__':
 					# Create command for harmonic load flow and add to Task Automation
 					hldf_command = study_cls.create_harm_load_flow(results_file=harm,
 																   settings=Harmonic_Loadflow_Settings)
-					# #harm = hldf_command.p_resvar
-
-					# #_ = harm.Clear()  # Clears Data
-					# #variable_contents = harm.GetContents()  # Gets the existing variables
-					# #for cc in variable_contents:  # Loops through and deletes the existing variables
-					# #	cc.Delete()
-
-					# #trm_count = 0
-					# #while trm_count < len(Terminals_index):  # Add terminal variables to the Results file
-					# #	add_vars_res(harm, Terminals_index[trm_count][3], HRM_Terminal_Variables)
-					# #	trm_count = trm_count + 1
-
 					study_cls.task_auto.AppendCommand(hldf_command, 0)
 					print1('Harmonic load flow added for study case {}'.format(study_cls.name))
-					# #Harm_err_cde = harm_load_flow(harm, Harmonic_Loadflow_Settings)
-					# #if Harm_err_cde == 0:
-					# #	hrm_scale, hrm_res = retrieve_results(harm,1)
-					# #	hrm_scale.insert(1,"THD")													# Inserts the THD
-					# #	hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
-					# #	hrm_scale.insert(1,"Scale")
-					# #	hrm_scale.pop(4)															# Takes out the 50 Hz
-					# #	hrm_scale.pop(4)
-					# #	for res12 in hrm_res:
-					# #		thd1 = re.split(r'[\\.]',res12[1])
-					# #		thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
-					# #		thdz = False
-					# #		if thd2[0] is not None:
-					# #			thd3 = thd2[0].GetContents()
-					# #			for thd4 in thd3:
-					# #				if (thd1[13] + ".ElmTerm") in str(thd4):
-					# #					THD = thd4.GetAttribute('m:THD')
-					# #					thdz = True
-					# #		elif thd2[0] is not None or thdz == False:
-					# #			THD = "NA"
-					# #		#thd4 = app.SearchObjectByForeignKey(thd1[11] + ".ElmSubstat")
-					# #		res12.insert(2, THD)														# Insert THD
-					# #		res12.insert(2, New_Contingency_List[count][0])							# Op scenario
-					# #		res12.insert(2, List_of_Studycases1[count_studycase][0])					# Study case description
-					# #		res12.pop(5)
-					# #		HRM_Contingency_Results.append(res12)									# Results
-					# #else:
-					# #	print2("Error with Harmonic Simulation: " + List_of_Studycases1[count_studycase][0] + New_Contingency_List[count][0])
 
 				else:
 					print1('No Harmonic load flow added for study case {}'.format(study_cls.name))
-					# #hrm_scale =[]
-				# #count = count + 1
-				# #print1("", bf=2, af=0)
-
-				# TODO:  Need to add in statement that will mean the initial study case is restored once completed
-				# #Scenario, scen_error = activate_scenario(List_of_Studycases1[count_studycase][3])		# Activate the base case scenario this just ensures that when the script finishes using PF that it goes back to a regular case
-				# #count_studycase = count_studycase + 1
-				# #print1("", bf=2, af=0)
-				# #if Delete_Created_Folders:
-				# #	delete_object(studycase_results_folder)
-				# #	delete_object(op_sc_results_folder)
-				# #	if Excel_Export_Z12:
-				# #		delete_object(studycase_mutual_folder)
-				# #	# Deactivate active variation
-				# #	Variation.Deactivate()
-				# #	delete_object(Variation)
-				# #else:
-				# #	print2('Could Not Activate Project {}'.format(study_cls.prj))
-				# #	# #print2('Could Not Activate Project: {}'.format(List_of_Studycases1[count_studycase][1]))
-				# #	# ERROR:  print2("Could Not Activate Project: " + Project_Name)
 
 			print1('Creating of commands for studies in project {} completed in {:0.2f} seconds'
 				   .format(prj_cls.name, time.clock()-t1_prj_start))
@@ -1471,16 +1317,11 @@ if __name__ == '__main__':
 					if FS_Sim:
 						start4 = time.clock()
 						FS_Terminal_Results.append(fs_scale)										# Adds the scale to terminal
-						# for results34 in FS_Contingency_Results:									# Adds each contingency to the terminal results
-						# 	if str(Terminals_index[trm1_count][3]) == results34[3]:					# Checks it it the right terminal and adds it
-						#			results34.pop(3)													# Takes out the terminal  PF object (big long string)
-						#		FS_Terminal_Results.append(results34)								# Append terminal data to the results list to be later passed to excel
 
 						# Results are now stored in dictionaries and so results are just looked up rather than
 						# searching through the different results.
 						FS_Terminal_Results.extend(dict_fs_res[str(Terminals_index[trm1_count][3])])
 
-						#print1(1,"Process Results RX & Z in Python: " + str(round((time.clock() - start4),2)) + " Seconds",0)		# Returns python results processing time
 						if Excel_Export_Z12:
 							# Implementing performance improvement by avoiding repetative loops, list comprehension is significantly faster
 							start5 = time.clock()
@@ -1499,39 +1340,6 @@ if __name__ == '__main__':
 
 
 							# TODO: Improvement possible here by avoiding looping so much, should be looking up results for each terminal
-							#res = [[tgb[1:2] + results35[:3] + results35[4:] for tgb in List_of_Mutual if
-							#		str(tgb[2]) == str(results35[3]) and Terminals_index[trm1_count][3] == tgb[3]] for
-							#	   results35 in FS_Contingency_Results]
-							#res = [x[0] for x in res if x != []]
-							# print1(res)
-							# res = [tgb[1:2] + dict_results[str(tgb[2])] for tgb in List_of_Mutual if Terminals_index[trm1_count][3] == tgb[3]]
-							# print1(res)
-							# print1(res)
-
-							# for results35 in FS_Contingency_Results:								# Adds each contingency to the terminal results
-							#	print1('Res 2 = \n')
-							# 	res2 = [tgb[1:2] + results35[:3] + results35[4:] for tgb in List_of_Mutual if str(tgb[2]) == str(results35[3]) and Terminals_index[trm1_count][3] == tgb[3]]
-							# 	print1(res2)
-							# 	for tgb in List_of_Mutual:
-							# 		res = []
-							# 		if Terminals_index[trm1_count][3] == tgb[3]:
-							# 			if str(tgb[2]) == str(results35[3]):						# Checks it it the right terminal and adds it
-							# 				results35.pop(3)										# Takes out the terminal  PF object (big long string)
-							# 				results35.insert(0,tgb[1])								# Adds in the Mutual tag ie Letterkenny_Binbane
-							# 				FS_Terminal_Results.append(results35)					# If it is the right terminal append
-							# 	# Loops through every entry in Terminals_index to find those where the terminals match
-							# 	# the selected results and then includes the relevant components
-							# 	# res = [tgb[1:2] + results35[:2] + results35[3:] for tgb in List_of_Mutual if (
-							# 	# 	str(tgb[2]) == str(results35[3]) and
-							# 	# 	Terminals_index[trm1_count][3] == tgb[3])]
-							# print1(FS_Terminal_Results)
-							# res = [[tgb[1:2] + results35[:2] + results35[3:] for tgb in List_of_Mutual if (
-							# 		str(tgb[2]) == str(results35[3]) and
-							# 		Terminals_index[trm1_count][3] == tgb[3])] for results35 in FS_Contingency_Results]
-							# res = [x for x in res if x != []]
-							# print1('NEXT\n\n')
-							# print1(res)
-							#FS_Terminal_Results.extend(res)
 							print1(
 								"Process Results Z12 in Python: " + str(round((time.clock() - start5), 2)) + " Seconds",
 								bf=1, af=0)  # Returns python results processing time
@@ -1562,13 +1370,11 @@ if __name__ == '__main__':
 												excel_export_z12=Excel_Export_Z12,
 												excel_convex_hull=Excel_Convex_Hull,
 												hrm_sim=HRM_Sim)				# Uses the terminal results to create a sheet and graph
-					# #create_sheet_plot(Terminals_index[trm1_count][0],FS_Terminal_Results, HRM_Terminal_Results, _wb=wb, _xl=xl)				# Uses the terminal results to create a sheet and graph
 					trm1_count = trm1_count + 1
 				# progress_txt = read_text_file(Progress_Log)
 
 				# Save and close workbook
 				excel_cls.close_workbook(wb=wb, workbookname=Excel_Results)
-				# #close_workbook(_wb=wb, workbookname=Excel_Results, _xl=xl)																# Closes and saves the workbook
 				print1("Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",
 					   bf=1, af=0)	# Returns the Total Export time
 

@@ -1,13 +1,27 @@
 """
-	Python function to deal with the logging of messages to both a log handler and to powerfactory
-	if powerfactory is active
+#######################################################################################################################
+###											logger																	###
+###		Script deals with the logging of messages to both a log handler and to PowerFactory if powerfactory.py is 	###
+###		active																										###
+###																													###
+###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
+###		project JI6973 for EirGrid project PSPF010 - Specialise Support in Power Quality Analysis during 2018		###
+###																													###
+#######################################################################################################################
+
 """
 import logging
 import logging.handlers
-
 import sys
 import os
 import unittest
+
+# Meta Data
+__author__ = 'David Mills'
+__version__ = '1.3a'
+__email__ = 'david.mills@pscconsulting.com'
+__phone__ = '+44 7899 984158'
+__status__ = 'In Development - Alpha'
 
 class Logger:
 	""" Contained within a class since logger will need to print to both power factory and

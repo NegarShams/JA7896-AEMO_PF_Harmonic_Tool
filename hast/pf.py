@@ -1,8 +1,23 @@
 """
-	Classes containing details needed for pf extract
+#######################################################################################################################
+###													pf																###
+###		Script deals with writing data to PowerFactory and any processing that takes place which requires 			###
+###		interacting with power factory																				###
+###																													###
+###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
+###		project JI6973 for EirGrid project PSPF010 - Specialise Support in Power Quality Analysis during 2018		###
+###																													###
+#######################################################################################################################
 """
 
 import math
+
+# Meta Data
+__author__ = 'David Mills'
+__version__ = '1.3a'
+__email__ = 'david.mills@pscconsulting.com'
+__phone__ = '+44 7899 984158'
+__status__ = 'In Development - Alpha'
 
 def create_object(location, pfclass, name):			# Creates a database object in a specified location of a specified class
 	"""
