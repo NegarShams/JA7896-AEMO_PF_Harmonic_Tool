@@ -280,10 +280,21 @@ def create_variation(folder, pfclass, name):
 	:param str name: Name for variation
 	:return powerfactory.Variation: Handle for newly created variation
 	"""
+	# Check if variation exists first
+	# #variation = folder.GetContents('{}.{}'.format(name, pfclass))
+
+	# #if len(variation) == 0:
+		# #Variation doesn't exist so create a new one
 	variation = create_object(folder, pfclass, name)
+
 	# Change color of variation
 	variation.icolor = 1
 	print1('Variation {} created'.format(variation))
+	# #else:
+	# #	# Returns list object so need to get first item
+	# #	variation = variation[0]
+
+	# #app.PrintPlain(variation)
 	return variation
 
 
@@ -930,7 +941,7 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 								else:
 									print2("Contingency entry: " + item[0] + ". Coupler in Substation: " + aa[0] +  " " + aa[1] + " could not carry out: " + aa[2] + " ..............................................")
 
-								coupler_exists = True										# Marks that it found the terminal
+						coupler_exists = True										# Marks that it found the terminal
 					if not coupler_exists:
 						print2("Contingency entry: " + item[0] + ". Coupler does not exist in Substation: " + aa[0] +  " " + aa[1] + " ..............................................")
 						print2("Skipping Contingency")

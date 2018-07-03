@@ -327,7 +327,9 @@ class Excel:
 					graph_across = 1  # Number of Graphs Across the Page
 					graph_spacing = 25  # Spacing between the graphs
 
-					noofgraphrows = int(math.ceil(len(scale[3:]) / graph_across) - 1)
+					# Adjusted to ensure that minimum number of graphs rows is 200 and not too small a number
+					noofgraphrows = max(int(math.ceil(len(scale[3:]) / graph_across) - 1), 200)
+					#noofgraphrowsrange = list(range(0, noofgraphrows))
 					noofgraphrowsrange = list(range(0, noofgraphrows))
 					gph_coord = []  # List of Graph coordinates for Impedance Loci
 					for uyt in noofgraphrowsrange:  # This creates the graph coordinates
@@ -374,6 +376,7 @@ class Excel:
 					r_results = list(zip(*r_results))
 					startrow1 = (endrow + 3)
 					startcol1 = startcol + 3
+
 					for hrm in non_int_rows:  # Plots the Graphs for the Harmonics including non integer rows
 						ws.Range(ws.Cells(1, 1),
 								 ws.Cells(1,2)).Select()  # Important for computation as it doesn't graph all the selection first ie these cells should be blank
