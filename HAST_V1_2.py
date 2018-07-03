@@ -760,8 +760,12 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							# during running can be deleted easily.
 							# Create new variation within variations_folder
 
+							# Adjusted to put the variations all in the same folder so that they can be deleted once
+							# the code running is completed.
 							variations_folder = app.GetProjectFolder("scheme")
-							variation = create_variation(variations_folder, "IntScheme", Variation_Name)
+							_variations_folder, _folder_exists3 = create_folder(variations_folder,
+																				Variation_Name)
+							variation = create_variation(_variations_folder, "IntScheme", Variation_Name)
 							activate_variation(variation)
 							# Create and activate recording stage within variation
 							_ = create_stage(variation, "IntSstage", Variation_Name)
@@ -831,10 +835,10 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 									if project_name not in prj_dict.keys():
 										# Create a new project and add these objects so that they will be deleted once
 										# the study has been completed
-										# Variation isn't strictly a folder but will still be deleted
+										# Variations all stored in a folder so that they can be deleted as a group.
 										objects_to_delete = [study_case_results_folder,
 															 _op_sc_results_folder,
-															 variation]
+															 _variations_folder]
 										prj_dict[project_name] = hast.pf.PFProject(name=project_name,
 																				   prj=_prj,
 																				   task_auto=task_automation,
