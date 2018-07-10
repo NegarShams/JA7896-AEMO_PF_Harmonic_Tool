@@ -1054,7 +1054,11 @@ if __name__ == '__main__':
 
 	# Enter what Variables you want to look at for terminals
 	FS_Terminal_Variables = ["m:R", "m:X", "m:Z", "m:phiz"]
-	Mutual_Variables = ["c:Z_12"]
+	# # Mutual_Variables = ["c:Z_12"]
+	# TODO:  Because mutual data is saved as part of network data it is not possible to get different mutual data from
+	# TODO:  results when parallel processing unless results extraction is completed as part of processing.  DM
+	# TODO:  imagines this would require adding a ComTask for the results extraction.
+	Mutual_Variables = ["c:Z_12", "c:R_12", "c:X_12"]
 	# THD attribute was not previously included
 	HRM_Terminal_Variables = ['m:HD', 'm:THD']
 	# Import Excel
@@ -1344,6 +1348,8 @@ if __name__ == '__main__':
 							# Performance improvement by using dictionaries to look up results rather than search
 							# through lists of results.  Can be improved further if the terminal and result name is
 							# included in the dictionary key to avoid this loop
+							# DEBUGGING:
+							print(List_of_Mutual)
 							for tgb in List_of_Mutual:
 								if Terminals_index[trm1_count][3] == tgb[3]:
 									# Dictionaries are stored in list to allow capturing of R and X data
@@ -1351,6 +1357,11 @@ if __name__ == '__main__':
 									# Insert contingency name to top of each result
 									res = [[tgb[1]] + x for x in res]
 									res.insert(0, tgb[1])
+									# TODO:  Add entry at this point to extract R12 data as well
+									# DEBUGGING:
+									print(tgb)
+									print(res)
+									raise SyntaxError('STOP')
 									FS_Terminal_Results.extend(res)					# If it is the right terminal append
 
 

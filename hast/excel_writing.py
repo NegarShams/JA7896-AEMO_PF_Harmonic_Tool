@@ -600,11 +600,18 @@ class Excel:
 					if excel_export_rx or excel_export_z:
 						newcol += 1
 
-					for x in fs_results:
-						if x[1] == "c:Z_12":
-							ws.Range(ws.Cells(startrow - 1, newcol),
-									 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
-							newcol = newcol + 1
+					# Additional loop added to loop through each string type to handle if R_12 and X_12 results
+					# are exported as well.  Could be made more efficient by only looping once and separating
+					# the columns by the number of results.
+					for res_type in ('c:Z_12', 'c:R_12', 'c:X_12'):
+						for x in fs_results:
+							# #if x[1] == "c:Z_12":
+							if x[1] == res_type:
+								ws.Range(ws.Cells(startrow - 1, newcol),
+										 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
+								newcol = newcol + 1
+
+						newcol = newcol + 1
 
 					t2 = time.clock() - t1
 					self.log_info('Exporting Z_12 data self impedance data, time taken: {:.2f} seconds'.format(t2))
