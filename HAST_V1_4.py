@@ -586,7 +586,9 @@ def create_mutual_impedance_list(location, terminal_list):
 	# TODO: Improve since this is a loop of loops
 	for y in terminal_list1:
 		for x in terminal_list1:
-			if x[3] != y[3]:
+			# Adjusted so that mutual data will only be collected from this node to the remote node if the remote node
+			# is set to True in the input data (column 4)
+			if x[3] != y[3] and x[4]:
 				name = '{}_{}'.format(y[0],x[0])
 				elmmut = create_mutual_elm(location, name, y[3], x[3])
 				list_of_mutual.append([str(y[0]), name, elmmut, y[3], x[3]])
@@ -886,12 +888,15 @@ def check_terminals(list_of_points): 		# This checks and creates the list of ter
 		else:
 			t1 = t[0].GetContents()													# Gets the Contents of the substations (ie objects) 
 			terminal_exists = False
-			for t2 in t1:															# Gets the contents of the objects in the Substaion
-				if list_of_points[tm_count][2]  in str(t2):												# Checks to see if the terminal is there
+			for t2 in t1:															# Gets the contents of the objects in the Substation
+				if list_of_points[tm_count][2] in str(t2):												# Checks to see if the terminal is there
 					terminals_index.append([list_of_points[tm_count][0],
 											list_of_points[tm_count][1],
 											list_of_points[tm_count][2],
-											t2])					# Appends Terminals ( Name, Terminal Name, Terminal object data)
+											t2,
+											# list_of_points 3rd column contains data on whether the mutual impedance should consider the node or not
+											# based on True or False given in the input spreadsheet
+											list_of_points[tm_count][3]])					# Appends Terminals ( Name, Terminal Name, Terminal object data)
 					terminal_exists = True											# Marks that it found the terminal
 			if not terminal_exists:
 				logger.error('Terminal does not exist in case: {} - {}'
@@ -1062,12 +1067,12 @@ if __name__ == '__main__':
 	# THD attribute was not previously included
 	HRM_Terminal_Variables = ['m:HD', 'm:THD']
 	# Import Excel
-	Import_Workbook = filelocation + "HAST_V1_2_Inputs.xlsx"					# Gets the CWD current working directory
+	Import_Workbook = filelocation + "HAST_V1_4_Inputs.xlsx"					# Gets the CWD current working directory
 	Variation_Name = "Temporary_Variation" + start1
 
 	# Create excel instance to deal with retrieving import data from excel
 	with hast.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
-		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
+		analysis_dict = excel_cls.import_excel_harmonic_inputsimport_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
 
 	Study_Settings = analysis_dict["Study_Settings"]
 	if len(Study_Settings) != 20:

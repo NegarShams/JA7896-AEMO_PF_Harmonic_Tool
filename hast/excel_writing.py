@@ -166,7 +166,10 @@ class Excel:
 						row_value = [
 							row_value[0],
 							'{}.ElmSubstat'.format(row_value[1]),
-							'{}.ElmTerm'.format(row_value[2])]
+							'{}.ElmTerm'.format(row_value[2]),
+							# Third column now contains TRUE or FALSE.  If True then data will be included including
+							# transfer impedance from other nodes to this node.  If False then no data will be included.
+							row_value[3]]
 
 					row_input.append(row_value)
 					count_row = count_row + 1
