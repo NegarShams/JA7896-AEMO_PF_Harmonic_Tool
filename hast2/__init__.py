@@ -9,9 +9,9 @@
 #######################################################################################################################
 """
 
-import hast.logger
-import hast.excel_writing
-import hast.pf
+import hast2.logger
+import hast2.excel_writing
+import hast2.pf
 
 # Meta Data
 __author__ = 'David Mills'

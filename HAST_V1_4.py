@@ -46,7 +46,7 @@ to determine that the code in principal works correctly.
 
 ----------------------------------
 SIGNIFICANT UPDATES
-- Converted to us a logging system that is stored in hast.logger which will avoid writing to a log file every time
+- Converted to us a logging system that is stored in hast2.logger which will avoid writing to a log file every time
 something happens
 
 """
@@ -62,8 +62,8 @@ import time                          	# Time
 
 # HAST module package requires reload during code development since python does not reload itself
 # HAST module package used as functions start to be transferred for efficiency
-import hast
-hast = importlib.reload(hast)
+import hast2
+hast2 = importlib.reload(hast2)
 
 # GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
 DEBUG_MODE = False
@@ -822,7 +822,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								if lf_error == 0:
 									# Create new class reference with all the details for this contingency and then add to
 									# list to be returned
-									_study_cls = hast.pf.PFStudyCase(full_name=cont_name,
+									_study_cls = hast2.pf.PFStudyCase(full_name=cont_name,
 																	 list_parameters=list_to_check[_count_studycase],
 																	 cont_name=new_contingency_list[cont_count][0],
 																	 sc=_new_study_case,
@@ -841,7 +841,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 										objects_to_delete = [study_case_results_folder,
 															 _op_sc_results_folder,
 															 _variations_folder]
-										prj_dict[project_name] = hast.pf.PFProject(name=project_name,
+										prj_dict[project_name] = hast2.pf.PFProject(name=project_name,
 																				   prj=_prj,
 																				   task_auto=task_automation,
 																				   folders=objects_to_delete)
@@ -1071,8 +1071,8 @@ if __name__ == '__main__':
 	Variation_Name = "Temporary_Variation" + start1
 
 	# Create excel instance to deal with retrieving import data from excel
-	with hast.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
-		analysis_dict = excel_cls.import_excel_harmonic_inputsimport_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
+	with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
+		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
 
 	Study_Settings = analysis_dict["Study_Settings"]
 	if len(Study_Settings) != 20:
@@ -1090,7 +1090,7 @@ if __name__ == '__main__':
 	Debug_Log = Results_Export_Folder + 'DEBUG' + start1 + '.txt'
 
 	# Setup logger with reference to powerfactory app
-	logger = hast.logger.Logger(pth_debug_log=Debug_Log,
+	logger = hast2.logger.Logger(pth_debug_log=Debug_Log,
 								pth_progress_log=Progress_Log,
 								pth_error_log=Error_Log,
 								app=app)
@@ -1148,7 +1148,7 @@ if __name__ == '__main__':
 			   .format(len(Harmonic_Loadflow_Settings), Harmonic_Loadflow_Settings))
 
 	# Check all study cases converge, etc. and produce a new study case + operational scenario for each one
-	# Adjusted to now return a list of handles to class <hast.pf.PF_Study_Case> which contain handles for the powerfactory
+	# Adjusted to now return a list of handles to class <hast22.pf.PF_Study_Case> which contain handles for the powerfactory
 	# scenario objects that require activating.
 	dict_of_projects = check_list_of_studycases(List_of_Studycases)
 
@@ -1332,7 +1332,7 @@ if __name__ == '__main__':
 			start2 = time.clock()																# Used to calc the total excel export time
 			# Create a new instance of excel to deal with reading and writing of data to excel instance
 			# With statement means that even if error occurs new instance of excel is closed
-			with hast.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
+			with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
 				wb = excel_cls.create_workbook(workbookname=Excel_Results, excel_visible=Excel_Visible)	# Creates Workbook
 				trm1_count = 0
 				while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
