@@ -588,7 +588,7 @@ def create_mutual_impedance_list(location, terminal_list):
 		for x in terminal_list1:
 			# Adjusted so that mutual data will only be collected from this node to the remote node if the remote node
 			# is set to True in the input data (column 4)
-			if x[3] != y[3] and x[4]:
+			if x[3] != y[3] and y[4]:
 				name = '{}_{}'.format(y[0],x[0])
 				elmmut = create_mutual_elm(location, name, y[3], x[3])
 				list_of_mutual.append([str(y[0]), name, elmmut, y[3], x[3]])
@@ -1353,8 +1353,6 @@ if __name__ == '__main__':
 							# Performance improvement by using dictionaries to look up results rather than search
 							# through lists of results.  Can be improved further if the terminal and result name is
 							# included in the dictionary key to avoid this loop
-							# DEBUGGING:
-							print(List_of_Mutual)
 							for tgb in List_of_Mutual:
 								if Terminals_index[trm1_count][3] == tgb[3]:
 									# Dictionaries are stored in list to allow capturing of R and X data
@@ -1362,11 +1360,6 @@ if __name__ == '__main__':
 									# Insert contingency name to top of each result
 									res = [[tgb[1]] + x for x in res]
 									res.insert(0, tgb[1])
-									# TODO:  Add entry at this point to extract R12 data as well
-									# DEBUGGING:
-									print(tgb)
-									print(res)
-									raise SyntaxError('STOP')
 									FS_Terminal_Results.extend(res)					# If it is the right terminal append
 
 
