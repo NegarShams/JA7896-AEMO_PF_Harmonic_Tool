@@ -1,4 +1,5 @@
 """
+test
 #######################################################################################################################
 ###											logger																	###
 ###		Script deals with the logging of messages to both a log handler and to PowerFactory if powerfactory.py is 	###

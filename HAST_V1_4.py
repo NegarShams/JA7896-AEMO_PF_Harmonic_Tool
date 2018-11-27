@@ -592,7 +592,7 @@ def create_mutual_impedance_list(location, terminal_list):
 				name = '{}_{}'.format(y[0],x[0])
 				elmmut = create_mutual_elm(location, name, y[3], x[3])
 				list_of_mutual.append([str(y[0]), name, elmmut, y[3], x[3]])
-	return list_of_mutual
+	return list_of_mutualgit
 
 
 def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance between two terminals
