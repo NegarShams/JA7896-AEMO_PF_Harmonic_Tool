@@ -22,10 +22,10 @@ from scipy.spatial import ConvexHull
 
 # Meta Data
 __author__ = 'David Mills'
-__version__ = '1.3a'
+__version__ = '1.3'
 __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
-__status__ = 'In Development - Alpha'
+__status__ = 'In Development - Beta'
 
 class Excel:
 	""" Class to deal with the writing and reading from excel and therefore allowing unittesting of the
