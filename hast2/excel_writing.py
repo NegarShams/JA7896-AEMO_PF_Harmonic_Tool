@@ -600,13 +600,17 @@ class Excel:
 				if excel_export_z12:  # Export Z12 data
 					# Insert Mutual Z_12 data to excel______________________________________________________________________________________________
 					self.log_info('Inserting Z_12 data')
+					res_to_include = ['c:Z_12']
 					if excel_export_rx or excel_export_z:
 						newcol += 1
+						if excel_export_rx:
+							res_to_include += ['c:R_12','c:X_12']
+
 
 					# Additional loop added to loop through each string type to handle if R_12 and X_12 results
 					# are exported as well.  Could be made more efficient by only looping once and separating
 					# the columns by the number of results.
-					for res_type in ('c:Z_12', 'c:R_12', 'c:X_12'):
+					for res_type in res_to_include:
 						for x in fs_results:
 							# #if x[1] == "c:Z_12":
 							if x[1] == res_type:
