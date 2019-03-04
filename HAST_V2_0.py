@@ -1,8 +1,9 @@
 """
 #######################################################################################################################
-###											HAST_V1_2																###
+###											HAST_V2_0																###
 ###		Script initially produced by EirGrid for Harmonics Automated Simulation Tool and further developed by		###
-###		David Mills to improve performance, extracting of data to Excel and solve some errors present in the code.	###
+###		David Mills (PSC) to improve performance, extracting of data to Excel and solve some errors present in 		###
+###		the code.																									###
 ###		The script now makes use of PowerFactory parallel processing and will require that the Parallel Processing	###
 ###		function in PowerFactory has been enabled and the number of cores has been set to N-1						###
 ###																													###
@@ -48,7 +49,7 @@ to determine that the code in principal works correctly.
 SIGNIFICANT UPDATES
 - Converted to us a logging system that is stored in hast2.logger which will avoid writing to a log file every time
 something happens
-
+- Added functionality to repeat studies for different filter arrangements and will now also run in unattended mode
 """
 
 # IMPORT SOME PYTHON MODULES
@@ -56,14 +57,21 @@ something happens
 import os
 import sys
 import importlib
-
-import powerfactory 					# Power factory module see notes above
 import time                          	# Time
 
 # HAST module package requires reload during code development since python does not reload itself
 # HAST module package used as functions start to be transferred for efficiency
 import hast2
 hast2 = importlib.reload(hast2)
+import hast2.constants as constants
+import hast2.pf as pf
+
+# Meta Data
+__author__ = 'David Mills'
+__version__ = '2.0'
+__email__ = 'david.mills@PSCconsulting.com'
+__phone__ = '+44 7899 984158'
+__status__ = 'In Development - Alpha'
 
 # GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
 DEBUG_MODE = False
@@ -592,7 +600,7 @@ def create_mutual_impedance_list(location, terminal_list):
 				name = '{}_{}'.format(y[0],x[0])
 				elmmut = create_mutual_elm(location, name, y[3], x[3])
 				list_of_mutual.append([str(y[0]), name, elmmut, y[3], x[3]])
-	return list_of_mutualgit
+	return list_of_mutual
 
 
 def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance between two terminals
@@ -749,6 +757,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							# TODO: Requires pre_case check for this to be created when these need to be created anyway
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 							# Adjusted to create new study_case for each op_scenario
+							new_filter_list, filter_ok = check_filters(List_of_Filters)
+
 
 							study_case_folder = app.GetProjectFolder('study')
 							study_case_results_folder, _folder_exists2 = create_folder(study_case_folder,
@@ -794,13 +804,13 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								deactivate_study_case()
 								cont_name = '{}_{}'.format(List_of_Studycases[_count_studycase][0],
 														   new_contingency_list[cont_count][0])
-								_new_study_case = add_copy(study_case_results_folder,
+								cont_study_case = add_copy(study_case_results_folder,
 														   study_case,
 														   cont_name)
 
 								_new_scenario = add_copy(_op_sc_results_folder, scenario,
 														 cont_name)	# Copies the base scenario
-								_new_study_case.Activate()
+								cont_study_case.Activate()
 
 								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
@@ -814,7 +824,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								lf_error = load_flow(Load_Flow_Setting)
 
 								# Deactivate new study case and reactivate old study case
-								_new_study_case.Deactivate()
+								cont_study_case.Deactivate()
 								study_case.Activate()
 
 								# Only add load flow to study case list and project list if load_flow successful, will still
@@ -825,7 +835,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 									_study_cls = hast2.pf.PFStudyCase(full_name=cont_name,
 																	 list_parameters=list_to_check[_count_studycase],
 																	 cont_name=new_contingency_list[cont_count][0],
-																	 sc=_new_study_case,
+																	 sc=cont_study_case,
 																	 op=_new_scenario,
 																	 prj=_prj,
 																	 task_auto=task_automation,
@@ -851,10 +861,82 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								else:
 									logger.error(('Load flow for study case {} not successful and so frequency scans ' +
 												 ' and harmonic load flows will not be run for this case')
-												 .format(_new_study_case))
+												 .format(cont_study_case))
+
+								# Filter item is a class entry in excel_writing.SubstationFilter which contains all the
+								# filter properties that need to be included
+								for filter_item in new_filter_list:
+									print1('Adding filters under name {} to model'.format(
+										filter_item.name),
+										bf=2, af=0)
+
+									# Loop through each of the q_f values for this filter and add to PF
+									for q_f in filter_item.q_f_values:
+										# Can't copy activated scenario or study case so deactivate
+										# TODO: Test if just deactivating study_case would work anyway
+										deactivate_scenario()
+										deactivate_study_case()
+
+
+										filter_name = '{}_{}_{}Hz_{}MVAR'.format(
+											cont_name, filter_item.name,
+											q_f[0], q_f[1])
+										filter_study_case = add_copy(study_case_results_folder,
+																	 cont_study_case,
+																	 filter_name)
+
+										_new_scenario = add_copy(_op_sc_results_folder, scenario,
+																 filter_name)  # Copies the base scenario
+										filter_study_case.Activate()
+
+										_ = activate_scenario1(_new_scenario)  # Activates the base scenario
+
+										# Add filter to model
+										pf.add_filter_to_pf(
+											_app=app,
+											filter_name=filter_name, filter_ref=filter_item,
+											q=q_f[0], freq=q_f[1],
+											logger=logger)
+
+										# Save updated scenario which now includes filter
+										save_active_scenario()
+
+										# Determine if load flow successful and if not then don't include _study_cls in results
+										lf_error = load_flow(Load_Flow_Setting)
+
+										# Deactivate new study case and reactivate old study case
+										filter_study_case.Deactivate()
+										study_case.Activate()
+
+										# Only add to study case list and project list if load_flow successful, will still
+										# remain in folder of study cases but will be skipped in freq_scan and harmonic lf
+										if lf_error == 0:
+											# Create new class reference with all the details for this contingency and
+											# filter combination and then add to
+											# list to be returned
+											_study_cls = pf.PFStudyCase(full_name=cont_name,
+																		list_parameters=list_to_check[
+																			_count_studycase],
+																		cont_name=new_contingency_list[cont_count][0],
+																		filter_name=filter_name,
+																		sc=filter_study_case,
+																		op=_new_scenario,
+																		prj=_prj,
+																		task_auto=task_automation,
+																		uid=start1)
+
+										# Add study case to file
+										prj_dict[project_name].sc_cases.append(_study_cls)
+									else:
+										logger.error(
+											('Load flow for study case {} not successful and so frequency scans ' +
+											 ' and harmonic load flows will not be run for this case')
+											.format(filter_study_case))
+
 
 								# TODO: Use enumerator rather than iterating counter
 								cont_count = cont_count + 1
+
 					else:
 						print2("Problem with Loadflow: " + str(list_to_check[_count_studycase][0]))
 				else:
@@ -922,6 +1004,7 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 	for item in list_of_contingencies:													# This loops through the contingencies to find the couplers
 		skip_contingency = False
 		list_of_couplers = []
+		# TODO:  Skip for other options such as 0 in Substation name, or
 		if item[0] == "Base_Case":														# Skips the base case
 			list_of_couplers.append("Base_Case")
 			list_of_couplers.append(0)
@@ -929,6 +1012,8 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 			list_of_couplers.append(item[0])
 			for aa in item[1:]:
 				coupler_exists = False
+				# TODO: Adjust to ensure that if aa[0] is an integer it will still work i.e. '{}.ElmSubstat'.format(aa[0])
+				# TODO:  This will need careful checking for contingency error in case is the Base Case entry.
 				t = app.GetCalcRelevantObjects(aa[0] + ".ElmSubstat")					# Finds the Substation 
 				if len(t) == 0:															# If it doesn't find it it stops the script
 					print2("Contingency entry: " + item[0] + ". Substation does not exist in case: " + aa[0] + ".ElmSubstat Check Python Entry..............................................")
@@ -963,6 +1048,47 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 	for item in new_contingency_list:
 		print1(item, bf=1, af=0)
 	return new_contingency_list, contingencies_ok
+
+
+def check_filters(list_of_filters):			# Checks and creates list of terminals to add the Filters to
+	"""
+			Checks the status of each contingency
+		:param list list_of_filters: List of filters to be checked where each filter is of type excel_writing.SubstationFilter
+		:return: List of filters to actually be studied 
+		"""
+	filters_ok = True
+	for item in list_of_filters:  # This loops through the contingencies to find the couplers
+		skip_filter = False
+		filter_name = item.name
+		substation = item.sub
+		terminal = item.term
+		hdl_substation = app.GetCalcRelevantObjects(substation)		# Finds the Substation
+
+		#If substation exists then find relevant terminal in substation contents
+		if len(hdl_substation) == 0:									# If it doesn't find it it reports it and skips it
+			logger.warning(
+				'For filter: {}, Python substation entry for {} does not exist in case so not modelled'
+					.format(filter_name, substation))
+			item.include = False
+		else:
+			# Find terminal in substation if doesn't exist then raise error and skip to next item
+			hdl_terminal = hdl_substation[0].GetContents(terminal)
+			if len(hdl_terminal) == 0:
+				logger.warning(
+					'For filter: {}, Python terminal {} within substation {} does not exist in the case and so not modelled'
+						.format(filter_name, substation, terminal))
+				item.include = False
+				continue
+
+		# Get nominal voltage of terminal as nominal voltage for filter
+		item.nom_voltage = hdl_terminal.GetAttribute(constants.PowerFactory.pf_term_voltage)
+
+	new_filters_list = [x for x in list_of_filters if x.include]
+	if len(new_filters_list) == 0:
+		logger.info('No filters to include')
+		filters_ok = False
+
+	return new_filters_list, filters_ok
 
 
 def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the results file
@@ -1026,11 +1152,15 @@ if __name__ == '__main__':
 	DIG_PATH = """C:\\Program Files\\DIgSILENT\\PowerFactory 2016 SP3\\"""
 	sys.path.append(DIG_PATH)
 	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
-	Title = ("""::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n
-		NAME:             HAST Harmonics Automated Simulation Tool\n
-		VERSION:          Development Verson by David Mills (PSC)\n
-		AUTHOR:           Barry O'Connell\n
-		::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n""")
+	Title = ('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n' +
+		'NAME:           Harmonics Automated Simulation Tool (HAST)\n' +
+		'VERSION:        {}\n' +
+		'AUTHOR:         {}, {}, {}\n' +
+		'STATUS:			{}\n' +
+		'::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n')\
+		.format(__name__, __author__, __email__, __phone__, __status__)
+
+	import powerfactory  # Power factory module imported here to allow running in unattended mode
 
 	# File location of this script when running
 	filelocation = os.getcwd() + "\\"
@@ -1067,7 +1197,7 @@ if __name__ == '__main__':
 	# THD attribute was not previously included
 	HRM_Terminal_Variables = ['m:HD', 'm:THD']
 	# Import Excel
-	Import_Workbook = filelocation + "HAST_V1_4_Inputs.xlsx"					# Gets the CWD current working directory
+	Import_Workbook = filelocation + "HAST_Inputs.xlsx"					# Gets the CWD current working directory
 	Variation_Name = "Temporary_Variation" + start1
 
 	# Create excel instance to deal with retrieving import data from excel
@@ -1131,6 +1261,9 @@ if __name__ == '__main__':
 	List_of_Contingencies = analysis_dict["Contingencies"]						# Uses the list of Contingencies
 	if len(List_of_Contingencies) <1:											# Check there are the right number of inputs
 		print2("Error - Check excel input Contingencies there should be at least 1 Item in the list ")
+	List_of_Filters = analysis_dict[hast2.excel_writing.Constants.sht_Filters]  # Imports Settings for the filters
+	if len(List_of_Filters) == 0:
+		logger.info('No harmonic filters listed for studies')
 	List_of_Points = analysis_dict["Terminals"]									# Uses the list of Terminals
 	if len(List_of_Points) <1:													# Check there are the right number of inputs
 		print2("Error - Check excel input Terminals there should be at least 1 Item in the list ")

@@ -19,13 +19,165 @@ import numpy as np
 import scipy.spatial
 import scipy.spatial.qhull
 from scipy.spatial import ConvexHull
+import itertools
+import hast2.constants as constants
+
 
 # Meta Data
 __author__ = 'David Mills'
-__version__ = '1.3'
+__version__ = '1.4.1'
 __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
-__status__ = 'In Development - Beta'
+__status__ = 'In Development - Alpha'
+
+""" Following functions are used purely for processing the inputs of the HAST worksheet """
+def add_contingency(row_data):
+	"""
+		Function to read in the contingency data and save to list
+	:param list row_data:
+	:return list combined_entry:
+	"""
+	if len(row_data) > 2:
+		aa = row_data[1:]
+		station_name = aa[0::3]
+		breaker_name = aa[1::3]
+		breaker_status = aa[2::3]
+		breaker_name1 = ['{}.{}'.format(nam, constants.PowerFactory.pf_coupler) for nam in breaker_name]
+		combined_entry = list(zip(station_name, breaker_name1, breaker_status))
+		combined_entry.insert(0, row_data[0])
+	else:
+		combined_entry = [row_data[0], [0]]
+	return combined_entry
+
+def add_scenarios(row_data):
+	"""
+		Function to read in the scenario data and save to list
+	:param list row_data:
+	:return list combined_entry:
+	"""
+	combined_entry = [
+		row_data[0],
+		row_data[1],
+		'{}.{}'.format(row_data[2], constants.PowerFactory.pf_case),
+		'{}.{}'.format(row_data[3], constants.PowerFactory.pf_scenario)]
+	return combined_entry
+
+def add_terminals(row_data):
+	"""
+		Function to read in the terminals data and save to list
+			:param list row_data:
+			:return list combined_entry:
+			"""
+	combined_entry = [
+		row_data[0],
+		'{}.{}'.format(row_data[1], constants.PowerFactory.pf_substation),
+		'{}.{}'.format(row_data[2], constants.PowerFactory.pf_terminal),
+		# Third column now contains TRUE or FALSE.  If True then data will be included including
+		# transfer impedance from other nodes to this node.  If False then no data will be included.
+		row_data[3]]
+	return combined_entry
+
+class SubstationFilter:
+	"""
+		Class for each filter from the HAST import spreadsheet with a new entry for each substation
+	"""
+	def __init__(self, row_data):
+		"""
+			Function to read in the filters and save to list
+		:param list row_data:  List of values in the form:
+			[name to use for filters,
+			substation filter belongs to,
+			terminal at which filter should be connected,
+			type of filter to use (integer based on PF type),
+			Q start, Q stop, number of sizes
+			freq start, freq stop, number of freq steps,
+			quality factor to use,
+			parallel resistance (Rp) value to use
+			]
+		:return list combined_entry:
+		"""
+		# Variable initialisation
+		self.include = True
+		self.nom_voltage = 0.0
+
+		# Name to use for filter
+		self.name = row_data[0]
+		# Substation and terminal within substation that filter should be connected to
+		self.sub ='{}.{}'.format(row_data[1], constants.PowerFactory.pf_substation)
+		self.term = '{}.{}'.format(row_data[2], constants.PowerFactory.pf_terminal)
+		# Type of filter to use
+		self.type = constants.PowerFactory.Filter_type[row_data[3]]
+		# Q values for filters (start, stop, no. steps)
+		self.q_range = [np.linspace(row_data[4], row_data[5], row_data[6])],
+		self.f_range = [np.linspace(row_data[7], row_data[8], row_data[9])],
+		# Quality factor and parallel resistance values to use
+		self.quality_factor = row_data[10]
+		self.resistance_parallel = row_data[11]
+
+		# Produce lists of each Q step for each frequency so multiple filters can be tested
+		self.q_f_values = list(itertools.product(self.f_range, self.q_range))
+
+
+# REMOVED:  Now considered as a class above
+# def add_filters(row_data):
+# 	"""
+# 		Function to read in the filters and save to list
+# 	:param list row_data:
+# 	:return list combined_entry:
+# 	"""
+# 	combined_entry = [
+# 		row_data[0],		# Name to use
+# 		'{}{}'.format(row_data[1],Constants.pf_substation),		# Substation name + PF identifier
+# 		'{}{}'.format(row_data[2],Constants.pf_terminal),		# Terminal to use + PF identifier
+# 		Constants.Filter_type[row_data[3]],
+# 		[np.linspace(row_data[4], row_data[5], row_data[6])],
+# 		[np.linspace(row_data[7], row_data[8], row_data[9])],
+# 		row_data[10],
+# 		row_data[11]
+# 	]
+#
+# 	return combined_entry
+
+def add_lf_settings(row_data):
+	"""
+		Function to read in the load flow settings and save to list
+	:param list row_data:
+	:return list combined_entry:
+	"""
+	z = row_data
+	combined_entry = [
+		int(z[0]), int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]),
+		int(z[8]),
+		float(z[9]), int(z[10]), int(z[11]), int(z[12]), z[13], z[14], int(z[15]), int(z[16]),
+		int(z[17]),
+		int(z[18]), float(z[19]), int(z[20]), float(z[21]), int(z[22]), int(z[23]), int(z[24]),
+		int(z[25]),
+		int(z[26]), int(z[27]), int(z[28]), z[29], z[30], int(z[31]), z[32], int(z[33]), int(z[34]),
+		int(z[35]), int(z[36]), int(z[37]), z[38], z[39], z[40], z[41], int(z[42]), z[43], z[44], z[45],
+		z[46], z[47], z[48], z[49], z[50], z[51], int(z[52]), int(z[53]), int(z[54])]
+	return combined_entry
+
+def add_freq_settings(row_data):
+	"""
+		Function to read in the frequency sweep settings and save to list
+	:param list row_data:
+	:return list combined_entry:
+	"""
+	z = row_data
+	combined_entry = [z[0], z[1], int(z[2]), z[3], z[4], z[5], int(z[6]), z[7], z[8], z[9],
+					  z[10], z[11], z[12], z[13], int(z[14]), int(z[15])]
+	return combined_entry
+
+def add_hlf_settings(row_data):
+	"""
+		Function to read in the harmonic load flow settings and save to list
+	:param list row_data:
+	:return list combined_entry:
+	"""
+	z = row_data
+	combined_entry = [int(z[0]), int(z[1]), int(z[2]), int(z[3]), z[4], z[5], z[6], z[7],
+					  z[8], int(z[9]), int(z[10]), int(z[11]), int(z[12]), int(z[13]), int(z[14])]
+	return combined_entry
 
 class Excel:
 	""" Class to deal with the writing and reading from excel and therefore allowing unittesting of the
@@ -111,9 +263,9 @@ class Excel:
 			ws.Range(cell_start).End(c.xlDown).Select()  # Equivalent to shift end down
 			row_end = self.xl.Selection.Address
 			row_input = []
+			current_worksheet = x[0]
 			# Code only to be executed for these sheets
-			# TODO: 'Contingencies', 'Base_Scenarios' and 'Terminals' should be defined in <constants.py>
-			if x[0] in ('Contingencies', 'Base_Scenarios', 'Terminals'):
+			if current_worksheet in constants.PowerFactory.HAST_Input_Scenario_Sheets:
 				# if x[0] == "Contingencies" or x[0] == "Base_Scenarios" or x[0] == "Terminals":	# For these sheets
 				# Find the starting and ending cells
 				cell_start_alph = re.sub('[^a-zA-Z]', '', cell_start)  # Gets the starting cell alpha C5 = C
@@ -138,75 +290,46 @@ class Excel:
 					row_value = ws.Range(aces[count_row] + ":" + col_end).Value
 					row_value = row_value[0]
 
-					# TODO: Rewrite as function
 					# Routine only for 'Contingencies' worksheet
-					if x[0] == "Contingencies":
-						if len(row_value) > 2:
-							aa = row_value[1:]
-							station_name = aa[0::3]
-							breaker_name = aa[1::3]
-							breaker_status = aa[2::3]
-							breaker_name1 = [str(nam) + ".ElmCoup" for nam in breaker_name]
-							aa1 = list(zip(station_name, breaker_name1, breaker_status))
-							aa1.insert(0, row_value[0])
-						else:
-							aa1 = [row_value[0], [0]]
-						row_value = aa1
+					if current_worksheet == constants.PowerFactory.sht_Contingencies:
+						row_value = add_contingency(row_data=row_value)
 
 					# Routine for Base_Scenarios worksheet
-					elif x[0] == "Base_Scenarios":
-						row_value = [
-							row_value[0],
-							row_value[1],
-							'{}.IntCase'.format(row_value[2]),
-							'{}.IntScenario'.format(row_value[3])]
+					elif current_worksheet == constants.PowerFactory.sht_Scenarios:
+						row_value = add_scenarios(row_data=row_value)
 
 					# Routine for Terminals worksheet
-					elif x[0] == "Terminals":
-						row_value = [
-							row_value[0],
-							'{}.ElmSubstat'.format(row_value[1]),
-							'{}.ElmTerm'.format(row_value[2]),
-							# Third column now contains TRUE or FALSE.  If True then data will be included including
-							# transfer impedance from other nodes to this node.  If False then no data will be included.
-							row_value[3]]
+					elif current_worksheet == constants.PowerFactory.sht_Terminals:
+						row_value = add_terminals(row_data=row_value)
+
+					# Routine for Filters worksheet
+					elif current_worksheet == constants.PowerFactory.sht_Filters:
+						row_value = SubstationFilter(row_data=row_value)
+						# #row_value = add_filters(row_data=row_value)
+
 
 					row_input.append(row_value)
 					count_row = count_row + 1
 
 			# More efficiently checking which worksheet looking at
-			elif x[0] in ('Study_Settings', 'Loadflow_Settings', 'Frequency_Sweep', 'Harmonic_Loadflow'):
+			elif current_worksheet in constants.PowerFactory.HAST_Input_Settings_Sheets:
 				row_value = ws.Range(cell_start + ":" + row_end).Value
 				for item in row_value:
 					row_input.append(item[0])
-				if x[0] == "Loadflow_Settings":
+				if current_worksheet == constants.PowerFactory.sht_LF:
 					# Process inputs for Loadflow_Settings
-					z = row_input
-					row_input = [
-						int(z[0]), int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]),
-						int(z[8]),
-						float(z[9]), int(z[10]), int(z[11]), int(z[12]), z[13], z[14], int(z[15]), int(z[16]),
-						int(z[17]),
-						int(z[18]), float(z[19]), int(z[20]), float(z[21]), int(z[22]), int(z[23]), int(z[24]),
-						int(z[25]),
-						int(z[26]), int(z[27]), int(z[28]), z[29], z[30], int(z[31]), z[32], int(z[33]), int(z[34]),
-						int(z[35]), int(z[36]), int(z[37]), z[38], z[39], z[40], z[41], int(z[42]), z[43], z[44], z[45],
-						z[46], z[47], z[48], z[49], z[50], z[51], int(z[52]), int(z[53]), int(z[54])]
+					row_input = add_lf_settings(row_data=row_input)
 
-				elif x[0] == "Frequency_Sweep":
+				elif current_worksheet == constants.PowerFactory.sht_Freq:
 					# Process inputs for Frequency_Sweep settings
-					z = row_input
-					row_input = [z[0], z[1], int(z[2]), z[3], z[4], z[5], int(z[6]), z[7], z[8], z[9],
-								 z[10], z[11], z[12], z[13], int(z[14]), int(z[15])]
+					row_input = add_freq_settings(row_data=row_input)
 
-				elif x[0] == "Harmonic_Loadflow":
+				elif current_worksheet == constants.PowerFactory.sht_HLF:
 					# Process inputs for Harmonic_Loadflow
-					z = row_input
-					row_input = [int(z[0]), int(z[1]), int(z[2]), int(z[3]), z[4], z[5], z[6], z[7],
-								 z[8], int(z[9]), int(z[10]), int(z[11]), int(z[12]), int(z[13]), int(z[14])]
+					row_input = add_hlf_settings(row_data=row_input)
 
 			# Combine imported results in a dictionary relevant to the worksheet that has been imported
-			analysis_dict[(x[0])] = row_input  # Imports range of values into a list of lists
+			analysis_dict[current_worksheet] = row_input  # Imports range of values into a list of lists
 
 		wb.Close()  # Close Workbook
 		return analysis_dict

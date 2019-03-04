@@ -11,6 +11,7 @@
 """
 
 import math
+import hast2.constants as constants
 
 # Meta Data
 __author__ = 'David Mills'
@@ -77,15 +78,60 @@ def remove_string_endings(astring, trailing):
 		return astring[:-len(trailing)]
 	return astring
 
+def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
+	"""
+		Adds the filter detailed to the PF model
+	:param _app: handle to power factory application
+	:param excel_writing.SubstationFilter filter_ref:  Handle to SubstationFilter class form HAST import
+	:param float q:  MVAR value for filter
+	:param float freq:  Frequency value for filter
+	:param str filter_name:  Name of filter being added which includes associated contingency
+	:param logger:  Handle for logger in case of any error messages
+	:return None:
+	"""
+	# Check that is supposed to be added
+	if not filter_ref.include:
+		logger.error(
+			'Filter <{}> is set to not be included but has been attempted to be added, there is an error somewhere'
+		.format(filter_ref.name))
+		raise IOError('An error has occured trying to add a filter which should not be added')
+
+	hdl_substation = _app.GetCalcRelevantObjects(filter_ref.sub)
+
+	hdl_filter = create_object(location=hdl_substation,
+						   pfclass=constants.PowerFactory.pf_filter,
+						   name=filter_name)
+
+
+	c = constants.PowerFactory
+	# Add cubicle for filter
+	hdl_terminal = hdl_substation[0].GetContents(filter_ref.term)
+	hdl_cubicle = create_object(location=hdl_terminal,
+							   pfclass=c.pf_cubicle,
+							   name=filter_name)
+
+	# Set attributes for new filter
+	hdl_filter.SetAttribute(c.pf_cubicle, hdl_cubicle)
+	hdl_filter.SetAttribute(c.pf_shn_voltage, filter_ref.voltage)
+	hdl_filter.SetAttribute(c.pf_shn_type, filter_ref.type)
+	hdl_filter.SetAttribute(c.pf_shn_q, q)
+	hdl_filter.SetAttribute(c.pf_shn_freq, freq)
+	hdl_filter.SetAttribute(c.pf_shn_qfactor, filter_ref.quality_factor)
+	hdl_filter.SetAttribute(c.pf_shn_rp, filter_ref.resistance_parallel)
+	logger.debug('Filter {} added to substation {} with Q = {} MVAR and resonant frequency = {} Hz'
+				 .format(filter_name, hdl_cubicle, q, freq))
+
+	return None
 
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
-	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid):
+	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid, filter_name='None'):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str full_name:  Full name of study case continaining base case and contingency
 		:param list list_parameters:  List of parameters from the Base_Scenaraios inputs sheet
 		:param str cont_name:  Name of contingency being considered
+		:param str filter_name: (optional=None) Name of filter that has been included if applicable
 		:param object sc:  Handle to newly created study case
 		:param object op:  Handle to newly created operational scenario
 		:param object prj:  Handle to project in which this study case is contained
