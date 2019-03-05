@@ -21,7 +21,7 @@ class PowerFactory:
 	"""
 	sht_Filters = 'Filters'
 	sht_Terminals = 'Terminals'
-	sht_Scenarios = 'Scenarios'
+	sht_Scenarios = 'Base_Scenarios'
 	sht_Contingencies = 'Contingencies'
 	sht_Study = 'Study_Settings'
 	sht_LF = 'Loadflow_Settings'
@@ -35,13 +35,34 @@ class PowerFactory:
 	pf_terminal =  'ElmTerm'
 	pf_coupler = 'ElmCoup'
 	pf_case = 'IntCase'
-	pf_scenario = 'IntScenarios'
+	pf_scenario = 'IntScenario'
 	pf_filter = 'ElmShnt'
 	pf_cubicle = 'StaCubic'
 	pf_term_voltage = 'uknom'
+	pf_shn_term = 'bus1'
 	pf_shn_voltage = 'ushnm'
 	pf_shn_type = 'shtype'
 	pf_shn_q = 'qtotn'
 	pf_shn_freq = 'fres'
 	pf_shn_qfactor = 'greaf0'
 	pf_shn_rp = 'rpara'
+	# constants for variations
+	pf_scheme = 'IntScheme'
+	pf_stage = 'IntSstage'
+
+analysis_sheets = (
+	(PowerFactory.sht_Study, "B5"),
+	(PowerFactory.sht_Scenarios, "A5"),
+	(PowerFactory.sht_Contingencies, "A5"),
+	(PowerFactory.sht_Terminals, "A5"),
+	(PowerFactory.sht_LF, "D5"),
+	(PowerFactory.sht_Freq, "D5"),
+	(PowerFactory.sht_HLF, "D5"),
+	(PowerFactory.sht_Filters, "A5"))
+
+iec_limits = [
+	["IEC", "61000-3-6", "Harmonics", "THD", 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+	 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
+	["IEC", "61000-3-6", "Limits", 3, 1.4, 2, 0.8, 2, 0.4, 2, 0.4, 1, 0.35, 1.5, 0.32, 1.5, 0.3, 0.3, 0.28, 1.2,
+	 0.265, 0.93, 0.255, 0.2, 0.246, 0.88, 0.24, 0.816, 0.233, 0.2, 0.227, 0.703, 0.223, 0.66, 0.219, 0.2, 0.2158,
+	 0.58, 0.2127, 0.55, 0.21, 0.2, 0.2075]]

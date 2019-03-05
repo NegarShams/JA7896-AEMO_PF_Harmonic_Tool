@@ -108,15 +108,14 @@ class SubstationFilter:
 		# Type of filter to use
 		self.type = constants.PowerFactory.Filter_type[row_data[3]]
 		# Q values for filters (start, stop, no. steps)
-		self.q_range = [np.linspace(row_data[4], row_data[5], row_data[6])],
-		self.f_range = [np.linspace(row_data[7], row_data[8], row_data[9])],
+		self.q_range = list(np.linspace(row_data[4], row_data[5], row_data[6]))
+		self.f_range = list(np.linspace(row_data[7], row_data[8], row_data[9]))
 		# Quality factor and parallel resistance values to use
 		self.quality_factor = row_data[10]
 		self.resistance_parallel = row_data[11]
 
 		# Produce lists of each Q step for each frequency so multiple filters can be tested
-		self.q_f_values = list(itertools.product(self.f_range, self.q_range))
-
+		self.f_q_values = list(itertools.product(self.f_range, self.q_range))
 
 # REMOVED:  Now considered as a class above
 # def add_filters(row_data):
@@ -194,20 +193,11 @@ class Excel:
 		"""
 		# Constants
 		# Sheets and starting rows for analysis
-		self.analysis_sheets = (
-		("Study_Settings", "B5"), ("Base_Scenarios", "A5"), ("Contingencies", "A5"), ("Terminals", "A5"),
-		("Loadflow_Settings", "D5"), ("Frequency_Sweep", "D5"), ("Harmonic_Loadflow", "D5"))
+		self.analysis_sheets = constants.analysis_sheets
 		# IEC limits
 		# TODO: Should be moved to a constants or imported from inputs workbook
 		# If on input spreadsheet then can be used to test against allocated limits
-		self.iec_limits = [
-			["IEC", "61000-3-6", "Harmonics", "THD", 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-			 19, 20,
-			 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
-			["IEC", "61000-3-6", "Limits", 3, 1.4, 2, 0.8, 2, 0.4, 2, 0.4, 1, 0.35, 1.5, 0.32, 1.5, 0.3, 0.3,
-			 0.28, 1.2, 0.265, 0.93, 0.255, 0.2, 0.246, 0.88,
-			 0.24, 0.816, 0.233, 0.2, 0.227, 0.703, 0.223, 0.66, 0.219, 0.2, 0.2158, 0.58, 0.2127, 0.55, 0.21,
-			 0.2, 0.2075]]
+		self.iec_limits = constants.iec_limits
 		self.limits = list(zip(*[self.iec_limits[1]]))
 
 		# Updated with logging handlers once setup finished
@@ -264,6 +254,7 @@ class Excel:
 			row_end = self.xl.Selection.Address
 			row_input = []
 			current_worksheet = x[0]
+
 			# Code only to be executed for these sheets
 			if current_worksheet in constants.PowerFactory.HAST_Input_Scenario_Sheets:
 				# if x[0] == "Contingencies" or x[0] == "Base_Scenarios" or x[0] == "Terminals":	# For these sheets
@@ -305,8 +296,8 @@ class Excel:
 					# Routine for Filters worksheet
 					elif current_worksheet == constants.PowerFactory.sht_Filters:
 						row_value = SubstationFilter(row_data=row_value)
+						print(row_value)
 						# #row_value = add_filters(row_data=row_value)
-
 
 					row_input.append(row_value)
 					count_row = count_row + 1

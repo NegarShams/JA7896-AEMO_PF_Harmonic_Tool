@@ -98,7 +98,7 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 
 	hdl_substation = _app.GetCalcRelevantObjects(filter_ref.sub)
 
-	hdl_filter = create_object(location=hdl_substation,
+	hdl_filter = create_object(location=hdl_substation[0],
 						   pfclass=constants.PowerFactory.pf_filter,
 						   name=filter_name)
 
@@ -106,13 +106,13 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	c = constants.PowerFactory
 	# Add cubicle for filter
 	hdl_terminal = hdl_substation[0].GetContents(filter_ref.term)
-	hdl_cubicle = create_object(location=hdl_terminal,
+	hdl_cubicle = create_object(location=hdl_terminal[0],
 							   pfclass=c.pf_cubicle,
 							   name=filter_name)
 
 	# Set attributes for new filter
-	hdl_filter.SetAttribute(c.pf_cubicle, hdl_cubicle)
-	hdl_filter.SetAttribute(c.pf_shn_voltage, filter_ref.voltage)
+	hdl_filter.SetAttribute(c.pf_shn_term, hdl_cubicle)
+	hdl_filter.SetAttribute(c.pf_shn_voltage, filter_ref.nom_voltage)
 	hdl_filter.SetAttribute(c.pf_shn_type, filter_ref.type)
 	hdl_filter.SetAttribute(c.pf_shn_q, q)
 	hdl_filter.SetAttribute(c.pf_shn_freq, freq)
@@ -120,6 +120,18 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	hdl_filter.SetAttribute(c.pf_shn_rp, filter_ref.resistance_parallel)
 	logger.debug('Filter {} added to substation {} with Q = {} MVAR and resonant frequency = {} Hz'
 				 .format(filter_name, hdl_cubicle, q, freq))
+
+	logger.info(hdl_filter)
+	logger.info('Connected cubicle = {}'.format(hdl_cubicle))
+	logger.info('Nominal voltage = {}kV'.format(filter_ref.nom_voltage))
+	logger.info('Shunt type = {}'.format(filter_ref.type))
+	logger.info('Shunt Q = {}MVAR'.format(q))
+	logger.info('Shunt tuning frequency = {}Hz'.format(freq))
+	logger.info('Shunt Q factor = {}'.format(filter_ref.quality_factor))
+	logger.info('Shunt Rp = {}'.format(filter_ref.resistance_parallel))
+
+	# Update drawing
+	_app.ExecuteCmd('grp/abi')
 
 	return None
 
@@ -147,6 +159,7 @@ class PFStudyCase:
 		self.op_name = remove_string_endings(astring=list_parameters[3], trailing='.IntScenario')
 		self.cont_name = cont_name
 		self.uid = uid
+		self.filter_name = filter_name
 
 		# Handle for study cases that will require activating
 		self.sc = sc
@@ -162,7 +175,7 @@ class PFStudyCase:
 		self.fs_scale = []
 		self.hrm_scale = []
 
-		# Disctionary for looking up frequency scan results
+		# Dictionary for looking up frequency scan results
 		self.fs_res = dict()
 
 	def create_freq_sweep(self, results_file, settings):
@@ -249,12 +262,14 @@ class PFStudyCase:
 		fs_scale.insert(1,"Scale")
 		fs_scale.pop(3)
 		for tope in fs_res:															# Adds the additional information to the results file
-			# #tope.insert(1, New_Contingency_List[count][0])							# Op scenario
-			tope.insert(1, self.cont_name)											# Contingency name
-			# #tope.insert(1,List_of_Studycases1[count_studycase][0])					# Study case description
-			# # tope.insert(1, self.sc_name)											# Study case description
-			# Added in to include scenario name as well
-			# # tope.insert(1, '{}_{}'.format(self.sc_name, self.op_name))  # Study case description
+			# Insert contingency / filter name (if exists)
+			if self.filter_name is not None:
+				# If filter name exists then filter name is used
+				tope.insert(1, self.filter_name)
+			else:
+				# If not then contingency name is used
+				tope.insert(1, self.cont_name)  # Contingency name
+
 			# Using base_name as description of study_case
 			tope.insert(1, self.base_name)  # Study case description
 

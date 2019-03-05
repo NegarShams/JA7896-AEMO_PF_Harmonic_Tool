@@ -777,10 +777,10 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							variations_folder = app.GetProjectFolder("scheme")
 							_variations_folder, _folder_exists3 = create_folder(variations_folder,
 																				Variation_Name)
-							variation = create_variation(_variations_folder, "IntScheme", Variation_Name)
+							variation = create_variation(_variations_folder, constants.PowerFactory.pf_scheme, Variation_Name)
 							activate_variation(variation)
 							# Create and activate recording stage within variation
-							_ = create_stage(variation, "IntSstage", Variation_Name)
+							_ = create_stage(variation, constants.PowerFactory.pf_stage, Variation_Name)
 
 							# Check if folder already exists
 							task_auto_name = 'Task_Automation_{}'.format(start1)
@@ -794,6 +794,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																'Task_Automation_{}'.format(start1))
 
 							cont_count = 0
+							# TODO: Swap order so adds filters to base case and then applies contingencies
+
 							while cont_count < len(new_contingency_list):
 								# TODO:  Adding in contingencies even if their load flow does not converge
 								# TODO:  This may need to be adjusted
@@ -808,11 +810,11 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 														   study_case,
 														   cont_name)
 
-								_new_scenario = add_copy(_op_sc_results_folder, scenario,
+								cont_scenario = add_copy(_op_sc_results_folder, scenario,
 														 cont_name)	# Copies the base scenario
 								cont_study_case.Activate()
 
-								_ = activate_scenario1(_new_scenario)										# Activates the base scenario
+								_ = activate_scenario1(cont_scenario)										# Activates the base scenario
 								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
 									# Take outages described for contingency
 									for _switch in new_contingency_list[cont_count][1:]:
@@ -836,7 +838,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																	 list_parameters=list_to_check[_count_studycase],
 																	 cont_name=new_contingency_list[cont_count][0],
 																	 sc=cont_study_case,
-																	 op=_new_scenario,
+																	 op=cont_scenario,
 																	 prj=_prj,
 																	 task_auto=task_automation,
 																	 uid=start1)
@@ -871,31 +873,47 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 										bf=2, af=0)
 
 									# Loop through each of the q_f values for this filter and add to PF
-									for q_f in filter_item.q_f_values:
+									for f_q in filter_item.f_q_values:
+
 										# Can't copy activated scenario or study case so deactivate
 										# TODO: Test if just deactivating study_case would work anyway
 										deactivate_scenario()
 										deactivate_study_case()
 
-
+										# Create name for filter based on contingency, frequency, mvar value
 										filter_name = '{}_{}_{}Hz_{}MVAR'.format(
 											cont_name, filter_item.name,
-											q_f[0], q_f[1])
+											f_q[0], f_q[1])
 										filter_study_case = add_copy(study_case_results_folder,
 																	 cont_study_case,
 																	 filter_name)
 
-										_new_scenario = add_copy(_op_sc_results_folder, scenario,
+										_new_scenario = add_copy(_op_sc_results_folder, cont_scenario,
 																 filter_name)  # Copies the base scenario
 										filter_study_case.Activate()
+										logger.debug('New study case created and activated for modelling filter: {}'
+													 .format(filter_name))
 
-										_ = activate_scenario1(_new_scenario)  # Activates the base scenario
+										# Create new variation specifically for this filter so can deactivate
+										# before copying to ensure filter isn't added to every case
+										filter_variation = create_variation(
+											_variations_folder,
+											constants.PowerFactory.pf_scheme,
+											filter_name)
+										activate_variation(filter_variation)
+										# Create and activate recording stage within variation
+										_ = create_stage(filter_variation,
+														 constants.PowerFactory.pf_stage,
+														 filter_name)
+										logger.debug('New variation created for filter: {}'.format(filter_name))
+
+										_ = activate_scenario1(_new_scenario)  # Activates the new scenario created for this variation
 
 										# Add filter to model
 										pf.add_filter_to_pf(
 											_app=app,
 											filter_name=filter_name, filter_ref=filter_item,
-											q=q_f[0], freq=q_f[1],
+											q=f_q[1], freq=f_q[0],
 											logger=logger)
 
 										# Save updated scenario which now includes filter
@@ -927,9 +945,11 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 										# Add study case to file
 										prj_dict[project_name].sc_cases.append(_study_cls)
+										logger.debug('Filter added to model and load flow run successfully for {}'
+													 .format(filter_study_case))
 									else:
 										logger.error(
-											('Load flow for study case {} not successful and so frequency scans ' +
+											('Load flow for filter study case {} not successful and so frequency scans ' +
 											 ' and harmonic load flows will not be run for this case')
 											.format(filter_study_case))
 
@@ -1081,9 +1101,10 @@ def check_filters(list_of_filters):			# Checks and creates list of terminals to 
 				continue
 
 		# Get nominal voltage of terminal as nominal voltage for filter
-		item.nom_voltage = hdl_terminal.GetAttribute(constants.PowerFactory.pf_term_voltage)
+		item.nom_voltage = hdl_terminal[0].GetAttribute(constants.PowerFactory.pf_term_voltage)
 
-	new_filters_list = [x for x in list_of_filters if x.include]
+
+	new_filters_list = [_x for _x in list_of_filters if _x.include]
 	if len(new_filters_list) == 0:
 		logger.info('No filters to include')
 		filters_ok = False
@@ -1224,6 +1245,9 @@ if __name__ == '__main__':
 								pth_progress_log=Progress_Log,
 								pth_error_log=Error_Log,
 								app=app)
+	for x,y in analysis_dict.items():
+		print1(x)
+		print1(y)
 
 	# Disable graphic updating
 	if not DEBUG_MODE:
@@ -1232,7 +1256,6 @@ if __name__ == '__main__':
 		app.EchoOff()
 	else:
 		logger.info('Running in debug mode and so output / screen updating is not disabled')
-
 
 	# Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
 	Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
@@ -1261,7 +1284,7 @@ if __name__ == '__main__':
 	List_of_Contingencies = analysis_dict["Contingencies"]						# Uses the list of Contingencies
 	if len(List_of_Contingencies) <1:											# Check there are the right number of inputs
 		print2("Error - Check excel input Contingencies there should be at least 1 Item in the list ")
-	List_of_Filters = analysis_dict[hast2.excel_writing.Constants.sht_Filters]  # Imports Settings for the filters
+	List_of_Filters = analysis_dict[constants.PowerFactory.sht_Filters]  # Imports Settings for the filters
 	if len(List_of_Filters) == 0:
 		logger.info('No harmonic filters listed for studies')
 	List_of_Points = analysis_dict["Terminals"]									# Uses the list of Terminals
