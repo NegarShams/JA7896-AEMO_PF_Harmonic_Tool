@@ -15,6 +15,13 @@ __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'Constants'
 
+nom_freq = 50.0
+
+# When parallel processing will ensure this number of cpus are kept free
+cpu_keep_free = 1
+# If unable to calculate this is the assumed maximum number of processes
+default_max_processes = 3
+
 class PowerFactory:
 	"""
 		Constants used in this script
@@ -44,7 +51,9 @@ class PowerFactory:
 	pf_shn_type = 'shtype'
 	pf_shn_q = 'qtotn'
 	pf_shn_freq = 'fres'
+	pf_shn_tuning = 'nres'
 	pf_shn_qfactor = 'greaf0'
+	pf_shn_qfactor_nom = 'grea'
 	pf_shn_rp = 'rpara'
 	# constants for variations
 	pf_scheme = 'IntScheme'

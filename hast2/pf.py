@@ -12,6 +12,8 @@
 
 import math
 import hast2.constants as constants
+import multiprocessing
+import unittest
 
 # Meta Data
 __author__ = 'David Mills'
@@ -115,29 +117,116 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	hdl_filter.SetAttribute(c.pf_shn_voltage, filter_ref.nom_voltage)
 	hdl_filter.SetAttribute(c.pf_shn_type, filter_ref.type)
 	hdl_filter.SetAttribute(c.pf_shn_q, q)
+	# For some reason need to set frequency and tuning order
 	hdl_filter.SetAttribute(c.pf_shn_freq, freq)
+	hdl_filter.SetAttribute(c.pf_shn_tuning, freq / constants.nom_freq)
+	# For some reason need to set q factor
 	hdl_filter.SetAttribute(c.pf_shn_qfactor, filter_ref.quality_factor)
+	hdl_filter.SetAttribute(c.pf_shn_qfactor_nom, filter_ref.quality_factor * (constants.nom_freq / freq))
+
 	hdl_filter.SetAttribute(c.pf_shn_rp, filter_ref.resistance_parallel)
 	logger.debug('Filter {} added to substation {} with Q = {} MVAR and resonant frequency = {} Hz'
 				 .format(filter_name, hdl_cubicle, q, freq))
 
+	# TODO:  Rather that writing messages to confirm this could instead validate using
 	logger.info(hdl_filter)
-	logger.info('Connected cubicle = {}'.format(hdl_cubicle))
-	logger.info('Nominal voltage = {}kV'.format(filter_ref.nom_voltage))
-	logger.info('Shunt type = {}'.format(filter_ref.type))
-	logger.info('Shunt Q = {}MVAR'.format(q))
-	logger.info('Shunt tuning frequency = {}Hz'.format(freq))
-	logger.info('Shunt Q factor = {}'.format(filter_ref.quality_factor))
-	logger.info('Shunt Rp = {}'.format(filter_ref.resistance_parallel))
+	logger.info('Connected cubicle = {} = {}'.format(hdl_cubicle, hdl_filter.GetAttribute(c.pf_shn_term)))
+	logger.info('Nominal voltage = {}kV = {}kV'.format(filter_ref.nom_voltage, hdl_filter.GetAttribute(c.pf_shn_voltage)))
+	logger.info('Shunt type = {} = {}'.format(filter_ref.type, hdl_filter.GetAttribute(c.pf_shn_type)))
+	logger.info('Shunt Q = {}MVAR = {}MVAR'.format(q, hdl_filter.GetAttribute(c.pf_shn_q)))
+	logger.info('Shunt tuning frequency = {:.2f}Hz = {:.2f}Hz'.format(freq, hdl_filter.GetAttribute(c.pf_shn_freq)))
+	logger.info('Shunt tuning order = {:.1f} = {:.1f}'.format(freq/constants.nom_freq, hdl_filter.GetAttribute(c.pf_shn_tuning)))
+	logger.info('Shunt Q factor = {} = {}'.format(filter_ref.quality_factor, hdl_filter.GetAttribute(c.pf_shn_qfactor)))
+	logger.info('Shunt Rp = {} = {}'.format(filter_ref.resistance_parallel, hdl_filter.GetAttribute(c.pf_shn_rp)))
 
 	# Update drawing
 	_app.ExecuteCmd('grp/abi')
 
 	return None
 
+def set_max_processes(_app, logger):
+	"""
+
+		DOESN'T WORK - Requires PowerFactory to run in Administrator to change settings
+		TODO: To fix would need to close and reopen PowerFactory as Admin, make changes
+		TODO: then close and reopen with correct user
+
+		Function will limit the number of processes to ensure that the maximum available
+		RAM on the machine is not used up.
+
+		Approach is to determine the amount of RAM that is being used up and then assume
+		that if the current process is multiplied to keep some RAM available.  This is a
+		pessimistic assumption but should ensure stability.
+
+		Requires the wmi module, if not available then will limit to maximum of either:
+			- 3 processes
+			- no. of cores - 1 process
+		<https://stackoverflow.com/questions/2017545/get-memory-usage-of-computer-in-windows-with-python>
+
+	:param handle _app:  reference to the powerfactory application
+	:param logger.LOGGER logger:  handle for the logging engine
+	:return int new_slave_num:  Max processes that have been set to run, if 0 then error
+	"""
+
+	# Determine number of cores available
+	max_cpu = multiprocessing.cpu_count() - constants.cpu_keep_free
+	logger.debug('There are {} CPUs available for parallel processing'.format(max_cpu))
+
+	# Obtain wmi module
+	try:
+		import wmi
+		wmi_available = True
+	except ImportError:
+		logger.error('python module, wmi has not been installed and so have to limit cores'
+					 'based on assumed maximum')
+		wmi_available = False
+
+	# Determine maximum available RAM
+	if wmi_available:
+		# Connect to computer
+		comp = wmi.WMI()
+
+		# Determine maximum physical memory in bytes
+		for i in comp.Win32_ComputerSystem():
+			memory_total = float(i.TotalPhysicalMemory)
+
+		# Determine maximum free memory
+		for os in comp.Win32_OperatingSystem():
+			memory_free = float(os.FreePhysicalMemory)
+
+		logger.debug('Total memory = {} bytes'.format(memory_total))
+		logger.debug('Free memory = {} bytes'.format(memory_free))
+		# Calculate max number of processes
+		max_processes = int(memory_total/memory_free)
+		logger.debug('Max processes = {}'.format(max_processes))
+
+	else:
+		# If not able to determine how much ram is available will limit the maximum number of
+		# processes to a constant
+		max_processes = constants.default_max_processes
+		logger.debug('Not able to calculate available memory so max processes = {}'.format(max_processes))
+
+	num_processes_to_set = max(max_cpu, max_processes)
+	logger.debug('Max of processes / cores to use in PowerFactory is {}'.format(num_processes_to_set))
+
+	# Set parallel processing restriction in powerfactory
+	current_slave_num = _app.GetNumSlave()
+	logger.info('Currently set to use {} slaves'.format(current_slave_num))
+	_app.SetNumSlave(num_processes_to_set)
+	logger.info('Set to use {} slaves'.format(num_processes_to_set))
+	new_slave_num = _app.GetNumSlave()
+	logger.info('Validating that has bene set to use {} slaves'.format(new_slave_num))
+
+	# Return new_slave_number if a success
+	if current_slave_num == new_slave_num:
+		return new_slave_num
+	else:
+		return 0
+
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
-	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid, filter_name='None'):
+	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid, filter_name=None,
+				 base_case=False):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str full_name:  Full name of study case continaining base case and contingency
@@ -149,6 +238,7 @@ class PFStudyCase:
 		:param object prj:  Handle to project in which this study case is contained
 		:param object task_auto:  Handle to the Task Automation object created for this project studies
 		:param string uid:  Unique identifier time added to new files created
+		:param bool base_case:  True / False on whether this is a base case study case, i.e. with no contingencies applied
 		"""
 		# Strings that are used to store
 		self.name = full_name
@@ -160,6 +250,7 @@ class PFStudyCase:
 		self.cont_name = cont_name
 		self.uid = uid
 		self.filter_name = filter_name
+		self.base_case = base_case
 
 		# Handle for study cases that will require activating
 		self.sc = sc
@@ -252,7 +343,7 @@ class PFStudyCase:
 		self.hldf = hldf
 		return self.hldf
 
-	def process_fs_results(self):
+	def process_fs_results(self, logger=None):
 		"""
 			Function extracts and processes the load flow results for this study case
 		:return list fs_res
@@ -274,7 +365,6 @@ class PFStudyCase:
 			tope.insert(1, self.base_name)  # Study case description
 
 		self.fs_scale = fs_scale
-
 		return fs_res
 
 	def process_hrlf_results(self, logger):
@@ -341,6 +431,7 @@ class PFProject:
 		:param object prj:  project reference
 		:param object task_auto:  task automation reference
 		:param list folders:  List of folders created as part of project, these will be deleted at end of study
+
 		"""
 
 		# TODO: When initialising find the initial study case, operating scenario and variations
@@ -352,14 +443,17 @@ class PFProject:
 		self.sc_cases = []
 		self.folders = folders
 
-	def process_fs_results(self):
+		# Populated with the base study case
+		self.sc_base = None
+
+	def process_fs_results(self, logger=None):
 		""" Loop through each study case cls and process results files
 		:return list fs_res
 		"""
 		fs_res = []
 		for sc_cls in self.sc_cases:
 			# #sc_cls.sc.Activate()
-			fs_res.extend(sc_cls.process_fs_results())
+			fs_res.extend(sc_cls.process_fs_results(logger=logger))
 			# #sc_cls.sc.Deactivate()
 		return fs_res
 
@@ -373,3 +467,66 @@ class PFProject:
 			hrlf_res.extend(sc_cls.process_hrlf_results(logger))
 			# #sc_cls.sc.Deactivate()
 		return hrlf_res
+
+	def ensure_active_study_case(self, app):
+		"""
+			Function checks if there is an active study case and if not will activate the study case deemed to be
+			the base case to ensure that there is one active for terminal checking
+		:param powerfactory.app app:  Handle to the PowerFactory application
+		:return bool success:
+		"""
+		# Get handle for active study case from PowerFactory
+		study = app.GetActiveStudyCase()
+
+		# If no study case has been activated then activate the base case
+		if study is None:
+			success = not self.sc_base.sc.Activate()
+		else:
+			success = True
+
+		return success
+
+
+#  ----- UNIT TESTS -----
+# Doesn't work because requires PowerFactory to run in Administrator mode to change settings
+# class TestPowerFactoryHandling(unittest.TestCase):
+# 	"""
+# 		UnitTest to test the PowerFactory handling
+# 	"""
+# 	@classmethod
+# 	def setUpClass(cls):
+# 		import logging
+# 		import sys
+# 		import os
+#
+# 		# PowerFactory Python path for unittest
+# 		path_pf_python = "C:\\Program Files\\DIgSILENT\\PowerFactory 2016 SP5\\Python\\3.4"
+# 		path_pf = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
+# 		sys.path.append(path_pf_python)
+# 		os.environ['PATH'] = path_pf + ';' + os.environ['PATH']
+#
+# 		import powerfactory
+#
+# 		# Initialise a logger for unittest
+# 		cls.logger = logging.getLogger('UNIT TEST')
+# 		cls.logger.setLevel(logging.DEBUG)
+#
+# 		# Get handle for powerfactory application
+# 		cls.logger.debug('Establishing connection to PowerFactory, may take a while')
+# 		cls.app = powerfactory.GetApplication()
+# 		if cls.app is None:
+# 			cls.logger.critical('Not able to access PowerFactory')
+# 			assert False, 'Class not setup properly'
+#
+#
+# 	def test_max_processes_setup(self):
+# 		"""
+# 			Tests that maximum number of powerfactory processes can be established
+# 		"""
+# 		success = set_max_processes(_app=self.app, logger=self.logger)
+# 		self.assertTrue(success>0)
+#
+# 	@classmethod
+# 	def tearDownClass(cls):
+# 		# Force PowerFactory module to be released
+# 		cls.app = None

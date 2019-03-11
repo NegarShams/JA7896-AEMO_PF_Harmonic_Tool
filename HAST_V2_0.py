@@ -52,6 +52,12 @@ something happens
 - Added functionality to repeat studies for different filter arrangements and will now also run in unattended mode
 """
 
+# TODO: Useful developments:
+# TODO: 1. Add in script to powerfactory so that each parallel process can save the results externally to a DataFrame such that if there is a crash the results can be post event processed
+
+DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
+DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.4'
+
 # IMPORT SOME PYTHON MODULES
 # --------------------------------------------------------------------------------------------------------------------
 import os
@@ -183,7 +189,7 @@ def deactivate_study_case(): 		# Deactivate Scenario
 			print2('Error Unsuccessfully Deactivated Study Case: {}..............................'.format(study))
 			print2('Unsuccessfully Deactivated Scenario Error Code: {}'.format(sce))
 	else:
-		print1("No Study Case Active to Deactivate ................................", bf=2, af=0)
+		print1("No Study Case active to deactivate ................................", bf=2, af=0)
 	return None
 
 
@@ -579,7 +585,6 @@ def create_folder(location, name):		# Creates Folder in location
 		_new_object = folder1[0]
 	return _new_object, folder_exists
 
-
 # Creates a mutual Impedance list from the terminal list in a folder under the active studycase
 def create_mutual_impedance_list(location, terminal_list):
 	"""
@@ -726,7 +731,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	new_list =[]
 
 	# Empty list which will be populated with the new classes
-	cls_list = []
 	prj_dict = dict()
 	while _count_studycase < len(list_to_check):
 		# ERROR: Previously was not actually looking at the list passed to function
@@ -739,22 +743,18 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 			if _study_error == 0:
 				scenario, scen_err = activate_scenario(list_to_check[_count_studycase][3])										# Activate Scenario
 				if scen_err == 0:
-					print2('Load flow being run for study case {}'.format(list_to_check[_count_studycase]))
+					print1('Load flow being run for study case {}'.format(list_to_check[_count_studycase]))
 					ldf_err = load_flow(Load_Flow_Setting)																			# Perform Load Flow
-					print2('DEBUG - Load flow study completed with error code {}'.format(ldf_err))					
+					print1('Load flow study completed with error code {}'.format(ldf_err))
 					if ldf_err == 0 or Skip_Unsolved_Ldf == False:
 						new_list.append(list_to_check[_count_studycase])
 
 						print1("Studycase Scenario Solving added to analysis list: " + str(list_to_check[_count_studycase]),
 							   bf=2, af=0)
 
-						# TODO: At this point could create just a list that references the newly created study case and return that,
-						# TODO: The newly created study cases can then just be activated and deactivated as appropriate.
-
 						# TODO: If no pre-case check then nothing will be run, need to add in alternative options here
 
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
-							# TODO: Requires pre_case check for this to be created when these need to be created anyway
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
 							# Adjusted to create new study_case for each op_scenario
 							new_filter_list, filter_ok = check_filters(List_of_Filters)
@@ -797,29 +797,34 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							# TODO: Swap order so adds filters to base case and then applies contingencies
 
 							while cont_count < len(new_contingency_list):
-								# TODO:  Adding in contingencies even if their load flow does not converge
-								# TODO:  This may need to be adjusted
 								print1('Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
 									   bf=2, af=0)
-								deactivate_scenario()																# Can't copy activated Scenario so deactivate it
-								# Can't copy activated study case so deactivate it
+								#REMOVE - Deactivating study case will also deactivate scenario
+								# #deactivate_scenario()																# Can't copy activated Scenario so deactivate it
+
+								# Copy study case so contingency can be applied
+								#  Can't copy activated study case so deactivate it
 								deactivate_study_case()
 								cont_name = '{}_{}'.format(List_of_Studycases[_count_studycase][0],
 														   new_contingency_list[cont_count][0])
 								cont_study_case = add_copy(study_case_results_folder,
 														   study_case,
 														   cont_name)
-
 								cont_scenario = add_copy(_op_sc_results_folder, scenario,
-														 cont_name)	# Copies the base scenario
-								cont_study_case.Activate()
+														 cont_name)
 
-								_ = activate_scenario1(cont_scenario)										# Activates the base scenario
-								if new_contingency_list[cont_count][0] != "Base_Case":								# Apply Contingencies if it is not the base case
+								# Activate new study case and scenario
+								cont_study_case.Activate()
+								_ = activate_scenario1(cont_scenario)
+
+								# Apply the requirements of the contingency if it is not the base case and save scenario
+								if new_contingency_list[cont_count][0] != "Base_Case":
 									# Take outages described for contingency
 									for _switch in new_contingency_list[cont_count][1:]:
 										switch_coup(_switch[0], _switch[1])
-
+									base_case = False
+								else:
+									base_case = True
 								save_active_scenario()
 
 								# Determine if load flow successful and if not then don't include _study_cls in results
@@ -827,7 +832,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 								# Deactivate new study case and reactivate old study case
 								cont_study_case.Deactivate()
-								study_case.Activate()
+
+								# REMOVED - Don't see need to re-activate old study case (TBC)
+								# # study_case.Activate()
 
 								# Only add load flow to study case list and project list if load_flow successful, will still
 								# remain in folder of study cases but will be skipped in freq_scan and harmonic lf
@@ -835,13 +842,14 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 									# Create new class reference with all the details for this contingency and then add to
 									# list to be returned
 									_study_cls = hast2.pf.PFStudyCase(full_name=cont_name,
-																	 list_parameters=list_to_check[_count_studycase],
-																	 cont_name=new_contingency_list[cont_count][0],
-																	 sc=cont_study_case,
-																	 op=cont_scenario,
-																	 prj=_prj,
-																	 task_auto=task_automation,
-																	 uid=start1)
+																	  list_parameters=list_to_check[_count_studycase],
+																	  cont_name=new_contingency_list[cont_count][0],
+																	  sc=cont_study_case,
+																	  op=cont_scenario,
+																	  prj=_prj,
+																	  task_auto=task_automation,
+																	  uid=start1,
+																	  base_case=base_case)
 
 
 
@@ -860,6 +868,11 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 									# Add study case to file
 									prj_dict[project_name].sc_cases.append(_study_cls)
+
+									# If this is a base case contingency for this project then made the reference
+									# to activate when checking for terminals that exist
+									if base_case:
+										prj_dict[project_name].sc_base = _study_cls
 								else:
 									logger.error(('Load flow for study case {} not successful and so frequency scans ' +
 												 ' and harmonic load flows will not be run for this case')
@@ -876,12 +889,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 									for f_q in filter_item.f_q_values:
 
 										# Can't copy activated scenario or study case so deactivate
-										# TODO: Test if just deactivating study_case would work anyway
-										deactivate_scenario()
-										deactivate_study_case()
+										# REMOVED - No need to deactive scenario since deactivating study case will
+										# achieve the same thing
+										# #deactivate_scenario()
 
+										# Copy study case so contingency can be applied
+										# can't copy activated study case so deactivate it
+										# TODO: Study case may not even be active
+										deactivate_study_case()
 										# Create name for filter based on contingency, frequency, mvar value
-										filter_name = '{}_{}_{}Hz_{}MVAR'.format(
+										filter_name = '{}_{}_{:.1f}Hz_{:.1f}MVAR'.format(
 											cont_name, filter_item.name,
 											f_q[0], f_q[1])
 										filter_study_case = add_copy(study_case_results_folder,
@@ -890,6 +907,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 										_new_scenario = add_copy(_op_sc_results_folder, cont_scenario,
 																 filter_name)  # Copies the base scenario
+
 										filter_study_case.Activate()
 										logger.debug('New study case created and activated for modelling filter: {}'
 													 .format(filter_name))
@@ -907,7 +925,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 														 filter_name)
 										logger.debug('New variation created for filter: {}'.format(filter_name))
 
-										_ = activate_scenario1(_new_scenario)  # Activates the new scenario created for this variation
+										# Activates the new scenario created for this filter
+										_ = activate_scenario1(_new_scenario)
 
 										# Add filter to model
 										pf.add_filter_to_pf(
@@ -924,7 +943,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 										# Deactivate new study case and reactivate old study case
 										filter_study_case.Deactivate()
-										study_case.Activate()
+
+										# REMOVED - No need to reactivate study case
+										# #study_case.Activate()
 
 										# Only add to study case list and project list if load_flow successful, will still
 										# remain in folder of study cases but will be skipped in freq_scan and harmonic lf
@@ -943,22 +964,22 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																		task_auto=task_automation,
 																		uid=start1)
 
-										# Add study case to file
-										prj_dict[project_name].sc_cases.append(_study_cls)
-										logger.debug('Filter added to model and load flow run successfully for {}'
-													 .format(filter_study_case))
-									else:
-										logger.error(
-											('Load flow for filter study case {} not successful and so frequency scans ' +
-											 ' and harmonic load flows will not be run for this case')
-											.format(filter_study_case))
+											# Add study case to file
+											prj_dict[project_name].sc_cases.append(_study_cls)
+											logger.debug('Filter added to model and load flow run successfully for {}'
+														 .format(filter_study_case))
+										else:
+											logger.error(
+												('Load flow for filter study case {} not successful and so frequency scans ' +
+												 ' and harmonic load flows will not be run for this case')
+												.format(filter_study_case))
 
 
 								# TODO: Use enumerator rather than iterating counter
 								cont_count = cont_count + 1
 
 					else:
-						print2("Problem with Loadflow: " + str(list_to_check[_count_studycase][0]))
+						print2("Problem with initial load flow: " + str(list_to_check[_count_studycase][0]))
 				else:
 					print2("Problem with Scenario: " + str(list_to_check[_count_studycase][0]) + " " + str(list_to_check[_count_studycase][3]))
 			else:
@@ -988,9 +1009,9 @@ def check_terminals(list_of_points): 		# This checks and creates the list of ter
 		if len(t) == 0:															# If it doesn't find it it reports it and skips it
 			print2("Python substation entry for does not exist in case: " + list_of_points[tm_count][1] + "..............................................")
 		else:
-			t1 = t[0].GetContents()													# Gets the Contents of the substations (ie objects) 
+			_t1 = t[0].GetContents()													# Gets the Contents of the substations (ie objects)
 			terminal_exists = False
-			for t2 in t1:															# Gets the contents of the objects in the Substation
+			for t2 in _t1:															# Gets the contents of the objects in the Substation
 				if list_of_points[tm_count][2] in str(t2):												# Checks to see if the terminal is there
 					terminals_index.append([list_of_points[tm_count][0],
 											list_of_points[tm_count][1],
@@ -1170,8 +1191,8 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 if __name__ == '__main__':
 	""" Ensures this code is only run when run as the main script and not for unittesting """
 	# TODO: If want to unittest PF will need to put this into a function
-	DIG_PATH = """C:\\Program Files\\DIgSILENT\\PowerFactory 2016 SP3\\"""
 	sys.path.append(DIG_PATH)
+	sys.path.append(DIG_PYTHON_PATH)
 	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
 	Title = ('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n' +
 		'NAME:           Harmonics Automated Simulation Tool (HAST)\n' +
@@ -1334,6 +1355,12 @@ if __name__ == '__main__':
 					   .format(prj_cls.name))
 				continue
 
+			# Ensure there is an active studycase otherwise not able to confirm terminals exist
+			study_case_active = prj_cls.ensure_active_study_case(app)
+			if not study_case_active:
+				logger.error('Unable to activate a base case for project named {}<{}> and so no studies run on this case'
+							 .format(prj_name, prj_cls.prj))
+
 			t1_prj_start = time.clock()
 			print1('Creating studies for Study Cases associated with project {}'.format(prj_cls.name))
 
@@ -1462,8 +1489,8 @@ if __name__ == '__main__':
 			prj_cls.prj.Activate()
 			# If frequency scan results were carried out process those
 			if FS_Sim:
-				FS_Contingency_Results.extend(prj_cls.process_fs_results())
-				# Is it possible that the fs_scale could be different for different results
+				FS_Contingency_Results.extend(prj_cls.process_fs_results(logger=logger))
+				# TODO: Is it possible that the fs_scale could be different for different results
 				fs_scale = prj_cls.sc_cases[0].fs_scale
 			if HRM_Sim:
 				HRM_Contingency_Results.extend(prj_cls.process_hrlf_results(logger=logger))

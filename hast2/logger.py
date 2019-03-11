@@ -39,6 +39,7 @@ class Logger:
 		self.handler_progress_log = None
 		self.handler_debug_log = None
 		self.handler_error_log = None
+		self.handler_stream_log = None
 
 		# Counter for each error message that occurs
 		self.error_count = 0
@@ -79,14 +80,23 @@ class Logger:
 														min_level=logging.ERROR,
 														formatter=log_formatter)
 
+		self.handler_stream_log = logging.StreamHandler(sys.stdout)
+		self.handler_stream_log.setLevel(logging.DEBUG)
+		self.handler_stream_log.setFormatter(log_formatter)
+
+
+
+
 		# Add handlers to logger
 		logger.addHandler(self.handler_progress_log)
 		logger.addHandler(self.handler_debug_log)
 		logger.addHandler(self.handler_error_log)
+		logger.addHandler(self.handler_stream_log)
 
 		logger.info('Path for debug log is {}'.format(self.pth_debug_log))
 		logger.info('Path for process log is {}'.format(self.pth_progress_log))
 		logger.info('Path for error log is {}'.format(self.pth_error_log))
+		logger.debug('Stream output is going to stdout')
 		self.handler_progress_log.flush()
 
 		return logger
