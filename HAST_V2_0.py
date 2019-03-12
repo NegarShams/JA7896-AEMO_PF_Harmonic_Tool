@@ -56,7 +56,9 @@ something happens
 # TODO: 1. Add in script to powerfactory so that each parallel process can save the results externally to a DataFrame such that if there is a crash the results can be post event processed
 
 DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
+DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
 DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.4'
+DIG_PYTHON_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5\Python\3.5'
 
 # IMPORT SOME PYTHON MODULES
 # --------------------------------------------------------------------------------------------------------------------
@@ -1192,8 +1194,11 @@ if __name__ == '__main__':
 	""" Ensures this code is only run when run as the main script and not for unittesting """
 	# TODO: If want to unittest PF will need to put this into a function
 	sys.path.append(DIG_PATH)
+	sys.path.append(DIG_PATH_REMOTE)
 	sys.path.append(DIG_PYTHON_PATH)
-	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
+	sys.path.append(DIG_PYTHON_PATH_REMOTE)
+
+	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH + ';' + DIG_PATH_REMOTE
 	Title = ('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n' +
 		'NAME:           Harmonics Automated Simulation Tool (HAST)\n' +
 		'VERSION:        {}\n' +
