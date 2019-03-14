@@ -100,6 +100,11 @@ class SubstationFilter:
 		self.include = True
 		self.nom_voltage = 0.0
 
+		# Confirm row data exists
+		if row_data[0] is None:
+			self.include = False
+			return
+
 		# Name to use for filter
 		self.name = row_data[0]
 		# Substation and terminal within substation that filter should be connected to
@@ -296,7 +301,7 @@ class Excel:
 					# Routine for Filters worksheet
 					elif current_worksheet == constants.PowerFactory.sht_Filters:
 						row_value = SubstationFilter(row_data=row_value)
-						print(row_value)
+
 						# #row_value = add_filters(row_data=row_value)
 
 					row_input.append(row_value)
@@ -411,7 +416,7 @@ class Excel:
 					r_first = newcol
 					r_results, x_results = [], []
 					for x in fs_results:
-						if x[0] == "m:R":
+						if x[constants.ResultsExtract.loc_pf_variable] == "m:R":
 							ws.Range(ws.Cells(startrow, newcol),
 									 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
 							r_results.append(x[3:])
@@ -422,7 +427,7 @@ class Excel:
 					newcol += 1
 					x_first = newcol
 					for x in fs_results:
-						if x[0] == "m:X":
+						if x[constants.ResultsExtract.loc_pf_variable] == "m:X":
 							ws.Range(ws.Cells(startrow, newcol),
 									 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
 							x_results.append(x[3:])
@@ -611,10 +616,10 @@ class Excel:
 					z_first = newcol - 1
 					z_results, base_case_pos = [], []
 					for x in fs_results:
-						if x[0] == "m:Z":
+						if x[constants.ResultsExtract.loc_pf_variable] == "m:Z":
 							ws.Range(ws.Cells(startrow, newcol), ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
 							z_results.append(x[3:])
-							if x[2] == "Base_Case":
+							if x[constants.ResultsExtract.loc_contingency] == "Base_Case":
 								base_case_pos.append([newcol])
 							newcol = newcol + 1
 					z_last = newcol - 1

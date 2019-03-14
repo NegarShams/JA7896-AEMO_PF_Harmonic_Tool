@@ -54,6 +54,9 @@ something happens
 
 # TODO: Useful developments:
 # TODO: 1. Add in script to powerfactory so that each parallel process can save the results externally to a DataFrame such that if there is a crash the results can be post event processed
+# TODO: 1.a. Could be done by adding a script to the study case that runs to process the results and extract them to a suitable file, the main script would then just need to import all of these files
+# TODO: 1.b. back in for post processing.  This would allow studies to be run in multiple stages and joined in different arrangements.  It would also mean the data processing components are separated
+# TODO: 1.c. into each process.  The script would need to be added to the initial study case so that the relevant results files are extracted.
 
 DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
 DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
@@ -736,7 +739,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	prj_dict = dict()
 	while _count_studycase < len(list_to_check):
 		# ERROR: Previously was not actually looking at the list passed to function
-		# TODO: Efficieny - This is activating a new project even if it is the same
+		# TODO: Efficiency - This is activating a new project even if it is the same
+
+		# TODO:  Create frequency / HLF command and results at this point and then copy / paste
 		project_name = list_to_check[_count_studycase][1]
 		_prj = activate_project(project_name)  # Activate Project
 
@@ -900,32 +905,32 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 										# TODO: Study case may not even be active
 										deactivate_study_case()
 										# Create name for filter based on contingency, frequency, mvar value
-										filter_name = '{}_{}_{:.1f}Hz_{:.1f}MVAR'.format(
-											cont_name, filter_item.name,
-											f_q[0], f_q[1])
+										filter_name = '{}_{:.1f}Hz_{:.1f}MVAR'.format(filter_item.name, f_q[0], f_q[1])
+										filter_full_name = '{}_{}'.format(cont_name, filter_name)
+
 										filter_study_case = add_copy(study_case_results_folder,
 																	 cont_study_case,
-																	 filter_name)
+																	 filter_full_name)
 
 										_new_scenario = add_copy(_op_sc_results_folder, cont_scenario,
-																 filter_name)  # Copies the base scenario
+																 filter_full_name)  # Copies the base scenario
 
 										filter_study_case.Activate()
 										logger.debug('New study case created and activated for modelling filter: {}'
-													 .format(filter_name))
+													 .format(filter_full_name))
 
 										# Create new variation specifically for this filter so can deactivate
 										# before copying to ensure filter isn't added to every case
 										filter_variation = create_variation(
 											_variations_folder,
 											constants.PowerFactory.pf_scheme,
-											filter_name)
+											filter_full_name)
 										activate_variation(filter_variation)
 										# Create and activate recording stage within variation
 										_ = create_stage(filter_variation,
 														 constants.PowerFactory.pf_stage,
-														 filter_name)
-										logger.debug('New variation created for filter: {}'.format(filter_name))
+														 filter_full_name)
+										logger.debug('New variation created for filter: {}'.format(filter_full_name))
 
 										# Activates the new scenario created for this filter
 										_ = activate_scenario1(_new_scenario)
@@ -933,7 +938,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 										# Add filter to model
 										pf.add_filter_to_pf(
 											_app=app,
-											filter_name=filter_name, filter_ref=filter_item,
+											filter_name=filter_full_name,
+											filter_ref=filter_item,
 											q=f_q[1], freq=f_q[0],
 											logger=logger)
 
@@ -955,7 +961,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 											# Create new class reference with all the details for this contingency and
 											# filter combination and then add to
 											# list to be returned
-											_study_cls = pf.PFStudyCase(full_name=cont_name,
+											_study_cls = pf.PFStudyCase(full_name=filter_full_name,
 																		list_parameters=list_to_check[
 																			_count_studycase],
 																		cont_name=new_contingency_list[cont_count][0],
@@ -1101,6 +1107,9 @@ def check_filters(list_of_filters):			# Checks and creates list of terminals to 
 		"""
 	filters_ok = True
 	for item in list_of_filters:  # This loops through the contingencies to find the couplers
+		if not item.include:
+			continue
+
 		skip_filter = False
 		filter_name = item.name
 		substation = item.sub
@@ -1218,6 +1227,7 @@ if __name__ == '__main__':
 
 	# Power factory commands
 	# --------------------------------------------------------------------------------------------------------------------
+	# TODO:  Need to add in capability here to capture script fail and release so that powerfactory license is released
 	app = powerfactory.GetApplication()  # Start PowerFactory  in engine  mode
 
 	# help("powerfactory")
@@ -1509,7 +1519,9 @@ if __name__ == '__main__':
 		# TODO:  Performance improvement if just returned as dictionary from fs_results and then dictionaries combined
 		dict_fs_res = dict()
 		for res in FS_Contingency_Results:
-			s_results_name = str(res.pop(3))
+			# Reposition results export in <pf.PFStudyCase.process_fs_results>
+			# #s_results_name = str(res.pop(3))
+			s_results_name = str(res.pop(5))
 			try:
 				dict_fs_res[s_results_name].append(res)
 			except KeyError:
@@ -1556,6 +1568,7 @@ if __name__ == '__main__':
 								"Process Results Z12 in Python: " + str(round((time.clock() - start5), 2)) + " Seconds",
 								bf=1, af=0)  # Returns python results processing time
 
+					print(FS_Terminal_Results)
 					HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
 					if HRM_Sim:
 						start6 = time.clock()
@@ -1620,3 +1633,6 @@ if __name__ == '__main__':
 	# Close the logger since script has now completed and this forces flushing of the open logs before script exits
 	logger.flush()
 	logger.close_logging()
+
+	app = None
+	del app

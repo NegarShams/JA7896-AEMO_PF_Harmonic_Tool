@@ -34,11 +34,13 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 	_new_object = location.CreateObject(pfclass, name)
 	return _new_object
 
-def retrieve_results(elmres, res_type):			# Reads results into python lists from results file
+def retrieve_results(elmres, res_type, write_as_df=False):			# Reads results into python lists from results file
 	"""
-		Reads results into python lists from results file for processing to add to Excel
+		Reads results into python lists from results file for processing to add to Excel		
+		TODO:  Adjust processing of results to write into a DataFrame for easier extraction to Excel / manipulation
 	:param powerfactory.Results elmres: handle for powerfactory results file 
-	:param int res_type: Type of results being dealt with 
+	:param int res_type: Type of results being dealt with	
+	:param bool write_as_df:  (optional=False) If set to True will return results in a DataFrame
 	:return: 
 	"""
 	# Note both column number and row start at 1.
@@ -229,8 +231,8 @@ class PFStudyCase:
 				 base_case=False):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
-		:param str full_name:  Full name of study case continaining base case and contingency
-		:param list list_parameters:  List of parameters from the Base_Scenaraios inputs sheet
+		:param str full_name:  Full name of study case containing base case and contingency
+		:param list list_parameters:  List of parameters from the Base_Scenarios inputs sheet
 		:param str cont_name:  Name of contingency being considered
 		:param str filter_name: (optional=None) Name of filter that has been included if applicable
 		:param object sc:  Handle to newly created study case
@@ -346,25 +348,48 @@ class PFStudyCase:
 	def process_fs_results(self, logger=None):
 		"""
 			Function extracts and processes the load flow results for this study case
+		:param logger:  (optional=None) handle for logger to allow message reporting
 		:return list fs_res
 		"""
+		c = constants.ResultsExtract
+
+		# Insert data labels into frequency data to act as row labels for data
 		fs_scale, fs_res = retrieve_results(self.fs_results, 0)
-		fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
-		fs_scale.insert(1,"Scale")
-		fs_scale.pop(3)
-		for tope in fs_res:															# Adds the additional information to the results file
-			# Insert contingency / filter name (if exists)
-			if self.filter_name is not None:
-				# If filter name exists then filter name is used
-				tope.insert(1, self.filter_name)
-			else:
-				# If not then contingency name is used
-				tope.insert(1, self.cont_name)  # Contingency name
-
-			# Using base_name as description of study_case
-			tope.insert(1, self.base_name)  # Study case description
-
+		fs_scale[0:2] = [
+			c.lbl_StudyCase,
+			c.lbl_Contingency,
+			c.lbl_Filter_ID,
+			c.lbl_FullName,
+			c.lbl_Frequency]
 		self.fs_scale = fs_scale
+
+		# fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
+		# fs_scale.insert(1,"Scale")
+		# fs_scale.pop(3)
+
+		# Insert additional details for each result
+		for res in fs_res:
+			# Results inserted to align with labels above
+			res[0:1] = [self.base_name,
+						self.cont_name,
+						self.filter_name,
+						self.name,
+						res[0]]
+
+			# #Insert contingency / filter name (if exists)
+			# #if self.filter_name is not None:
+			# #	# If filter name exists then filter name is used
+			# #	res.insert(1, self.filter_name)
+			# #else:
+			# #	# If not then contingency name is used
+			# #	res.insert(1, self.cont_name)  # Contingency name
+
+			# # Using base_name as description of study_case
+			# #res.insert(1, self.base_name)  # Study case description
+
+		logger.debug('Frequency scan results for study <{}> extracted from PowerFactory'
+					 .format(self.name))
+
 		return fs_res
 
 	def process_hrlf_results(self, logger):

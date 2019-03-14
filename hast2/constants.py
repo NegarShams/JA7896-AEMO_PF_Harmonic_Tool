@@ -59,6 +59,21 @@ class PowerFactory:
 	pf_scheme = 'IntScheme'
 	pf_stage = 'IntSstage'
 
+class ResultsExtract:
+	"""
+		Constants used in processing the results
+	"""
+	# Labels used for frequency scan results extract
+	lbl_StudyCase = 'Study Case'
+	lbl_Frequency = 'Frequency in Hz'
+	lbl_Filter_ID = 'Filter Details'
+	lbl_Contingency = 'Contingency'
+	lbl_FullName = 'Full Result Name'
+	# Location of m:R, m:X, m:Z, etc.
+	loc_pf_variable = 4
+	loc_contingency = 1
+
+
 analysis_sheets = (
 	(PowerFactory.sht_Study, "B5"),
 	(PowerFactory.sht_Scenarios, "A5"),
