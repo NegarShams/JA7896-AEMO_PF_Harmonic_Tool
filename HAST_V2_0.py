@@ -1423,6 +1423,8 @@ if __name__ == '__main__':
 				Study_Case_Folder = app.GetProjectFolder("study")										# Returns string the location of the project folder for "study", (Ops) "scen" , "scheme" (Variations) Python reference guide 4.6.19 IntPrjfolder
 				Operation_Case_Folder = app.GetProjectFolder("scen")
 
+				# TODO: Move this section to be done on the default study cases before they are duplicated to increase
+				# TODO: preocessing speed
 				if FS_Sim:
 					# During task automation each process only has access to single study case and therefore results
 					# need to be stored in the study case file.  Once completed they can then be moved to a centralised
@@ -1441,6 +1443,7 @@ if __name__ == '__main__':
 					freq_sweep = study_cls.create_freq_sweep(results_file=sweep, settings=Fsweep_Settings)
 
 					# Add freq_sweep to task automation
+					# TODO: Move to add the auto function when each study case / contingency is created
 					study_cls.task_auto.AppendCommand(freq_sweep, 0)
 					print1('Frequency sweep added for study case {}'.format(study_cls.name))
 
@@ -1568,7 +1571,6 @@ if __name__ == '__main__':
 								"Process Results Z12 in Python: " + str(round((time.clock() - start5), 2)) + " Seconds",
 								bf=1, af=0)  # Returns python results processing time
 
-					print(FS_Terminal_Results)
 					HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
 					if HRM_Sim:
 						start6 = time.clock()
