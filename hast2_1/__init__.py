@@ -9,10 +9,10 @@
 #######################################################################################################################
 """
 
-import hast2.logger
-import hast2.excel_writing
-import hast2.pf
-import hast2.constants
+import hast2_1.logger
+import hast2_1.excel_writing
+import hast2_1.pf
+import hast2_1.constants
 
 # Meta Data
 __author__ = 'David Mills'

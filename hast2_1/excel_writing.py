@@ -20,7 +20,7 @@ import scipy.spatial
 import scipy.spatial.qhull
 from scipy.spatial import ConvexHull
 import itertools
-import hast2.constants as constants
+import hast2_1.constants as constants
 
 
 # Meta Data
@@ -732,7 +732,7 @@ class Excel:
 					for res_type in res_to_include:
 						for x in fs_results:
 							# #if x[1] == "c:Z_12":
-							if x[1] == res_type:
+							if x[constants.ResultsExtract.loc_pf_variable_mutual] == res_type:
 								ws.Range(ws.Cells(startrow - 1, newcol),
 										 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
 								newcol = newcol + 1

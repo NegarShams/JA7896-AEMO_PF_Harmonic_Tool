@@ -11,7 +11,7 @@
 """
 
 import math
-import hast2.constants as constants
+import hast2_1.constants as constants
 import multiprocessing
 import unittest
 
@@ -47,6 +47,7 @@ def retrieve_results(elmres, res_type, write_as_df=False):			# Reads results int
 	# The first column is usually the scale ie timestep, frequency etc.
 	# The columns are made up of Objects from left to right (ElmTerm, ElmLne)
 	# The Objects then have sub variables (m:R, m:X etc)
+	# TODO: This processing is slow, 20seconds per study, improve data extraction
 	elmres.Load()
 	cno = elmres.GetNumberOfColumns()	# Returns number of Columns
 	rno = elmres.GetNumberOfRows()		# Returns number of Rows in File
@@ -225,6 +226,11 @@ def set_max_processes(_app, logger):
 	else:
 		return 0
 
+def check_if_object_exists(location, name):  	# Check if the object exists
+	#_new_object used instead of new_object to avoid shadowing
+	new_object = location.GetContents(name)
+	return new_object[0]
+
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
 	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid, filter_name=None,
@@ -267,6 +273,7 @@ class PFStudyCase:
 		self.hldf_results = None
 		self.fs_scale = []
 		self.hrm_scale = []
+
 
 		# Dictionary for looking up frequency scan results
 		self.fs_res = dict()
@@ -446,16 +453,46 @@ class PFStudyCase:
 
 		return hrm_res
 
+	def update_results_files(self,fs,hldf):
+		c = constants.PowerFactory
+		# Update FS results file
+		if fs:
+			self.fs_results = check_if_object_exists(
+				location=self.sc,
+				name='{}{}.{}'.format(
+					c.default_results_name,
+					c.default_fs_extension,
+					c.pf_results))
+
+		# Update harmonic load flow
+		if hldf:
+			self.hldf_results = check_if_object_exists(
+				location=self.sc,
+				name='{}{}.{}'.format(
+					c.default_results_name,
+					c.default_hldf_extension,
+					c.pf_results))
+
+	def create_studies(self,fs=False,hldf=False,fs_settings=[],hldf_settings=[]):
+		self.update_results_files(fs=fs,hldf=hldf)
+		if fs:
+			_ = self.create_freq_sweep(results_file=self.fs_results,
+									   settings=fs_settings)
+
+		if hldf:
+			_ = self.create_harm_load_flow(results_file=self.hldf_results,
+														settings=hldf_settings)
 
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
-	def __init__(self, name, prj, task_auto, folders):
+	def __init__(self, name, prj, task_auto, folders, include_mutual=False):
 		"""
 			Initialise class
 		:param str name:  project name
 		:param object prj:  project reference
 		:param object task_auto:  task automation reference
 		:param list folders:  List of folders created as part of project, these will be deleted at end of study
+		:param bool include_mutual: (Optional=False) - Set to True when mutual impedance data is being exported
 
 		"""
 
@@ -468,8 +505,21 @@ class PFProject:
 		self.sc_cases = []
 		self.folders = folders
 
+
 		# Populated with the base study case
 		self.sc_base = None
+
+		# If Mutual impedance data required then added here
+		self.include_mutual = include_mutual
+		self.mutual_impedance_folder = None
+		self.list_of_mutual = None
+
+		# Network elements folder
+		self.folder_network_elements = None
+
+		# List of terminals for results
+		self.terminals_index = None
+
 
 	def process_fs_results(self, logger=None):
 		""" Loop through each study case cls and process results files
@@ -510,6 +560,25 @@ class PFProject:
 			success = True
 
 		return success
+
+	def update_auto_exec(self, fs=False, hldf=False):
+		"""
+			For the newly added study case, updates the frequency sweep and hldf references and adds to the auto_exec command
+		:param PFStudyCase sc:
+		:param bool fs:
+		:param bool hldf:
+		:return:
+		"""
+		for cls_sc in self.sc_cases:
+			self.task_auto.AppendStudyCase(cls_sc.sc)
+
+			if fs:
+				self.task_auto.AppendCommand(cls_sc.frq, 0)
+
+			if hldf:
+				self.task_auto.AppendCommand(cls_sc.hldf, 0)
+		return
+
 
 
 #  ----- UNIT TESTS -----

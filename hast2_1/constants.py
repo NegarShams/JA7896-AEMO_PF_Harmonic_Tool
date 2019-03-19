@@ -58,6 +58,15 @@ class PowerFactory:
 	# constants for variations
 	pf_scheme = 'IntScheme'
 	pf_stage = 'IntSstage'
+	pf_results = 'ElmRes'
+
+	# General Types
+	pf_folder_type = 'IntFolder'
+
+	# Default results file name
+	default_results_name = 'HAST_Res'
+	default_fs_extension = '_FS'
+	default_hldf_extension = '_HLDF'
 
 class ResultsExtract:
 	"""
@@ -71,8 +80,15 @@ class ResultsExtract:
 	lbl_FullName = 'Full Result Name'
 	# Location of m:R, m:X, m:Z, etc.
 	loc_pf_variable = 4
+	# Location of m:R12, m:X12, m:Z12, etc.
+	loc_pf_variable_mutual = loc_pf_variable + 1
 	loc_contingency = 1
 
+class HASTInputs:
+	base_case = 'Base_Case'
+	mutual_variables = ["c:Z_12", "c:R_12", "c:X_12"]
+	fs_term_variables = ["m:R", "m:X", "m:Z", "m:phiz"]
+	hldf_term_variables = ['m:HD', 'm:THD']
 
 analysis_sheets = (
 	(PowerFactory.sht_Study, "B5"),
