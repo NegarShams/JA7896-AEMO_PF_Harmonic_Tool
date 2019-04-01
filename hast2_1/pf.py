@@ -10,6 +10,7 @@
 #######################################################################################################################
 """
 
+import os
 import math
 import hast2_1.constants as constants
 import multiprocessing
@@ -233,8 +234,8 @@ def check_if_object_exists(location, name):  	# Check if the object exists
 
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
-	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid, filter_name=None,
-				 base_case=False):
+	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid,
+				 results_pth, filter_name=None, base_case=False):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str full_name:  Full name of study case containing base case and contingency
@@ -246,6 +247,7 @@ class PFStudyCase:
 		:param object prj:  Handle to project in which this study case is contained
 		:param object task_auto:  Handle to the Task Automation object created for this project studies
 		:param string uid:  Unique identifier time added to new files created
+		:param string results_pth:  Full path to store results in
 		:param bool base_case:  True / False on whether this is a base case study case, i.e. with no contingencies applied
 		"""
 		# Strings that are used to store
@@ -259,6 +261,7 @@ class PFStudyCase:
 		self.uid = uid
 		self.filter_name = filter_name
 		self.base_case = base_case
+		self.res_pth = results_pth
 
 		# Handle for study cases that will require activating
 		self.sc = sc
@@ -269,14 +272,20 @@ class PFStudyCase:
 		# Attributes set during study completion
 		self.frq = None
 		self.hldf = None
+		self.frq_export_com = None
+		self.hldf_export_com = None
 		self.fs_results = None
 		self.hldf_results = None
+		self.com_res = None
 		self.fs_scale = []
 		self.hrm_scale = []
 
-
 		# Dictionary for looking up frequency scan results
 		self.fs_res = dict()
+
+		# Paths for frequency and hlf results that are exported
+		self.fs_result_exports = []
+		self.hldf_result_exports = []
 
 	def create_freq_sweep(self, results_file, settings):
 		"""
@@ -473,15 +482,80 @@ class PFStudyCase:
 					c.default_hldf_extension,
 					c.pf_results))
 
-	def create_studies(self,fs=False,hldf=False,fs_settings=[],hldf_settings=[]):
+	def create_studies(self,logger,fs=False,hldf=False,fs_settings=[],hldf_settings=[]):
+		"""
+			Function to create the frq and hldf studies including exporting to a pre-determined folder
+		:param logging.logger logger: Handle for log messages
+		:param bool fs: (optional=False) - Set to True to create FS studies
+		:param bool hldf: (optional=False) - Set to True to create HLDF studies
+		:param list fs_settings: (optional=[]) - Contains the settings for FS if required
+		:param list hldf_settings:  (optional=[]) - Contains the settings for HLDF if required
+		:return:
+		"""
 		self.update_results_files(fs=fs,hldf=hldf)
 		if fs:
 			_ = self.create_freq_sweep(results_file=self.fs_results,
 									   settings=fs_settings)
+			self.frq_export_com, export_pth = self.set_results_export(
+				result=self.fs_results,
+				name='{}_{}'.format('FS',self.name))
+			self.fs_result_exports.append(export_pth)
+			logger.debug(('For study case {}, frequency scan command {} and results export {} have been created'
+						  'with results being exported to: {}')
+						 .format(self.sc, self.frq, self.frq_export_com, export_pth))
 
 		if hldf:
 			_ = self.create_harm_load_flow(results_file=self.hldf_results,
-														settings=hldf_settings)
+										   settings=hldf_settings)
+			self.hldf_export_com, export_pth = self.set_results_export(
+				result=self.hldf_results,
+				name='{}_{}'.format('HLDF', self.name))
+			self.hldf_result_exports.append(export_pth)
+			logger.debug(('For study case {}, harmonic load flow command {} and results export {} have been created'
+						  'with results being exported to: {}')
+						 .format(self.sc, self.hldf, self.hldf_export_com, export_pth))
+
+	def set_results_export(self, result, name):
+		"""
+			Function will create a results export command (.ComRes) to then use to deal with exporting all the results
+			into a CSV file as soon as they are completed.  They can then be processed by a different script.
+		:param str pth:  Path where the file should be saved
+		:param handle result:  handle to powerfactory result that should be extracted
+		:param str name:  Name of file to extract (without extension)
+		:return (h_comres, res_export_pth):  Handle to PF ComRes function, Full path to exported result
+		"""
+		c = constants.PowerFactory.ComRes
+		res_export_path = os.path.join(self.res_pth, '{}.csv'.format(name))
+
+		# Create com_res file to deal with extracting the results
+		h_comres = create_object(location=self.sc, pfclass=c.pf_comres, name=name)
+
+		# Set relevant result
+		h_comres.SetAttribute(c.result, result)
+
+		# Set type as CSV and define results file
+		h_comres.SetAttribute(c.export_type, 6)
+		h_comres.SetAttribute(c.file, os.path.join(self.res_pth, res_export_path))
+		h_comres.SetAttribute(c.separators, 1)
+		h_comres.SetAttribute(c.object_head_only, 0)
+
+		# Export values (0 = values, 1 = variable descriptors only)
+		h_comres.SetAttribute(c.export_values, 0)
+
+		# Export all variables (0 = all variables, 1 = list of variables)
+		h_comres.SetAttribute(c.variables_all, 0)
+
+		# Set time steps
+		h_comres.SetAttribute(c.user_interval, 0)
+		h_comres.SetAttribute(c.filtered_time, 0)
+		h_comres.SetAttribute(c.shift_time, 0)
+
+		# Set data to include
+		h_comres.SetAttribute(c.element, 3)
+		h_comres.SetAttribute(c.variable, 1)
+
+		return h_comres, res_export_path
+
 
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
@@ -519,7 +593,6 @@ class PFProject:
 
 		# List of terminals for results
 		self.terminals_index = None
-
 
 	def process_fs_results(self, logger=None):
 		""" Loop through each study case cls and process results files
@@ -564,19 +637,22 @@ class PFProject:
 	def update_auto_exec(self, fs=False, hldf=False):
 		"""
 			For the newly added study case, updates the frequency sweep and hldf references and adds to the auto_exec command
-		:param PFStudyCase sc:
-		:param bool fs:
-		:param bool hldf:
-		:return:
+		:param bool fs: (optional=False) - Set to True to include export of frequency scan results
+		:param bool hldf: (optional=False) - Set to True to include export of harmonic load flow results
+		:return None:
 		"""
 		for cls_sc in self.sc_cases:
 			self.task_auto.AppendStudyCase(cls_sc.sc)
 
 			if fs:
+				# Add frequency scan commands and results export
 				self.task_auto.AppendCommand(cls_sc.frq, 0)
+				self.task_auto.AppendCommand(cls_sc.frq_export_com, 0)
 
 			if hldf:
+				# Add harmonic load flow commands and results export
 				self.task_auto.AppendCommand(cls_sc.hldf, 0)
+				self.task_auto.AppendCommand(cls_sc.hldf_export_com, 0)
 		return
 
 

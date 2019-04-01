@@ -41,6 +41,7 @@ class PowerFactory:
 	pf_substation = 'ElmSubstat'
 	pf_terminal =  'ElmTerm'
 	pf_coupler = 'ElmCoup'
+	pf_mutual = 'ElmMut'
 	pf_case = 'IntCase'
 	pf_scenario = 'IntScenario'
 	pf_filter = 'ElmShnt'
@@ -62,11 +63,59 @@ class PowerFactory:
 
 	# General Types
 	pf_folder_type = 'IntFolder'
+	pf_prjfolder_type = 'netdat'
 
 	# Default results file name
 	default_results_name = 'HAST_Res'
 	default_fs_extension = '_FS'
 	default_hldf_extension = '_HLDF'
+
+	class ComRes:
+		# Power Factory class name
+		pf_comres = 'ComRes'
+		#Com Res setting constants
+
+		# File export type:
+		#	0 = Output window
+		#	1 = Windows clipboard
+		#	2 = Measurement file (ElmFile)
+		#	3 = Comtrade
+		#	4 = Testfile
+		#	5 = PSSPLT Version 2.0
+		#	6 = Commas Separated Values (*.csv)
+		export_type = 'iopt_exp'
+		# Name of file to export to (if appropriate)
+		file = 'f_name'
+		# Type of deparators to use (0 = Custom, 1 = system defaults)
+		separators = 'iopt_sep'
+		# Export object headers only (0 = all data, 1 = headers only)
+		object_head_only = 'iopt_honly'
+		# Variables to extract (0 = all, 1 = custom list)
+		variables_all = 'iopt_csel'
+		# Name of result file from PF to export
+		result = 'pResult'
+		# Details to export from element:
+		# 	0 = None,
+		# 	1 = Name,
+		# 	2 = Short path and name,
+		# 	3 = Path and name,
+		# 	4 = Foreign key
+		element = 'iopt_locn'
+		# Details to export from variable:
+		#	0 = None,
+		#	1 = Parameters name,
+		#	3 = Short description,
+		#	4 = Full description
+		variable = 'ciopt_head'
+		# Custom of full dataset (0 = full, 1 = custom)
+		user_interval = 'iopt_tsel'
+		# Export values (0 = values, 1 = variable descriptors only)
+		export_values = 'iopt_vars'
+		# Shift time of results (0 = none, 1 = shift)
+		shift_time = 'iopt_rscl'
+		# Filter time of results (0 = None, 1 = filter)
+		filtered_time = 'filtered'
+
 
 class ResultsExtract:
 	"""
@@ -78,6 +127,9 @@ class ResultsExtract:
 	lbl_Filter_ID = 'Filter Details'
 	lbl_Contingency = 'Contingency'
 	lbl_FullName = 'Full Result Name'
+	lbl_Terminal = 'Terminal Name'
+	lbl_Reference_Terminal = 'Terminal'
+	lbl_Result = 'Result Type'
 	# Location of m:R, m:X, m:Z, etc.
 	loc_pf_variable = 4
 	# Location of m:R12, m:X12, m:Z12, etc.
