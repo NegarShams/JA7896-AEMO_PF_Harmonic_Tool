@@ -83,6 +83,7 @@ def process_file(pth_file, dict_of_terms):
 	:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
 	"""
 	c = constants.ResultsExtract
+	# TODO:  Need to account for mutual impedance data to provide in both directions from the single direction produced by HAST
 
 	# Import dataframe
 	_df = pd.read_csv(pth_file, header=[0, 1], index_col=0)
