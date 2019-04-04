@@ -9,6 +9,10 @@
 #######################################################################################################################
 """
 
+import pandas as pd
+import os
+import unittest
+
 # Meta Data
 __author__ = 'David Mills'
 __email__ = 'david.mills@pscconsulting.com'
@@ -69,6 +73,13 @@ class PowerFactory:
 	default_results_name = 'HAST_Res'
 	default_fs_extension = '_FS'
 	default_hldf_extension = '_HLDF'
+
+	pf_r1 = 'm:R'
+	pf_x1 = 'm:X'
+	pf_z1 = 'm:Z'
+	pf_r12 = 'c:R_12'
+	pf_x12 = 'c:X_12'
+	pf_z12 = 'c:Z_12'
 
 	class ComRes:
 		# Power Factory class name
@@ -136,11 +147,64 @@ class ResultsExtract:
 	loc_pf_variable_mutual = loc_pf_variable + 1
 	loc_contingency = 1
 
+	# Default positions
+	start_row = 31 # (0 referenced so will be Excel row 32)
+	start_col = 0 # (0 referenced so will be Excel col A)
+	col_spacing = 2 # Leaves 1 empty column between results
+
+	# Labels for charts
+	lbl_Impedance = 'Impendance in Ohms'
+
+	def __init__(self):
+		"""
+			Initial class
+		"""
+		self.color_map = dict()
+
+	def get_color_map(self, pth_color_map=None, refresh=False):
+		"""
+			Obtains a dictionary of the colors to use for plotting graphs in excel.
+		:param: str pth_color_map: (Optional=None) - If a different color map is desired can be passed as input
+		:return dict color_map:  Returns a dictionary of the color map based on N-1 contingency : hex color code
+		"""
+		def hex_converter(value):
+			"""
+				Used to convert the number to a hex value including leading # during import of excel
+			:param str value:  Value to be converted
+			:return str value:  Returns value with leading #
+			"""
+			return '#{}'.format(value)
+
+		if not refresh and len(self.color_map) > 0:
+			return self.color_map
+
+		# If no color map has been provided then use the default one in the script directory
+		if pth_color_map is None:
+			pth_color_map = os.path.join(os.path.dirname(os.path.realpath(__file__)),'N1_color_map.xlsm')
+
+		# Import data into a DataFrame in case there is any other processing that needs to be done
+		df_colormap = pd.read_excel(pth_color_map, header=0,
+									usecols=1, converters={1: hex_converter})
+		df_colormap.dropna(axis=0, inplace=True)
+		df_colormap.set_index(df_colormap.columns[0], inplace=True)
+
+		# Extract the index and color values
+		index = df_colormap.index
+		values = df_colormap.iloc[:,0]
+
+		# Produce dictionary for lookup and return
+		self.color_map=dict(zip(index, values))
+		return self.color_map
+
+
+
 class HASTInputs:
 	base_case = 'Base_Case'
 	mutual_variables = ["c:Z_12", "c:R_12", "c:X_12"]
 	fs_term_variables = ["m:R", "m:X", "m:Z", "m:phiz"]
 	hldf_term_variables = ['m:HD', 'm:THD']
+	terminals = 'Terminals'
+	study_settings = 'Study_Settings'
 
 analysis_sheets = (
 	(PowerFactory.sht_Study, "B5"),
@@ -158,3 +222,33 @@ iec_limits = [
 	["IEC", "61000-3-6", "Limits", 3, 1.4, 2, 0.8, 2, 0.4, 2, 0.4, 1, 0.35, 1.5, 0.32, 1.5, 0.3, 0.3, 0.28, 1.2,
 	 0.265, 0.93, 0.255, 0.2, 0.246, 0.88, 0.24, 0.816, 0.233, 0.2, 0.227, 0.703, 0.223, 0.66, 0.219, 0.2, 0.2158,
 	 0.58, 0.2127, 0.55, 0.21, 0.2, 0.2075]]
+
+# Format to use to mark debug log
+DEBUG = 'DEBUG'
+
+class TestResultsExtract(unittest.TestCase):
+	"""
+		Unit Test to test the operation and constant definition of the Results Extract class
+	"""
+	@classmethod
+	def setUpClass(cls):
+		"""
+			Setup the handle for the Results Extract class
+		:return:
+		"""
+		cls.res_extract = ResultsExtract()
+
+	def test_results_extract_constant(self):
+		"""
+			Simple test to confirm test case is operational
+		"""
+		self.assertEqual(self.res_extract.lbl_StudyCase, ResultsExtract.lbl_StudyCase)
+
+	def test_color_map(self):
+		"""
+			Test to confirm import of N-1 Color map successful and convertion into a
+			dictionary of values works correctly
+		"""
+		dict_color_map = self.res_extract.get_color_map()
+		self.assertEqual('#000000', dict_color_map[0])
+

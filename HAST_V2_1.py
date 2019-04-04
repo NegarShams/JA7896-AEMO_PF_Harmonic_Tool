@@ -1516,6 +1516,7 @@ if __name__ == '__main__':
 	Variation_Name = "Temporary_Variation" + start1
 
 	# Create excel instance to deal with retrieving import data from excel
+	# TODO: Make use of class in <hast2.excel_writing> for complete processing of inputs
 	with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
 		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
 

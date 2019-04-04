@@ -1031,6 +1031,136 @@ class Excel:
 		wb.Close()  # Close Workbook
 		return None
 
+class HASTInputs:
+	"""
+		Class that the HAST Spreadsheet is fed into for processing
+		TODO: At the moment only study settings are processed
+	"""
+	def __init__(self, hast_inputs, uid_time=time.strftime('%y_%m_%d_%H_%M_%S')):
+		"""
+			Initialises the settings based on the HAST Study Settings spreadsheet
+		:param dict hast_inputs:  Dictionary of input data returned from excel_writing.Excel.import_excel_harmonic_inputs
+		:param str uid_time:  Time string to use as the uid for these files
+		"""
+		c = constants.HASTInputs
+
+		# Attribute definitions (study settings)
+		self.pth_results_folder = str()
+		self.results_name = str()
+		self.progress_log_name = str()
+		self.error_log_name = str()
+		self.debug_log_name = str()
+		self.pth_results_folder_temp = str()
+		self.pf_netelm = str()
+		self.pf_mutelm = str()
+		self.pf_resfolder = str()
+		self.pf_opscen_folder = str()
+		self.pre_case_check = bool()
+		self.fs_sim = bool()
+		self.hrm_sim = bool()
+		self.skip_failed_lf = bool()
+		self.del_created_folders = bool()
+		self.export_to_excel = bool()
+		self.excel_visible = bool()
+		self.include_rx = bool()
+		self.include_convex_hull = bool()
+		self.export_z = bool()
+		self.export_z12 = bool()
+		self.export_hrm = bool()
+
+		# Attribute definitions (terminals)
+		self.list_of_terms = list()
+		self.dict_of_terms = dict()
+
+		# Process study settings
+		self.uid = uid_time
+		self.study_settings(hast_inputs[c.study_settings])
+
+		# Process List of Terminals
+		self.process_terminals(hast_inputs[c.terminals])
+
+	def study_settings(self, list_study_settings):
+		"""
+			Populate study settings
+		:param list list_study_settings:
+		:return None:
+		"""
+		l = list_study_settings
+		# Folder to store logs (progress/error) and the excel results if empty will use current working directory
+		if not l[0]:
+			self.pth_results_folder = os.getcwd() + "\\"
+		else:
+			self.pth_results_folder = l[0]
+
+		# Leading names to use for exported excel result file (python adds on the unique time and date).
+		self.results_name = '{}{}{}.'.format(self.pth_results_folder, l[1], self.uid)
+		self.progress_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[2], self.uid)
+		self.error_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[3], self.uid)
+		self.debug_log_name = '{}{}{}.txt'.format(self.pth_results_folder, constants.DEBUG, self.uid)
+
+		# Temporary folder to use to store results exported during script run
+		self.pth_results_folder_temp = os.path.join(self.pth_results_folder, self.uid)
+
+		# Constants for power factory
+		self.pf_netelm = l[4]
+		self.pf_mutelm = '{}{}'.format(l[5], self.uid)
+		self.pf_resfolder = '{}{}'.format(l[6], self.uid)
+		self.pf_opscen_folder = '{}{}'.format(l[7], self.uid)
+
+		# Constants to control study running
+		self.pre_case_check = l[8]
+		self.fs_sim = l[9]
+		self.hrm_sim = l[10]
+		self.skip_failed_lf = l[11]
+		self.del_created_folders = l[12]
+		self.export_to_excel = l[13]
+		self.excel_visible = l[14]
+		self.include_rx = l[15]
+		self.include_convex_hull = l[16]
+		self.export_z = l[17]
+		self.export_z12 = l[18]
+		self.export_hrm = l[19]
+
+		return None
+
+	def process_terminals(self, list_of_terminals):
+		"""
+			Processes the terminals from the HAST input into a dictionary so can lookup the name to use based on
+			substation and terminal
+		:param list list_of_terminals: List of terminals from HAST inputs, expected in the form
+		:return None
+		"""
+		self.list_of_terms = list_of_terminals
+		self.dict_of_terms = {(k[1], k[2]): k[0] for k in list_of_terminals}
+
+		return None
+
+	def vars_to_export(self):
+		"""
+			Determines the variables that will be exported from PowerFactory and they will be exported in this order
+		:return list pf_vars:  Returns list of variables in the format they are defined in PowerFactory
+		"""
+		c = constants.PowerFactory
+		pf_vars = []
+
+		# The order variables are added here determines the order they appear in the export
+		# If self impedance data should be exported
+		if self.export_z:
+			# Whether to include RX data as well
+			if self.include_rx:
+				pf_vars.append(c.pf_r1)
+				pf_vars.append(c.pf_x1)
+			pf_vars.append(c.pf_z1)
+
+		# If mutual impedance data should be exported
+		if self.export_z12:
+			# If RX data should be exported
+			if self.include_rx:
+				pf_vars.append(c.pf_r12)
+				pf_vars.append(c.pf_x12)
+			pf_vars.append(c.pf_z12)
+
+		return pf_vars
 
 #  ----- UNIT TESTS -----
 class TestExcelSetup(unittest.TestCase):

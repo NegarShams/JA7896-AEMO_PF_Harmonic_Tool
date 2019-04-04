@@ -25,6 +25,7 @@ import logging
 import hast2_1 as hast2
 import hast2_1.constants as constants
 import time
+import random
 
 target_dir = r'C:\Users\david\Desktop\19_03_28_12_22_12'
 
@@ -79,10 +80,17 @@ def process_file(pth_file, dict_of_terms):
 		# Process the imported HAST results file into a dataframe with the relevant multi-index
 	:param str pth_file:  Full path to results that need importing
 	:param dict dict_of_terms:  Dictionary of terminals that need updating
-	:return:
+	:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
 	"""
+	c = constants.ResultsExtract
+
 	# Import dataframe
-	df = pd.read_csv(pth_file, header=[0, 1], index_col=0)
+	_df = pd.read_csv(pth_file, header=[0, 1], index_col=0)
+
+	# Check if index is frequency or harmonic no. and if latter then multiply by nominal frequency
+	if not _df.index[0] >= constants.nom_freq:
+		_df.index = _df.index * constants.nom_freq
+	_df.index.name = c.lbl_Frequency
 
 	# Get from file name
 	#	Study Case
@@ -101,9 +109,7 @@ def process_file(pth_file, dict_of_terms):
 	# TODO: Processing filter name from results
 	filter_name = ''
 
-
-
-	columns = list(zip(*df.columns.tolist()))
+	columns = list(zip(*_df.columns.tolist()))
 	var_names = columns[0]
 	var_types = columns[1]
 
@@ -114,7 +120,6 @@ def process_file(pth_file, dict_of_terms):
 	# var_name_type = list(zip(var_names, var_types))
 
 	# Produce new multi-index containing new headers
-	c = constants.ResultsExtract
 	col_headers = [(ref_terminal, var_name, sc_name, cont_name, filter_name, full_name, var_type)
 				   for ref_terminal, var_name, var_type in zip(ref_terminals, var_names, var_types)]
 	names = (c.lbl_Reference_Terminal,
@@ -126,31 +131,120 @@ def process_file(pth_file, dict_of_terms):
 			 c.lbl_Result)
 	columns = pd.MultiIndex.from_tuples(tuples=col_headers, names=names)
 	# Replace previous multi-index with new
-	df.columns = columns
+	_df.columns = columns
 
-	return df
+	return _df
 
-def process_terminals(list_of_terms):
-	"""
-		Processes the terminals from the HAST input into a dictionary so can lookup the name to use based on
-		substation and terminal
-	:param list list_of_terms: List of terminals from HAST inputs, expected in the form
-	:return dict dict_of_terms: Dictionary of terminals in the form {(sub name, term name) : HAST name}
-	"""
-	dict_of_terms = {(k[1], k[2]) : k[0] for k in list_of_terms}
-	return dict_of_terms
-
-def extract_results(pth_file, df):
+def extract_results(pth_file, df, hast_inputs):
 	"""
 		Extract results into workbook with each result on separate worksheet
-	:param pth_file:
+	:param str pth_file:  File to save workbook to
+	:param pd.DataFrame df:  Pandas dataframe to be extracted
+	:param hast2.excel_writing.HASTInputs hast_inputs:  Inputs used for class study
 	:return:
 	"""
-	list_dfs = df.groupby(level=0, axis=1)
-	with pd.ExcelWriter(pth_file) as writer:
-		for _df in list_dfs:
-			if _df[0] != '':
-				_df[1].to_excel(writer, sheet_name=_df[0])
+	# Obtain constants
+	c = constants.ResultsExtract
+	start_row = c.start_row
+	# Obtain the variables to export and they will be expoted in this order
+	vars_to_export = hast_inputs.vars_to_export()
+
+	# Delete empty column headers which correlate to either frequency of harmonic number data which
+	# has already been used as the index
+	del df['']
+
+	# Group the data frame by node name
+	list_dfs = df.groupby(level=c.lbl_Reference_Terminal, axis=1)
+
+	# Export to excel with a new sheet for each node
+	with pd.ExcelWriter(pth_file, engine='xlsxwriter') as writer:
+		for node_name, _df in list_dfs:
+			col = c.start_col
+			for var in vars_to_export:
+				# Will only include index and header labels if True
+				# include_index = col <= c.start_col
+				include_index = True
+
+
+				df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
+				if not df_to_export.empty:
+					# TODO:  Need to sort in study_case order and then some sort of order for contingencies
+					# TODO:  Ideal sort order would be to use same order as appear in hast_inputs
+					df_to_export.to_excel(writer, merge_cells=True,
+										  sheet_name=node_name,
+										  startrow=start_row, startcol=col,
+										  header=include_index, index_label=False)
+
+					# Add graphs if data is self-impedance
+					if var == constants.PowerFactory.pf_z1:
+						num_rows = df_to_export.shape[0]
+						num_cols = df_to_export.shape[1]
+						names = df_to_export.columns.names
+						row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
+
+						# TODO:  Rather than producing chart for all Z1 data should actually produce for each study case
+
+						add_graph(writer, sheet_name=node_name,
+								  num_cols=num_cols,
+								  col_start=col+1,
+								  row_cont=row_cont,
+								  row_start=start_row + len(names) + 1,
+								  col_freq=col,
+								  num_rows=num_rows)
+
+					col = df_to_export.shape[1] + c.col_spacing
+				else:
+					logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
+
+
+
+def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_freq, num_rows):
+	"""
+		Add graph to HAST export
+	:param pd.ExcelWriter writer:
+	:param str sheet_name:
+	:return:
+	"""
+	c = constants.ResultsExtract
+	color_map = c().get_color_map()
+
+	# Get handles
+	wkbk = writer.book
+	sht = writer.sheets[sheet_name]
+	chart = wkbk.add_chart({'type': 'scatter'})
+
+	# Calculate the row number for the end of the dataset
+	max_row = row_start+num_rows
+
+	# Loop through each column and add series
+	# TODO: Need to split into separate chart if more than 255 series
+	color_i = 0
+	for i in range(num_cols):
+		col = col_start + i
+		chart.add_series({
+			'name': [sheet_name, row_cont, col],
+			'categories': [sheet_name, row_start, col_freq, max_row, col_freq],
+			'values': [sheet_name, row_start, col, max_row, col],
+			'marker': {'type': 'none'},
+			'line':  {'color': color_map[color_i]}
+		})
+
+		# color_i is used to determine the color of the plot to use, resetting to 0 if exceeds length
+		if color_i >= len(color_map):
+			color_i = 0
+		else:
+			color_i += 1
+
+	# TODO:  Need to add chart title to detail the study case being looked at
+
+	# Add axis labels
+	chart.set_x_axis({'Name': c.lbl_Frequency})
+	chart.set_y_axis({'Name': c.lbl_Impedance})
+
+	# Add the legend to the chart
+	# TODO:  Need to determine position or potentially add position wh
+	sht.insert_chart('A1', chart)
+
 
 
 # Only runs if main script is run
@@ -164,8 +258,12 @@ if __name__ == '__main__':
 	with hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
 		# TODO:  Performance improvement possible by speeding up processing of HAST inputs workbook
 		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=HAST_workbook)
+
 	# Process the terminals into a lookup dict based
-	d_terminals = process_terminals(analysis_dict["Terminals"])  # Uses the list of Terminals
+	hast_inputs = hast2.excel_writing.HASTInputs(analysis_dict)
+	d_terminals = hast_inputs.dict_of_terms
+	# study_settings = analysis_dict[constants.HASTInputs.study_settings]
+
 	logger.debug('Processing HAST inputs took {:.2f} seconds'.format(time.time() - t0))
 
 	# Get list of all files in folder for frequency scan
@@ -180,12 +278,11 @@ if __name__ == '__main__':
 
 		logger.warning('Processing file {} took {:.2f} seconds'.format(file, time.time() - t1))
 
-	df = pd.concat(dfs, axis=1)
+	combined_df = pd.concat(dfs, axis=1)
 
 	# Extract results into a spreadsheet
 	pth_results = os.path.join(target_dir, 'Results.xlsx')
-	# TODO:  To be completed so that looks the same as a HAST export
-	extract_results(pth_file=pth_results, df=df)
+	extract_results(pth_file=pth_results, df=combined_df, hast_inputs=hast_inputs)
 
 	t2 = time.time()
 	logger.warning('Complete process took {:.2f} seconds'.format(t2-t0))
