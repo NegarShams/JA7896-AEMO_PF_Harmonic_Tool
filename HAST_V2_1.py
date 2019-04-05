@@ -960,7 +960,7 @@ def add_all_filters(new_filter_list, cont_name, sc, op, sc_target_folder,
 											filter_name=filter_name,
 											sc=filter_study_case,
 											op=filter_op,
-											prj=project,
+											prj=cls_prj,
 											task_auto=cls_prj.task_auto,
 											uid=start1,
 											results_pth=Temp_Results_Export)
