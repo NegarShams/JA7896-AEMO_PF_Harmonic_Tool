@@ -155,6 +155,10 @@ class ResultsExtract:
 	# Labels for charts
 	lbl_Impedance = 'Impendance in Ohms'
 
+	# Labels for processing
+	# This label is used for the column headers when an entry should be deleted post processing
+	lbl_to_delete = 'TO DELETE'
+
 	def __init__(self):
 		"""
 			Initial class
@@ -199,10 +203,18 @@ class ResultsExtract:
 
 
 class HASTInputs:
+	file_name = 'HAST Inputs'
+	file_format = '.xlsx'
 	base_case = 'Base_Case'
 	mutual_variables = ["c:Z_12", "c:R_12", "c:X_12"]
 	fs_term_variables = ["m:R", "m:X", "m:Z", "m:phiz"]
 	hldf_term_variables = ['m:HD', 'm:THD']
+	res_values = ['b:fnow','b:ifnow']
+	# For checking variable extraction only
+	all_variable_types = (mutual_variables +
+						  fs_term_variables +
+						  hldf_term_variables +
+						  res_values)
 	terminals = 'Terminals'
 	study_settings = 'Study_Settings'
 
