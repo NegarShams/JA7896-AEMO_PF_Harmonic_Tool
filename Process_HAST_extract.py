@@ -292,9 +292,9 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 				if not df_to_export.empty:
 					# Results are sorted in study case then contingency then filter order
 					df_to_export.to_excel(writer, merge_cells=True,
-										  sheet_name=node_name,
-										  startrow=start_row, startcol=col,
-										  header=include_index, index_label=False)
+														sheet_name=node_name,
+														startrow=start_row, startcol=col,
+														header=include_index, index_label=False)
 
 					# Add graphs if data is self-impedance
 					if var == constants.PowerFactory.pf_z1 and plot_graphs:
