@@ -69,20 +69,20 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Test that mutual extaction works correctly
 		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name,
 														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, 'Bracetown 220 kV_Clonee 220 kV')
-		self.assertEqual(ref_term, 'Bracetown 220 kV')
+		self.assertEqual(new_var, ('Bracetown 220 kV_Clonee 220 kV', 'Clonee 220 kV_Bracetown 220 kV'))
+		self.assertEqual(ref_term, ('Bracetown 220 kV', 'Clonee 220 kV'))
 
 		# Test that mutual extraction works correctly the other way around
 		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name2,
 														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, 'Clonee 220 kV_Bracetown 220 kV')
-		self.assertEqual(ref_term, 'Clonee 220 kV')
+		self.assertEqual(new_var, ('Clonee 220 kV_Bracetown 220 kV', 'Bracetown 220 kV_Clonee 220 kV'))
+		self.assertEqual(ref_term, ('Clonee 220 kV', 'Bracetown 220 kV'))
 
 		# Test that mutual extraction works correctly when testing nodes which are not defined
 		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name3,
 														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, 'Clonee 220 kV_Clonee 110 kV')
-		self.assertEqual(ref_term, 'Clonee 220 kV')
+		self.assertEqual(new_var, ('Clonee 220 kV_Clonee 110 kV', 'Clonee 110 kV_Clonee 220 kV'))
+		self.assertEqual(ref_term, ('Clonee 220 kV', 'Clonee 110 kV'))
 
 		# Test raises an error if terminal has not been defined in dictionary
 		self.assertRaises(KeyError,
@@ -122,8 +122,13 @@ class TestStandAloneFunctions(unittest.TestCase):
 		self.assertEqual(df.shape[0], 396)
 		self.assertEqual(df.shape[1], 15)
 		self.assertEqual(df.columns.levels[0][0], 'Bracetown 220 kV')
+		# Confirm that mutual impedance data is being added in
+		self.assertEqual(df.columns.levels[1][1], 'Bracetown 220 kV_Clonee 220 kV')
+		self.assertEqual(df.columns.levels[1][3], 'Clonee 220 kV_Bracetown 220 kV')
+		# Confirm naming is correct
 		self.assertEqual(df.columns.names[0], 'Terminal')
-		self.assertAlmostEqual(df.iloc[5,10], 2.676125, places=5)
+		# Check a single value
+		self.assertAlmostEqual(df.iloc[5,10], 78.484256, places=5)
 
 	def test_combine_multiple_files(self):
 		"""
@@ -298,8 +303,8 @@ class TestImportingMultipleResults(unittest.TestCase):
 			search_pths=[self.search_pth_1,
 						 self.search_pth_2]
 		)
-		self.assertEqual(df.shape[1], 30)
-		self.assertAlmostEqual(df.iloc[250, 20], 260.946343, places=4)
+		self.assertEqual(df.shape[1], 34)
+		self.assertAlmostEqual(df.iloc[250, 20], 51.042238, places=4)
 
 	def test_multiple_hast_imports_different_datasets(self):
 		"""
@@ -309,7 +314,7 @@ class TestImportingMultipleResults(unittest.TestCase):
 			search_pths=[self.search_pth_1,
 						 self.search_pth_3]
 		)
-		self.assertEqual(df.shape[1], 52)
+		self.assertEqual(df.shape[1], 58)
 		self.assertAlmostEqual(df.iloc[250,25], 231.464654, places=4)
 
 	def test_multiple_hast_imports_do_not_drop_duplicates(self):
@@ -321,7 +326,7 @@ class TestImportingMultipleResults(unittest.TestCase):
 						 self.search_pth_2],
 			drop_duplicates=False
 		)
-		self.assertEqual(df.shape[1], 54)
+		self.assertEqual(df.shape[1], 60)
 		self.assertAlmostEqual(df.iloc[250,25], -123.121829, places=4)
 
 	def test_extract_multiple_files(self):

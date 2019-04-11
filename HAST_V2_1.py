@@ -71,6 +71,7 @@ import hast2_1
 hast2 = importlib.reload(hast2_1)
 import hast2_1.constants as constants
 import hast2_1.pf as pf
+import Process_HAST_extract
 
 # Meta Data
 __author__ = 'David Mills'
@@ -1459,7 +1460,6 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 	elmres.Release()
 	return scale[0], results
 
-
 # Main Engine ------------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------------------------
 # Following if statement stops the code being run unless it is the main script
@@ -1674,117 +1674,6 @@ if __name__ == '__main__':
 
 		print1('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
 
-
-		logger.warning('Results no longer extracted to Excel, instead processing is done afterwards')
-		# print1('Processing results into suitable format for extraction to excel')
-		# Following loop extracts all the results from the different projects into excel
-		# for prj_name, prj_cls in dict_of_projects.items():
-		# 	# TODO: Confirm if project needs to be activated for .GetCalcRelevantObjects to work (in pf.py)
-			# TODO: If it is then reorder if staments to avoid activating and deactivating study cases multiple times
-		#	prj_cls.prj.Activate()
-		#	# Extract constants from project
-		#	Terminals_index = prj_cls.terminals_index
-		#	List_of_Mutual = prj_cls.list_of_mutual
-		3	# If frequency scan results were carried out process those
-		#	if FS_Sim:
-		#		FS_Contingency_Results.extend(prj_cls.process_fs_results(logger=logger))
-		#		# TODO: Is it possible that the fs_scale could be different for different results
-		#		fs_scale = prj_cls.sc_cases[0].fs_scale
-		#	if HRM_Sim:
-		#		HRM_Contingency_Results.extend(prj_cls.process_hrlf_results(logger=logger))
-		#		# TODO: Is it possible that the hrm_scale could be different for different sets of results
-		#		hrm_scale = prj_cls.sc_cases[0].hrm_scale
-		#
-		#	# TODO: Only required if project activated above
-		#	prj_cls.prj.Deactivate()
-
-		# # Convert frequency scan results into a dictionary for faster lookup
-		# # TODO:  Performance improvement if just returned as dictionary from fs_results and then dictionaries combined
-		# dict_fs_res = dict()
-		# for res in FS_Contingency_Results:
-		#	# Reposition results export in <pf.PFStudyCase.process_fs_results>
-		#	# #s_results_name = str(res.pop(3))
-		#	s_results_name = str(res.pop(5))
-		#	try:
-		#		dict_fs_res[s_results_name].append(res)
-		#	except KeyError:
-		#		dict_fs_res[s_results_name] = [res]
-		#
-		# if Export_to_Excel:																# This Exports the Results files to Excel in terminal format
-		#	print1("\nProcessing Results and output to Excel", bf=1, af=0)
-		#	start2 = time.clock()																# Used to calc the total excel export time
-		#	# Create a new instance of excel to deal with reading and writing of data to excel instance
-		#	# With statement means that even if error occurs new instance of excel is closed
-		#	with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
-		#		wb = excel_cls.create_workbook(workbookname=Excel_Results, excel_visible=Excel_Visible)	# Creates Workbook
-		#		trm1_count = 0
-		#		while trm1_count < len(Terminals_index):											# For Terminals in the index loop through creating results to pass to excel sheet creator
-		#			start3 = time.clock()															# Used for measuring time to create a sheet
-		#			FS_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
-		#			if FS_Sim:
-		#				start4 = time.clock()
-		#				FS_Terminal_Results.append(fs_scale)										# Adds the scale to terminal
-		#
-		#				# Results are now stored in dictionaries and so results are just looked up rather than
-		#				# searching through the different results.
-		#				FS_Terminal_Results.extend(dict_fs_res[str(Terminals_index[trm1_count][3])])
-		#
-		#				if Excel_Export_Z12:
-		#					# Implementing performance improvement by avoiding repetative loops, list comprehension is significantly faster
-		#					start5 = time.clock()
-		#
-		#					# Performance improvement by using dictionaries to look up results rather than search
-		#					# through lists of results.  Can be improved further if the terminal and result name is
-		#					# included in the dictionary key to avoid this loop
-		#					for tgb in List_of_Mutual:
-		#						if Terminals_index[trm1_count][3] == tgb[3]:
-		#							# Dictionaries are stored in list to allow capturing of R and X data
-		#							res = dict_fs_res[str(tgb[2])]
-		#							# Insert contingency name to top of each result
-		#							res = [[tgb[1]] + x for x in res]
-		#							res.insert(0, tgb[1])
-		#							FS_Terminal_Results.extend(res)					# If it is the right terminal append
-		#
-		#
-		#					# TODO: Improvement possible here by avoiding looping so much, should be looking up results for each terminal
-		#					print1(
-		#						"Process Results Z12 in Python: " + str(round((time.clock() - start5), 2)) + " Seconds",
-		#						bf=1, af=0)  # Returns python results processing time
-		#
-		#			HRM_Terminal_Results = []														# Creates a Temporary list to pass through terminal data to excel to create the terminal sheet
-		#			if HRM_Sim:
-		#				start6 = time.clock()
-		#				# TODO: Error reported that fs_scale can be undefined.  Wrapping in class / function will prevent this
-		#				HRM_Terminal_Results.append(hrm_scale)										# Adds the scale to terminal
-		#				if Excel_Export_HRM:
-		#					for results35 in HRM_Contingency_Results:								# Adds each contingency to the terminal results
-		#						if str(Terminals_index[trm1_count][3]) == results35[1]:				# Checks it it the right terminal and adds it
-		#							results35.pop(1)												# Takes out the terminal  PF object (big long string)
-		#							HRM_Terminal_Results.append(results35)							# Append terminal data to the results list to be later passed to excel
-		#				print1("Process Results HRM in Python: " + str(round((time.clock() - start6),2)) + " Seconds",
-		#					   bf=1, af=0)		# Returns python results processing time
-		#
-		#			# Replaced with using instance in excel_writing
-		#			excel_cls.create_sheet_plot(sheet_name=Terminals_index[trm1_count][0],
-		#										fs_results=FS_Terminal_Results,
-		#										hrm_results=HRM_Terminal_Results,
-		#										wb=wb,
-		#										# TODO:  The following are all booleans and could be passed in a better way
-		#										excel_export_rx=Excel_Export_RX,
-		#										excel_export_z=Excel_Export_Z,
-		#										excel_export_hrm=Excel_Export_HRM,
-		#										fs_sim=FS_Sim,
-		#										excel_export_z12=Excel_Export_Z12,
-		#										excel_convex_hull=Excel_Convex_Hull,
-		#										hrm_sim=HRM_Sim)				# Uses the terminal results to create a sheet and graph
-		#			trm1_count = trm1_count + 1
-		#		# progress_txt = read_text_file(Progress_Log)
-		#
-		#		# Save and close workbook
-		#		excel_cls.close_workbook(wb=wb, workbookname=Excel_Results)
-		#		print1("Total Excel Export Time: " + str(round((time.clock() - start2),2)) + " Seconds",
-		#			   bf=1, af=0)	# Returns the Total Export time
-
 	# Deleting newly created folders which will include study_cases and operational_scenarios
 	if Delete_Created_Folders:
 		t_start_delete = time.clock()
@@ -1808,6 +1697,16 @@ if __name__ == '__main__':
 	logger.info('Graphic updating and load flow results will not be shown')
 	app.SetGraphicUpdate(1)
 	app.EchoOn()
+
+	# Plot results to excel
+	if Export_to_Excel:
+		combined_df, vars_in_hast = Process_HAST_extract.combine_multiple_hast_runs(
+			search_pths=[Temp_Results_Export],
+			drop_duplicates=False)
+		Process_HAST_extract.extract_results(
+			pth_file=Excel_Results + constants.ResultsExtract.extension,
+			df=combined_df,
+			vars_to_export=vars_in_hast)
 
 	logger.info('Total Time: {:.2f}'.format(time.clock() - start))
 

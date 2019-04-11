@@ -61,9 +61,20 @@ def extract_var_name(var_name, dict_of_terms):
 	# Process each variable to identify the mutual / terminal names
 	for var in vars_list:
 		if '.{}'.format(c.pf_mutual) in var:
+			# Two mutual names returns in lists for each direction and each ref_terminal
 			# Mutual name found so exit for loop
 			var_name = var.strip('.{}'.format(c.pf_mutual))
-			ref_terminal = var_name.split('_')[0]
+			ref_terminals = var_name.split('_')
+			ref_terminal = (ref_terminals[0],ref_terminals[1])
+
+			if len(ref_terminals) > 2:
+				logger.warning(('Not completely sure if the reference terminals for mutual impedance {} are correct.'
+								'In determining the reference terminals it is assumed that the mutual impedance is '
+								'named by HAST as "Terminal 1_Terminal 2" but this seems not to be the case here.'
+								'The following terminals have been used: \n'
+								'{}\n{}').format(var_name, ref_terminal[0], ref_terminal[1]))
+			# Variable names as lists in reverse order
+			var_name = ('_'.join(ref_terminal),'_'.join(ref_terminal[::-1]))
 			break
 		elif '.{}'.format(c.pf_substation) in var:
 			var_sub = var
@@ -146,11 +157,6 @@ def process_file(pth_file, dict_of_terms):
 		_df.index = _df.index * constants.nom_freq
 	_df.index.name = c.lbl_Frequency
 
-	# Get from file name
-	#	Study Case
-	#	Contingency
-	# 	Filter details?
-
 	# Get from results file:
 	#	Node / Mutual Name
 	#	Variable type
@@ -170,15 +176,42 @@ def process_file(pth_file, dict_of_terms):
 	var_names = columns[0]
 	var_types = columns[1]
 
-	var_names = [extract_var_name(var, dict_of_terms) for var in var_names]
-	var_names, ref_terminals = zip(*var_names)
-	var_types = [extract_var_type(var) for var in var_types]
-	# Combine into a list
-	# var_name_type = list(zip(var_names, var_types))
+	df_mutual = pd.DataFrame().reindex_like(_df)
+	df_mutual = df_mutual.drop(_df.columns, axis=1)
+	# #df_mutual.index = _df.index
+	new_var_names1 = []
+	new_var_names2 = []
+	new_ref_terminals1 = []
+	new_ref_terminals2 = []
+	new_var_types1 = []
+	new_var_types2 = []
+	for i, var in enumerate(var_names):
+		_var_names, _ref_terms = extract_var_name(var, dict_of_terms)
+		_var_type = extract_var_type(var_types[i])
+		# Mutual impedance data
+		if type(_var_names) is tuple:
+			# If mutual impedance data is returned then need to duplicate dataframe to create data in the other direction
+			new_var_names1.append(_var_names[0])
+			new_var_names2.append(_var_names[1])
+			new_ref_terminals1.append(_ref_terms[0])
+			new_ref_terminals2.append(_ref_terms[1])
+			new_var_types1.append(_var_type)
+			new_var_types2.append(_var_type)
+			# Create a copy of the data
+			df_mutual[_df.columns[i]] = _df[_df.columns[i]]
+		else:
+			# If no mutual impedance data then just extract variable names in lists
+			new_var_names1.append(_var_names)
+			new_ref_terminals1.append(_ref_terms)
+			new_var_types1.append(_var_type)
 
 	# Produce new multi-index containing new headers
-	col_headers = [(ref_terminal, var_name, sc_name, cont_name, filter_name, full_name, var_type)
-				   for ref_terminal, var_name, var_type in zip(ref_terminals, var_names, var_types)]
+	col_headers1 = [(ref_terminal, var_name, sc_name, cont_name, filter_name, full_name, var_type)
+				   for ref_terminal, var_name, var_type in zip(new_ref_terminals1, new_var_names1, new_var_types1)]
+	col_headers2 = [(ref_terminal, var_name, sc_name, cont_name, filter_name, full_name, var_type)
+					for ref_terminal, var_name, var_type in zip(new_ref_terminals2, new_var_names2, new_var_types2)]
+
+	# Names for headers
 	names = (c.lbl_Reference_Terminal,
 			 c.lbl_Terminal,
 			 c.lbl_StudyCase,
@@ -186,9 +219,15 @@ def process_file(pth_file, dict_of_terms):
 			 c.lbl_Filter_ID,
 			 c.lbl_FullName,
 			 c.lbl_Result)
-	columns = pd.MultiIndex.from_tuples(tuples=col_headers, names=names)
+	# Produce multi-index and assign to DataFrames
+	columns1 = pd.MultiIndex.from_tuples(tuples=col_headers1, names=names)
+	columns2 = pd.MultiIndex.from_tuples(tuples=col_headers2, names=names)
 	# Replace previous multi-index with new
-	_df.columns = columns
+	_df.columns = columns1
+	df_mutual.columns = columns2
+
+	# Combine dataframes into one and return
+	_df = pd.concat([_df, df_mutual], axis=1)
 
 	return _df
 
@@ -520,7 +559,6 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 		logger.debug('No check for duplicates carried out')
 
 	return df, vars_to_export
-
 
 # Only runs if main script is run
 if __name__ == '__main__':
