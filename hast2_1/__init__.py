@@ -13,6 +13,7 @@ import hast2_1.logger
 import hast2_1.excel_writing
 import hast2_1.pf
 import hast2_1.constants
+import hast2_1.gui
 
 # Meta Data
 __author__ = 'David Mills'

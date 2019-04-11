@@ -52,12 +52,6 @@ something happens
 - Added functionality to repeat studies for different filter arrangements and will now also run in unattended mode
 """
 
-# TODO: Useful developments:
-# TODO: 1. Add in script to powerfactory so that each parallel process can save the results externally to a DataFrame such that if there is a crash the results can be post event processed
-# TODO: 1.a. Could be done by adding a script to the study case that runs to process the results and extract them to a suitable file, the main script would then just need to import all of these files
-# TODO: 1.b. back in for post processing.  This would allow studies to be run in multiple stages and joined in different arrangements.  It would also mean the data processing components are separated
-# TODO: 1.c. into each process.  The script would need to be added to the initial study case so that the relevant results files are extracted.
-
 DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
 DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
 DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.4'

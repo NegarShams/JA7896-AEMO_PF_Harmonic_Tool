@@ -30,6 +30,8 @@ class PowerFactory:
 	"""
 		Constants used in this script
 	"""
+	# String used to define the tuning frequency of the filter
+	hz='Hz'
 	sht_Filters = 'Filters'
 	sht_Terminals = 'Terminals'
 	sht_Scenarios = 'Base_Scenarios'
@@ -127,11 +129,11 @@ class PowerFactory:
 		# Filter time of results (0 = None, 1 = filter)
 		filtered_time = 'filtered'
 
-
 class ResultsExtract:
 	"""
 		Constants used in processing the results
 	"""
+	extension = '.xlsx'
 	# Labels used for frequency scan results extract
 	lbl_StudyCase = 'Study Case'
 	lbl_Frequency = 'Frequency in Hz'
@@ -147,17 +149,33 @@ class ResultsExtract:
 	loc_pf_variable_mutual = loc_pf_variable + 1
 	loc_contingency = 1
 
+	# Chart grouping
+	chart_grouping = (lbl_StudyCase, lbl_Contingency)
+
 	# Default positions
 	start_row = 31 # (0 referenced so will be Excel row 32)
 	start_col = 0 # (0 referenced so will be Excel col A)
 	col_spacing = 2 # Leaves 1 empty column between results
 
 	# Labels for charts
+	chart_type = {'type': 'scatter'}
 	lbl_Impedance = 'Impendance in Ohms'
+
+	# Positioning of charts in excel workbook
+	chrt_row = 1
+	chrt_col = 1
+	# Number of columns between each chart
+	chrt_space = 20
 
 	# Labels for processing
 	# This label is used for the column headers when an entry should be deleted post processing
 	lbl_to_delete = 'TO DELETE'
+
+	# Chart plot properties
+	line_width = 1.0
+	lbl_position = 'next_to'
+	chrt_width = 960
+	chrt_height = 576
 
 	def __init__(self):
 		"""
@@ -199,8 +217,6 @@ class ResultsExtract:
 		# Produce dictionary for lookup and return
 		self.color_map=dict(zip(index, values))
 		return self.color_map
-
-
 
 class HASTInputs:
 	file_name = 'HAST Inputs'

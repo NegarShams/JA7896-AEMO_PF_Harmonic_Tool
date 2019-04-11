@@ -26,9 +26,14 @@ import hast2_1 as hast2
 import hast2_1.constants as constants
 import time
 import random
+import collections
+import math
 
 logger = logging.getLogger()
+
+# Populate the following to avoid a GUI import
 list_of_folders_to_import = []
+target_file = None
 
 try:
 	import tkinter as tk
@@ -98,6 +103,31 @@ def extract_var_type(var_type):
 					  .format(var_extract, var_type, constants.HASTInputs.all_variable_types))
 	return var_extract
 
+def split_contingency_filter_values(list_of_terms, starting_point=2):
+	"""
+		Due to the method of export from HAST the contingency and filter details need to be separated
+		Assumption is that the naming of the contingency is along the lines of:
+			cont_name_fname_freq_mvar
+	:param list list_of_terms: List of values from which to obtain the contingency and filter details
+	:param int starting_point: Start in list where continency is defined
+	:return str cont_name, str filter_name:  Returns a string with the contingency name and filter name
+	"""
+	c = constants.PowerFactory
+	filter_pos = None
+	for i, var in enumerate(list_of_terms):
+		# Determine if any of the variables contain the frequency
+		if c.hz in var:
+			filter_pos = i-1
+			break
+	if filter_pos is None:
+		# No filter so merge all terms
+		contingency_name = '_'.join(list_of_terms[starting_point:])
+		filter_name = ''
+	else:
+		contingency_name = '_'.join(list_of_terms[starting_point:filter_pos])
+		filter_name = '_'.join(list_of_terms[filter_pos:])
+	return contingency_name, filter_name
+
 def process_file(pth_file, dict_of_terms):
 	"""
 		# Process the imported HAST results file into a dataframe with the relevant multi-index
@@ -128,10 +158,13 @@ def process_file(pth_file, dict_of_terms):
 	file_split = filename.split('_')
 	study_type = file_split[0]
 	sc_name = file_split[1]
-	cont_name = '_'.join(file_split[2:])
-	full_name = '{}_{}'.format(sc_name, cont_name)
-	# TODO: Processing filter name from results
-	filter_name = ''
+	# Separate filter and contingency names
+	cont_name, filter_name = split_contingency_filter_values(list_of_terms=file_split)
+
+	if filter_name != '':
+		full_name = '{}_{}_{}'.format(sc_name, cont_name, filter_name)
+	else:
+		full_name = '{}_{}'.format(sc_name, cont_name)
 
 	columns = list(zip(*_df.columns.tolist()))
 	var_names = columns[0]
@@ -158,6 +191,33 @@ def process_file(pth_file, dict_of_terms):
 	_df.columns = columns
 
 	return _df
+
+def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
+	"""
+		Determines sizes for grouping of graphs together
+	:param pd.DataFrame df: Dataframe to calculate grouping for
+	:param tuple group_by: (optional = constants.ResultsExtract.graph_grouping) = Levels to group by
+	:return list grouping:  {Name of graph, number of columns for results
+	"""
+	# Determine number of columns to consider in each graph
+	df_grouping = df.groupby(axis=1, level=group_by).size()
+	# Obtain index keys and values
+	keys = df_grouping.index.tolist()
+	values = list(df_grouping)
+
+	# If only single plot on each graph then no need to separate at this level so go up 1 level
+	if max(values) == 1:
+		logger.debug('Only single value for each entry so no need to split across multiple graphs')
+		group_by = group_by[:-1]
+		df_grouping = df.groupby(axis=1, level=group_by).size()
+		keys = df_grouping.index.tolist()
+		values = list(df_grouping)
+
+	if len(keys) == 1:
+		keys = [keys]
+	# Create a tuple with name of chart followed by value (tuple used to ensure order matches)
+	grouping = [('_'.join(k),v) for k,v in zip(keys, values)]
+	return grouping
 
 def extract_results(pth_file, df, vars_to_export):
 	"""
@@ -190,8 +250,7 @@ def extract_results(pth_file, df, vars_to_export):
 
 				df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
 				if not df_to_export.empty:
-					# TODO:  Need to sort in study_case order and then some sort of order for contingencies
-					# TODO:  Ideal sort order would be to use same order as appear in hast_inputs
+					# Results are sorted in study case then contingency then filter order
 					df_to_export.to_excel(writer, merge_cells=True,
 										  sheet_name=node_name,
 										  startrow=start_row, startcol=col,
@@ -201,6 +260,8 @@ def extract_results(pth_file, df, vars_to_export):
 					if var == constants.PowerFactory.pf_z1:
 						num_rows = df_to_export.shape[0]
 						num_cols = df_to_export.shape[1]
+						# Get number of columns to include in each graph grouping
+						dict_graph_grouping = graph_grouping(df=df_to_export)
 						names = df_to_export.columns.names
 						row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
 
@@ -212,17 +273,54 @@ def extract_results(pth_file, df, vars_to_export):
 								  row_cont=row_cont,
 								  row_start=start_row + len(names) + 1,
 								  col_freq=col,
-								  num_rows=num_rows)
+								  num_rows=num_rows,
+								  graph_grouping=dict_graph_grouping)
 
 					col = df_to_export.shape[1] + c.col_spacing
 				else:
 					logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
 
-def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_freq, num_rows):
+def split_plots(max_plots, start_col, graph_grouping):
+	"""
+		TODO:  Add description
+	:param max_plots:
+	:param start_col:
+	:param graph_grouping:
+	:return graphs:
+	"""
+	graphs = collections.OrderedDict()
+
+	for title, num in graph_grouping:
+		# Get all columns in range associated with this group
+		# Plot 0 removed and added back in as starting plot
+		all_cols = list(range(start_col + 1, start_col + num))
+		# Number of plots this group needs to be split into
+		number_of_plots = math.ceil((num-1) / max_plots)
+
+		# If greater than 1 then split into equal size groups with basecase plot at starting point
+		if number_of_plots > 1:
+			steps = math.ceil((num-1) / number_of_plots)
+			a = [all_cols[i * steps:(i + 1) * steps] for i in range(math.ceil(len(all_cols) / steps))]
+			a = [[start_col] + x for x in a]
+			for i, group in enumerate(a):
+				graphs['{}({})'.format(title, i + 1)] = group
+		else:
+			graphs['{}'.format(title)] = [start_col] + all_cols
+
+		if all_cols == []:
+			start_col = start_col+1
+		else:
+			start_col = max(all_cols) + 1
+
+	return graphs
+
+def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_freq, num_rows,
+			  graph_grouping):
 	"""
 		Add graph to HAST export
 	:param pd.ExcelWriter writer:
 	:param str sheet_name:
+	:param list graph_grouping:  Names and groups to use for graph grouping
 	:return:
 	"""
 	c = constants.ResultsExtract
@@ -231,7 +329,6 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 	# Get handles
 	wkbk = writer.book
 	sht = writer.sheets[sheet_name]
-	chart = wkbk.add_chart({'type': 'scatter'})
 
 	# Calculate the row number for the end of the dataset
 	max_row = row_start+num_rows
@@ -239,31 +336,61 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 	# Loop through each column and add series
 	# TODO: Need to split into separate chart if more than 255 series
 	color_i = 0
-	for i in range(num_cols):
-		col = col_start + i
-		chart.add_series({
-			'name': [sheet_name, row_cont, col],
-			'categories': [sheet_name, row_start, col_freq, max_row, col_freq],
-			'values': [sheet_name, row_start, col, max_row, col],
-			'marker': {'type': 'none'},
-			'line':  {'color': color_map[color_i]}
-		})
+	charts = []
+	chrt = None
+	chrt_count = 0
+	group_i = 0
+	group_titles = []
+	max_plots = len(color_map) - 1
 
-		# color_i is used to determine the color of the plot to use, resetting to 0 if exceeds length
-		if color_i >= len(color_map):
-			color_i = 0
-		else:
+	plots = split_plots(max_plots, col_start, graph_grouping)
+
+	for chart_name, cols in plots.items():
+		chrt = wkbk.add_chart(c.chart_type)
+		chrt.set_title({'name':chart_name})
+		charts.append(chrt)
+		color_i = 0
+
+		# Loop through each column and add series
+		for col in cols:
+
+
+			# # Loop through each column and add new series
+			# #for i in range(num_cols):
+			# #	col = col_start + i
+			# #	# Maximum number of plots exceeded, create a new chart
+			# #	if color_i > max_plots or chrt is None:
+			# #		chrt = wkbk.add_chart(c.chart_type)
+			# #		charts.append(chrt)
+			# #		chrt_count += 1
+			# #		color_i = 0
+
+			# #else:
+				# #chrt = charts[chrt_count]
+
+			chrt.add_series({
+				'name': [sheet_name, row_cont, col],
+				'categories': [sheet_name, row_start, col_freq, max_row, col_freq],
+				'values': [sheet_name, row_start, col, max_row, col],
+				'marker': {'type': 'none'},
+				'line':  {'color': color_map[color_i],
+						  'width': c.line_width}
+			})
+
+			# color_i is used to determine the maximum number of plots that can be stored
 			color_i += 1
 
 	# TODO:  Need to add chart title to detail the study case being looked at
 
-	# Add axis labels
-	chart.set_x_axis({'Name': c.lbl_Frequency})
-	chart.set_y_axis({'Name': c.lbl_Impedance})
+	for i, chrt in enumerate(charts):
+		# Add axis labels
+		chrt.set_x_axis({'name': c.lbl_Frequency, 'label_position': c.lbl_position})
+		chrt.set_y_axis({'name': c.lbl_Impedance, 'label_position': c.lbl_position})
 
-	# Add the legend to the chart
-	# TODO:  Need to determine position or potentially add position wh
-	sht.insert_chart('A1', chart)
+		chrt.set_size({'width': c.chrt_width, 'height': c.chrt_height})
+
+		# Add the legend to the chart
+		sht.insert_chart(c.chrt_row, c.chrt_col+(c.chrt_space*i), chrt)
 
 def import_all_results(search_pth, terminals, search_type='FS'):
 	"""
@@ -397,12 +524,21 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 # Only runs if main script is run
 if __name__ == '__main__':
 	# Start logger
-	t0 = time.time()
+	time_stamps = [time.time()]
 
-	if tk:
+	# Load GUI to select files
+	if tk and len(list_of_folders_to_import) == 0:
 		# Load GUI for user to select files
-		pass
-	elif len(list_of_folders_to_import)>0:
+		gui = hast2.gui.MainGUI(title='Select HAST results for processing')
+		list_of_folders_to_import = gui.results_files_list
+		target_file = gui.target_file
+		if list_of_folders_to_import == [] or target_file == '':
+			logger.critical('Missing either folders or a target file for processing from GUI')
+			raise IOError('Missing either folders or a target file for processing from GUI')
+	elif tk and len(list_of_folders_to_import) > 0 and not target_file is None:
+		logger.warning('List of folders to import has been provided and so these have been used instead: \n'
+					   '{}'.format(list_of_folders_to_import))
+	elif len(list_of_folders_to_import)>0 or target_file is None:
 		logger.critical(('Since python module <tkinter> could not be imported the user must manually'
 						 'enter the folders which should be searched under the variable {} at the top'
 						 'of the script {} located in {}')
@@ -411,44 +547,21 @@ if __name__ == '__main__':
 								os.path.dirname(__file__)))
 		raise IOError('No folders provided for data import')
 
+	time_stamps.append(time.time())
+	logger.debug('User file selection took {:.2f} seconds'.format(time_stamps[-1]-time_stamps[0]))
 
-	# Get and import relevant HAST file to obtain relevant terminal names
-	# HAST_workbook = glob.glob('{}\HAST Inputs*.xlsx'.format(target_dir))[0]
-	# with hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
-	# 	# TODO:  Performance improvement possible by speeding up processing of HAST inputs workbook
-	# 	analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=HAST_workbook)
+	combined_df, vars_in_hast = combine_multiple_hast_runs(search_pths=list_of_folders_to_import)
 
-	# Process the terminals into a lookup dict based
-	# hast_inputs = hast2.excel_writing.HASTInputs(analysis_dict)
-	hast_inputs = get_hast_values(search_pth=target_dir)
-	d_terminals = hast_inputs.dict_of_terms
-	# study_settings = analysis_dict[constants.HASTInputs.study_settings]
+	time_stamps.append(time.time())
+	logger.debug('Processing HAST inputs took {:.2f} seconds'.format(time_stamps[-1] - time_stamps[-2]))
 
-	logger.debug('Processing HAST inputs took {:.2f} seconds'.format(time.time() - t0))
+	extract_results(pth_file=target_file, df=combined_df, vars_to_export=vars_in_hast)
+	time_stamps.append(time.time())
+	logger.debug('Extracting results took'.format(time_stamps[-1] - time_stamps[-2]))
 
-	# Get list of all files in folder for frequency scan
-	# files = glob.glob('{}\FS*.csv'.format(target_dir))
+	logger.info('Results extracted to {}'.format(target_file))
 
-	# Import each results file and combine into a single dataframe
-	# dfs = []
-	# for file in files:
-	# 	t1 = time.time()
-	# 	df = process_file(file, d_terminals)
-	# 	dfs.append(df)
-	#
-	# 	logger.warning('Processing file {} took {:.2f} seconds'.format(file, time.time() - t1))
-
-	# combined_df = pd.concat(dfs, axis=1)
-	df = import_all_results(search_pth=target_dir, terminals=d_terminals)
-
-	# Extract results into a spreadsheet
-	pth_results = os.path.join(target_dir, 'Results.xlsx')
-	# Obtain the variables to export and they will be exported in this order
-	vars_in_hast = hast_inputs.vars_to_export()
-	extract_results(pth_file=pth_results, df=df, vars_to_export=vars_in_hast)
-
-	t2 = time.time()
-	logger.warning('Complete process took {:.2f} seconds'.format(t2-t0))
+	logger.info('Complete process took {:.2f} seconds'.format(time_stamps[-1] - time_stamps[0]))
 
 
 

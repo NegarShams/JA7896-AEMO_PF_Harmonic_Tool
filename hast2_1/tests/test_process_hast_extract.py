@@ -2,6 +2,7 @@ import unittest
 import Process_HAST_extract as TestModule
 import os
 import hast2_1.constants as constants
+import pandas as pd
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 SEARCH_PTH = os.path.join(TESTS_DIR, 'results1')
@@ -174,6 +175,67 @@ class TestStandAloneFunctions(unittest.TestCase):
 		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=self.test_vars)
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))
+
+	def test_split_contingency_filter_values(self):
+		"""
+			Confirm the for a variety of filter names they are extracted correctly
+		"""
+		name = dict()
+		name['FS_SC1_CDU2-CRU2-ckt1_F1_500.0Hz_20.0MVAR'] = ('CDU2-CRU2-ckt1', 'F1_500.0Hz_20.0MVAR')
+		name['FS_SC1_Base_Case'] = ('Base_Case','')
+		name['FS_SC1_Base_Case_F1_550.0Hz_5.0MVAR'] = ('Base_Case', 'F1_550.0Hz_5.0MVAR')
+		name['FS_SC1_WOO4_T4204_F1_500.0Hz_5.0MVAR'] = ('WOO4_T4204', 'F1_500.0Hz_5.0MVAR')
+		name['FS_SC1_WOO4_T4204'] = ('WOO4_T4204','')
+
+		for sc, (test_cont_name, test_filter_name) in name.items():
+			file_splits = sc.split('_')
+			cont_name, filter_name = TestModule.split_contingency_filter_values(list_of_terms=file_splits)
+			self.assertEqual(cont_name, test_cont_name)
+			self.assertEqual(filter_name, test_filter_name)
+
+		cont_name, filter_name = TestModule.split_contingency_filter_values(list_of_terms=file_splits,
+																			starting_point=3)
+		self.assertNotEqual(cont_name, test_cont_name)
+
+	def test_grouping(self):
+		"""
+			Test that if dataframe is passed it will return the correct grouping numbers
+		"""
+		# Create test dataframe
+		data = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
+		df = pd.DataFrame(data)
+
+		cols = [['ab', 'ab', 'ab'], ['abc', 'bac', 'abc'], ['1', '2', '3']]
+		index = pd.MultiIndex.from_arrays(cols, names=('A', 'B', 'C'))
+		df.columns = index
+		# Confirm if multiple results then are split by 2nd level
+		df_grouping = TestModule.graph_grouping(df=df, group_by=('A','B'))
+		self.assertEqual(df_grouping[0],('ab_abc', 2))
+		self.assertEqual(df_grouping[1], ('ab_bac', 1))
+
+		# Confirm if only 1 result then they are moved up a level
+		df_grouping = TestModule.graph_grouping(df=df, group_by=('A', 'C'))
+		self.assertEqual(df_grouping[0], ('ab', 3))
+
+		# Confirm if only 1 result then they are moved up a level
+		df_grouping = TestModule.graph_grouping(df=df, group_by=('A',))
+		self.assertEqual(df_grouping[0], ('ab', 3))
+
+	def test_split_plots(self):
+		"""
+			Test that it is suitable extracted
+		"""
+		max_plots = 5
+		start_col=1
+		graph_grouping = [('a',15),('b',1),('c',4)]
+		graphs = TestModule.split_plots(max_plots=max_plots,
+										start_col=start_col,
+										graph_grouping=graph_grouping)
+		keys = list(graphs.keys())
+		self.assertEqual(keys[0],'a(1)')
+		self.assertEqual(keys[3],'b')
+		self.assertEqual(graphs['c'][2],19)
+
 
 @unittest.skipIf(not FULL_TEST, 'Slower tests have been skipped')
 class TestImportingMultipleResults(unittest.TestCase):
