@@ -219,12 +219,13 @@ def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
 	grouping = [('_'.join(k),v) for k,v in zip(keys, values)]
 	return grouping
 
-def extract_results(pth_file, df, vars_to_export):
+def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 	"""
 		Extract results into workbook with each result on separate worksheet
 	:param str pth_file:  File to save workbook to
 	:param pd.DataFrame df:  Pandas dataframe to be extracted
 	:param list vars_to_export:  List of variables to export based on Hast Inputs class
+	:param bool plot_graphs:  (optional=True) - If set to False then graphs will not be exported
 	:return:
 	"""
 	# Obtain constants
@@ -257,7 +258,7 @@ def extract_results(pth_file, df, vars_to_export):
 										  header=include_index, index_label=False)
 
 					# Add graphs if data is self-impedance
-					if var == constants.PowerFactory.pf_z1:
+					if var == constants.PowerFactory.pf_z1 and plot_graphs:
 						num_rows = df_to_export.shape[0]
 						num_cols = df_to_export.shape[1]
 						# Get number of columns to include in each graph grouping
@@ -463,9 +464,9 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 		t0 = time.time()
 		logger.debug('Importing hast files in folder: {}'.format(folder))
 		_hast_inputs = get_hast_values(search_pth=folder)
-		combined_df = import_all_results(search_pth=folder,
+		_combined_df = import_all_results(search_pth=folder,
 										 terminals=_hast_inputs.dict_of_terms)
-		all_dfs.append(combined_df)
+		all_dfs.append(_combined_df)
 		logger.debug('Importing of all results in folder {} completed in {:.2f} seconds'
 					 .format(folder, time.time()-t0))
 
@@ -527,6 +528,7 @@ if __name__ == '__main__':
 	time_stamps = [time.time()]
 
 	# Load GUI to select files
+	# TODO: Add option in GUI whether to include graphs in plots
 	if tk and len(list_of_folders_to_import) == 0:
 		# Load GUI for user to select files
 		gui = hast2.gui.MainGUI(title='Select HAST results for processing')

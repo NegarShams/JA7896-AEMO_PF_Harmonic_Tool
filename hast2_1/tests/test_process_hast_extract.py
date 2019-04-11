@@ -176,6 +176,22 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))
 
+	def test_export_multiple_files_without_graphs(self):
+		"""
+			Test to export the imported and combined results without graph plotting, just tests that the file exists rather than
+			the contents of it.
+		"""
+		# File to export to
+		target_file = RESULTS_EXTRACT_1
+		# Check if file already exists and delete
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, terminals=self.test_dict_terminals)
+		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=self.test_vars, plot_graphs=False)
+		# Confirm newly created file exists
+		self.assertTrue(os.path.isfile(target_file))
+
 	def test_split_contingency_filter_values(self):
 		"""
 			Confirm the for a variety of filter names they are extracted correctly
