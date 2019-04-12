@@ -625,8 +625,7 @@ def create_mutual_impedance_list(location, terminal_list):
 				name_inverse = '{}_{}'.format(_x[0], _y[0])
 				# Checks that mutual impedance has not already been created for the reverse direction
 				if name not in list_of_mutuals_created:
-					logger.debug('Term 1 = {} - {}'.format(pf_terminal_1, _y))
-					logger.debug('Term 2 = {} - {}'.format(pf_terminal_2, _x))
+					logger.debug('Term 1 = {} - {}, Term 2 = {} - {}'.format(pf_terminal_1, _y, pf_terminal_2, _x))
 					elmmut = create_mutual_elm(location, name, pf_terminal_1, pf_terminal_2)
 					list_of_mutual.append([str(y[0]), name, elmmut, pf_terminal_1, pf_terminal_2])
 
@@ -1550,9 +1549,10 @@ if __name__ == '__main__':
 
 	# Setup logger with reference to powerfactory app
 	logger = hast2.logger.Logger(pth_debug_log=Debug_Log,
-								pth_progress_log=Progress_Log,
-								pth_error_log=Error_Log,
-								app=app)
+								 pth_progress_log=Progress_Log,
+								 pth_error_log=Error_Log,
+								 app=app,
+								 debug=DEBUG_MODE)
 	for x,y in analysis_dict.items():
 		print1(x)
 		print1(y)

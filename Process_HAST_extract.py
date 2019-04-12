@@ -420,7 +420,7 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 			# color_i is used to determine the maximum number of plots that can be stored
 			color_i += 1
 
-	# TODO:  Need to add chart title to detail the study case being looked at
+	# TODO:  Add grid lines to plots and set x axis limits / tick marks appropriately
 
 	for i, chrt in enumerate(charts):
 		# Add axis labels

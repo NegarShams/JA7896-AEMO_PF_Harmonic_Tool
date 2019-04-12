@@ -27,12 +27,13 @@ class Logger:
 	""" Contained within a class since logger will need to print to both power factory and
 		to the various log files
 	"""
-	def __init__(self, pth_debug_log, pth_progress_log, pth_error_log, app=None):
+	def __init__(self, pth_debug_log, pth_progress_log, pth_error_log, app=None, debug=False):
 		"""
 			Initialise logger
 		:param str pth_progress_log:  Full path to the location of the log file that contains the process messages
 		:param str pth_error_log:  Full path to the location of the log file that contains the error messages
 		:param str pth_debug_log:  Full path to the location of the log file that contains the error messages
+		:param bool debug:  True / False on whether running in debug mode or not
 		:param powerfactory app: (optional) - If not None then will use this to provide updates to powerfactory
 		"""
 		# Attributes used during setup_logging
@@ -48,6 +49,7 @@ class Logger:
 		self.pth_progress_log = pth_progress_log
 		self.pth_error_log = pth_error_log
 		self.app = app
+		self.debug_mode = debug
 
 		self.file_handlers=[]
 
@@ -81,7 +83,12 @@ class Logger:
 														formatter=log_formatter)
 
 		self.handler_stream_log = logging.StreamHandler(sys.stdout)
-		self.handler_stream_log.setLevel(logging.DEBUG)
+
+		# If running in DEBUG mode then will export all the debug logs to the window as well
+		if self.debug_mode:
+			self.handler_stream_log.setLevel(logging.DEBUG)
+		else:
+			self.handler_stream_log.setLevel(logging.INFO)
 		self.handler_stream_log.setFormatter(log_formatter)
 
 
