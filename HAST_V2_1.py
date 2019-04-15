@@ -603,7 +603,7 @@ def create_mutual_impedance_list(location, terminal_list):
 	"""
 	print1('Creating: Mutual Impedance List of Terminals', bf=1, af=0)
 	terminal_list1 = list(terminal_list)
-	logger.info(terminal_list1)
+	# #logger.info(terminal_list1)
 
 	# Produce a dictionary of the terminals so can lookup which ones require mutual impedance data
 	_dict_terminal_mutual = {term[3]:term[4] for term in terminal_list1}
