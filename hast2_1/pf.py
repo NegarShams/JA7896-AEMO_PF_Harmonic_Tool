@@ -18,10 +18,10 @@ import unittest
 
 # Meta Data
 __author__ = 'David Mills'
-__version__ = '1.3a'
+__version__ = '2.1.2'
 __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
-__status__ = 'In Development - Alpha'
+__status__ = 'In Development - Beta'
 
 def create_object(location, pfclass, name):			# Creates a database object in a specified location of a specified class
 	"""
@@ -586,7 +586,17 @@ class PFProject:
 		# If Mutual impedance data required then added here
 		self.include_mutual = include_mutual
 		self.mutual_impedance_folder = None
-		self.list_of_mutual = None
+		# list of mutual impedance elements in the format:
+		# [(HAST_input_name,
+		# 	mutual_impedance_name (i.e. 'from_to'),
+		# 	reference to mutual element in pf,
+		# 	reference to terminal 1 in pf,
+		# 	reference to terminal 2 in pf)
+		# ]
+		self.list_of_mutual = []
+		# List of names for which mutual impedance elements have been created in the form
+		#	[from1_to1, to1_from1, from2_to2, to2_from2, ...]
+		self.list_of_mutual_names = []
 
 		# Network elements folder
 		self.folder_network_elements = None

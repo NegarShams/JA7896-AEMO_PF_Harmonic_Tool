@@ -75,7 +75,7 @@ import Process_HAST_extract
 
 # Meta Data
 __author__ = 'David Mills'
-__version__ = '2.1.1'
+__version__ = '2.1.2'
 __email__ = 'david.mills@PSCconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Beta'
@@ -594,12 +594,15 @@ def create_folder(location, name):		# Creates Folder in location
 	return _new_object, folder_exists
 
 # Creates a mutual Impedance list from the terminal list in a folder under the active studycase
-def create_mutual_impedance_list(location, terminal_list):
+def create_mutual_impedance_list(location, terminal_list, list_of_mutual = [], list_of_mutual_names = []):
 	"""
 		Create a mutual impedance list from the terminal list in a folder under the active studycase
 	:param powerfacory.Location location: Handle for location to be created 
-	:param list terminal_list: List of terminals 
-	:return list list_of_mutual: List of mutual impedances 
+	:param list terminal_list: List of terminals
+	:param list list_of_mutual:  (optional=[]) List of mutual impedance values already in list
+	:param list list_of_mutual_names:  List of names for mutual impedance values already created
+		(these are included in both directions 'from_to', 'to_from' to avoid duplication)
+	:return list list_of_mutual: List of mutual impedances
 	"""
 	print1('Creating: Mutual Impedance List of Terminals', bf=1, af=0)
 	terminal_list1 = list(terminal_list)
@@ -607,8 +610,9 @@ def create_mutual_impedance_list(location, terminal_list):
 
 	# Produce a dictionary of the terminals so can lookup which ones require mutual impedance data
 	_dict_terminal_mutual = {term[3]:term[4] for term in terminal_list1}
-	list_of_mutual = []
-	list_of_mutuals_created = []
+	# If some mutual elements have already been created then those will not be created again
+	# list_of_mutual = existing_list_of_mutual
+	# list_of_mutual_names = []
 	# TODO: Improve since this is a loop of loops
 	for _y in terminal_list1:
 		pf_terminal_1 = _y[3]
@@ -624,18 +628,18 @@ def create_mutual_impedance_list(location, terminal_list):
 				# Inverse name created for checking if already in list
 				name_inverse = '{}_{}'.format(_x[0], _y[0])
 				# Checks that mutual impedance has not already been created for the reverse direction
-				if name not in list_of_mutuals_created:
+				if name not in list_of_mutual_names:
 					logger.debug('Term 1 = {} - {}, Term 2 = {} - {}'.format(pf_terminal_1, _y, pf_terminal_2, _x))
 					elmmut = create_mutual_elm(location, name, pf_terminal_1, pf_terminal_2)
 					list_of_mutual.append([str(y[0]), name, elmmut, pf_terminal_1, pf_terminal_2])
 
 					# Add name in both directions to list_of_mutual created
-					list_of_mutuals_created.append(name)
-					list_of_mutuals_created.append(name_inverse)
+					list_of_mutual_names.append(name)
+					list_of_mutual_names.append(name_inverse)
 				else:
 					logger.debug('Mutual elements {} has already been created in the form {}'
 								 .format(name, name_inverse))
-	return list_of_mutual
+	return list_of_mutual, list_of_mutual_names
 
 
 def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance between two terminals
@@ -800,7 +804,13 @@ def create_study_case_results_files(cls_sc, cls_prj):
 		# Newly created folder is added to list of folders created so can be deleted at end of study
 		# No longer required since Variation deleted which includes the mutual folder
 		# Create list of mutual impedances between the terminals in the folder requested
-		cls_prj.list_of_mutual = create_mutual_impedance_list(cls_prj.mutual_impedance_folder, cls_prj.terminals_index)
+		cls_prj.list_of_mutual, cls_prj.list_of_mutual_names = create_mutual_impedance_list(
+			location=cls_prj.mutual_impedance_folder,
+			terminal_list=cls_prj.terminals_index,
+			list_of_mutual=cls_prj.list_of_mutual,
+			list_of_mutual_names=cls_prj.list_of_mutual_names
+		)
+		print(cls_prj.list_of_mutual)
 		logger.info('List of mutual impedance elements = {}'.format(cls_prj.list_of_mutual))
 	else:
 		# Can't Export mutual impedances if you give it only one bus
