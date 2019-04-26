@@ -1639,9 +1639,7 @@ if __name__ == '__main__':
 		current_prj.Deactivate()
 
 		t1 = time.clock()
-		# TODO: If running studies on multiple_projects the studies may need to be grouped and run at a project level
-		if len(dict_of_projects.keys()) > 1:
-			logger.error('\n\n Currently the script is not reliable when working on multiple PF project files \n\n')
+		# As of v2.1.2 tested on multiple projects and seems to be producing the output correctly
 		for prj_name, prj_cls in dict_of_projects.items():
 			# Activate project
 			prj_activation_failed = prj_cls.prj.Activate()

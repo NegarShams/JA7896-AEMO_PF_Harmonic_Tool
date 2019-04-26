@@ -11,6 +11,7 @@ HAST_Results1 = os.path.join(SEARCH_PTH, 'FS_SC1_Base_Case.csv')
 
 RESULTS_EXTRACT_1 = os.path.join(TESTS_DIR, 'Processed Hast Results1.xlsx')
 RESULTS_EXTRACT_2 = os.path.join(TESTS_DIR, 'Processed Hast Results2.xlsx')
+RESULTS_EXTRACT_3 = os.path.join(TESTS_DIR, 'Processed Hast Results3.xlsx')
 
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
@@ -130,10 +131,19 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Check a single value
 		self.assertAlmostEqual(df.iloc[5,10], 78.484256, places=5)
 
+	def test_process_r12_file(self):
+		"""
+			Tests that a HAST output containing R12 and X12 data can be handled correctly
+		"""
+		r12_test_file = os.path.join(TESTS_DIR, 'results4','FS_SC1_Base_case.csv')
+		df = TestModule.process_file(pth_file=r12_test_file, dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(df.shape,(196, 15))
+		self.assertEqual(df.columns.levels[6][1], 'c:R_12')
+		self.assertAlmostEqual(df.iloc[5,10], 78.484256, places=5)
+
 	def test_combine_multiple_files(self):
 		"""
 			Test to import and combine multiple HAST results files and export them
-			Only confirms that the file is produced
 		"""
 		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, terminals=self.test_dict_terminals)
 		# Confirm size correct
@@ -143,6 +153,21 @@ class TestStandAloneFunctions(unittest.TestCase):
 		self.assertEqual(combined_df.columns.names[5],constants.ResultsExtract.lbl_FullName)
 		# Check a random value
 		self.assertAlmostEqual(combined_df.iloc[10,15],29.087961, places=4)
+
+	def test_combine_r12_files(self):
+		"""
+			Tests that importing results with r12 and x12 data works correctly
+		"""
+		search_path = os.path.join(TESTS_DIR, 'results4')
+		combined_df = TestModule.import_all_results(search_pth=search_path, terminals=self.test_dict_terminals)
+		# Confirm size correct
+		self.assertEqual(combined_df.shape, (196,90))
+		# Confirm r12 and x12 headers correct
+		result_type_labels = combined_df.columns.levels[6]
+		self.assertTrue('c:R_12' in result_type_labels)
+		self.assertTrue('c:X_12' in result_type_labels)
+		# Check a random value
+		self.assertAlmostEqual(combined_df.iloc[10,15], 29.087961, places=4)
 
 	@unittest.skipIf(not FULL_TEST, 'Tests that import HAST file skipped')
 	def test_obtaining_vars_from_hast(self):
@@ -178,6 +203,23 @@ class TestStandAloneFunctions(unittest.TestCase):
 
 		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, terminals=self.test_dict_terminals)
 		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=self.test_vars)
+		# Confirm newly created file exists
+		self.assertTrue(os.path.isfile(target_file))
+
+	def test_export_multiple_r12_files(self):
+		"""
+			Tests that exporting r12 and x12 data works, just tests that the file exists rather than content of it
+		"""
+		# File to export to
+		target_file = RESULTS_EXTRACT_1
+		search_path = os.path.join(TESTS_DIR, 'results4')
+		test_vars = ['m:R', 'm:X', 'm:Z', 'c:R_12', 'c:X_12', 'c:Z_12']
+		# Check if file already exists and delete
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		combined_df = TestModule.import_all_results(search_pth=search_path, terminals=self.test_dict_terminals)
+		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=test_vars)
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))
 
@@ -251,7 +293,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		graph_grouping = [('a',15),('b',1),('c',4)]
 		graphs = TestModule.split_plots(max_plots=max_plots,
 										start_col=start_col,
-										graph_grouping=graph_grouping)
+										graph_groups=graph_grouping)
 		keys = list(graphs.keys())
 		self.assertEqual(keys[0],'a(1)')
 		self.assertEqual(keys[3],'b')
@@ -273,6 +315,7 @@ class TestImportingMultipleResults(unittest.TestCase):
 		cls.search_pth_1 = os.path.join(TESTS_DIR, 'results1')
 		cls.search_pth_2 = os.path.join(TESTS_DIR, 'results2')
 		cls.search_pth_3 = os.path.join(TESTS_DIR, 'results3')
+		cls.search_pth_4 = os.path.join(TESTS_DIR, 'results4')
 
 	def test_with_single_hast_file(self):
 		"""
@@ -304,7 +347,7 @@ class TestImportingMultipleResults(unittest.TestCase):
 						 self.search_pth_2]
 		)
 		self.assertEqual(df.shape[1], 34)
-		self.assertAlmostEqual(df.iloc[250, 20], 51.042238, places=4)
+		self.assertAlmostEqual(df.iloc[250, 20], -120.48696100000001, places=4)
 
 	def test_multiple_hast_imports_different_datasets(self):
 		"""
@@ -315,7 +358,7 @@ class TestImportingMultipleResults(unittest.TestCase):
 						 self.search_pth_3]
 		)
 		self.assertEqual(df.shape[1], 58)
-		self.assertAlmostEqual(df.iloc[250,25], 231.464654, places=4)
+		self.assertAlmostEqual(df.iloc[250,25], -123.121829, places=4)
 
 	def test_multiple_hast_imports_do_not_drop_duplicates(self):
 		"""
@@ -328,6 +371,17 @@ class TestImportingMultipleResults(unittest.TestCase):
 		)
 		self.assertEqual(df.shape[1], 60)
 		self.assertAlmostEqual(df.iloc[250,25], -123.121829, places=4)
+
+	def test_multiple_hast_imports_different_length_datasets(self):
+		"""
+			Tests the actual importing of multiple files but with different length datasets
+		"""
+		df, _ = TestModule.combine_multiple_hast_runs(
+			search_pths=[self.search_pth_1,
+						 self.search_pth_4]
+		)
+		self.assertEqual(df.shape[1], 120)
+		self.assertAlmostEqual(df.iloc[120,25], 58.063766, places=4)
 
 	def test_extract_multiple_files(self):
 		"""
@@ -344,6 +398,27 @@ class TestImportingMultipleResults(unittest.TestCase):
 		df, vars_to_export = TestModule.combine_multiple_hast_runs(
 			search_pths=[self.search_pth_1,
 						 self.search_pth_3]
+		)
+
+		TestModule.extract_results(pth_file=target_file, df=df, vars_to_export=vars_to_export)
+		# Confirm newly created file exists
+		self.assertTrue(os.path.isfile(target_file))
+
+	def test_extract_multiple_files_different_data_lengths(self):
+		"""
+			Function imports multiple results and extracts them to a single results file
+			NB:  Only tests that the file is created and no the contents of it
+			Does not test that the import is correct since that is tested elsewhere
+		"""
+		# File to export to
+		target_file = RESULTS_EXTRACT_3
+		# Check if file already exists and delete
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		df, vars_to_export = TestModule.combine_multiple_hast_runs(
+			search_pths=[self.search_pth_1,
+						 self.search_pth_4]
 		)
 
 		TestModule.extract_results(pth_file=target_file, df=df, vars_to_export=vars_to_export)

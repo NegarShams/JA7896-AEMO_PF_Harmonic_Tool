@@ -17,17 +17,21 @@ Flow or extraction of ConvexHull data to excel.
 # IMPORT SOME PYTHON MODULES
 # --------------------------------------------------------------------------------------------------------------------
 import os
-import sys
 import pandas as pd
-import unittest
 import glob
 import logging
 import hast2_1 as hast2
 import hast2_1.constants as constants
 import time
-import random
 import collections
 import math
+
+# Meta Data
+__author__ = 'David Mills'
+__version__ = '2.1.2'
+__email__ = 'david.mills@PSCconsulting.com'
+__phone__ = '+44 7899 984158'
+__status__ = 'In Development - Beta'
 
 logger = logging.getLogger()
 
@@ -240,6 +244,7 @@ def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
 	"""
 	# Determine number of columns to consider in each graph
 	df_grouping = df.groupby(axis=1, level=group_by).size()
+
 	# Obtain index keys and values
 	keys = df_grouping.index.tolist()
 	values = list(df_grouping)
@@ -254,6 +259,7 @@ def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
 
 	if len(keys) == 1:
 		keys = [keys]
+
 	# Create a tuple with name of chart followed by value (tuple used to ensure order matches)
 	grouping = [('_'.join(k),v) for k,v in zip(keys, values)]
 	return grouping
@@ -265,7 +271,7 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 	:param pd.DataFrame df:  Pandas dataframe to be extracted
 	:param list vars_to_export:  List of variables to export based on Hast Inputs class
 	:param bool plot_graphs:  (optional=True) - If set to False then graphs will not be exported
-	:return:
+	:return None:
 	"""
 	# Obtain constants
 	c = constants.ResultsExtract
@@ -273,7 +279,7 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 
 	# Delete empty column headers which correlate to either frequency of harmonic number data which
 	# has already been used as the index
-	del df[c.lbl_to_delete]
+	df.drop(columns=c.lbl_to_delete, inplace=True, level=0)
 
 	# Group the data frame by node name
 	list_dfs = df.groupby(level=c.lbl_Reference_Terminal, axis=1)
@@ -306,7 +312,6 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 						row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
 
 						# TODO:  Rather than producing chart for all Z1 data should actually produce for each study case
-
 						add_graph(writer, sheet_name=node_name,
 								  num_cols=num_cols,
 								  col_start=col+1,
@@ -314,23 +319,24 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 								  row_start=start_row + len(names) + 1,
 								  col_freq=col,
 								  num_rows=num_rows,
-								  graph_grouping=dict_graph_grouping)
-
-					col = df_to_export.shape[1] + c.col_spacing
+								  graph_groups=dict_graph_grouping)
+					col = col + df_to_export.shape[1] + c.col_spacing
 				else:
 					logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
 
-def split_plots(max_plots, start_col, graph_grouping):
+	return None
+
+def split_plots(max_plots, start_col, graph_groups):
 	"""
 		TODO:  Add description
 	:param max_plots:
 	:param start_col:
-	:param graph_grouping:
+	:param graph_groups:
 	:return graphs:
 	"""
 	graphs = collections.OrderedDict()
 
-	for title, num in graph_grouping:
+	for title, num in graph_groups:
 		# Get all columns in range associated with this group
 		# Plot 0 removed and added back in as starting plot
 		all_cols = list(range(start_col + 1, start_col + num))
@@ -347,7 +353,7 @@ def split_plots(max_plots, start_col, graph_grouping):
 		else:
 			graphs['{}'.format(title)] = [start_col] + all_cols
 
-		if all_cols == []:
+		if not all_cols:
 			start_col = start_col+1
 		else:
 			start_col = max(all_cols) + 1
@@ -355,12 +361,12 @@ def split_plots(max_plots, start_col, graph_grouping):
 	return graphs
 
 def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_freq, num_rows,
-			  graph_grouping):
+			  graph_groups):
 	"""
 		Add graph to HAST export
 	:param pd.ExcelWriter writer:
 	:param str sheet_name:
-	:param list graph_grouping:  Names and groups to use for graph grouping
+	:param list graph_groups:  Names and groups to use for graph grouping
 	:return:
 	"""
 	c = constants.ResultsExtract
@@ -374,16 +380,10 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 	max_row = row_start+num_rows
 
 	# Loop through each column and add series
-	# TODO: Need to split into separate chart if more than 255 series
-	color_i = 0
 	charts = []
-	chrt = None
-	chrt_count = 0
-	group_i = 0
-	group_titles = []
 	max_plots = len(color_map) - 1
 
-	plots = split_plots(max_plots, col_start, graph_grouping)
+	plots = split_plots(max_plots, col_start, graph_groups)
 
 	for chart_name, cols in plots.items():
 		chrt = wkbk.add_chart(c.chart_type)
@@ -393,21 +393,6 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 
 		# Loop through each column and add series
 		for col in cols:
-
-
-			# # Loop through each column and add new series
-			# #for i in range(num_cols):
-			# #	col = col_start + i
-			# #	# Maximum number of plots exceeded, create a new chart
-			# #	if color_i > max_plots or chrt is None:
-			# #		chrt = wkbk.add_chart(c.chart_type)
-			# #		charts.append(chrt)
-			# #		chrt_count += 1
-			# #		color_i = 0
-
-			# #else:
-				# #chrt = charts[chrt_count]
-
 			chrt.add_series({
 				'name': [sheet_name, row_cont, col],
 				'categories': [sheet_name, row_start, col_freq, max_row, col_freq],
@@ -495,6 +480,7 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	:return pd.DataFrame df, list vars_to_export:  Combined results into single dataframe, list of variables for export
 	"""
 	# Loop through each folder, obtain the hast files and produce the dataframes
+	c = constants.ResultsExtract
 	all_dfs = []
 	vars_to_export = []
 
@@ -525,7 +511,7 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	vars_to_export = [x for x in vars_to_export if not (x in seen or seen_add(x))]
 
 	if drop_duplicates:
-		# Remove any duplicate datasets based on column names
+		# Remove any duplicate datasets with matching column names and rows
 		original_shape = df.shape
 		# Gets list of duplicated index values and will only compare actual values if duplicated
 		df_t = df.T
@@ -540,6 +526,54 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 			# Remove temporary index and transpose back
 			del df_t['TEMP']
 			df = df_t.T
+
+		# Check if any columns are still duplicated as this must now be due to different result sets
+		# Check and rename results if duplicated study case names at level (Full Results Name)
+		duplicated_col_names = df.columns.get_duplicates()
+		if duplicated_col_names:
+			# Produce dictionary for any duplicated names
+			dict_duplicates = {k: 1 for k in duplicated_col_names}
+			idx_sc = df.columns.names.index(c.lbl_StudyCase)
+			idx_full_name = df.columns.names.index(c.lbl_FullName)
+
+			# Get names for existing columns
+			existing_columns = df.columns.tolist()
+
+			new_cols = []
+			for col in existing_columns:
+				# Loop through each column and rename those which appear in the list of duplicated columns
+				try:
+					duplicated_count = dict_duplicates[col]
+				except KeyError:
+					duplicated_count = False
+
+				if duplicated_count:
+					# Rename duplicated columns to be the form 'sc_name(dup_count)'
+					new_col = list(col)
+					sc_name = col[idx_sc]
+					full_name = col[idx_full_name]
+					# Produce new names for study case and full name
+					new_sc_name = '{}({})'.format(sc_name, duplicated_count)
+					new_full_name = full_name.replace(sc_name, new_sc_name)
+					new_col[idx_sc] =  new_sc_name
+					new_col[idx_full_name] = new_full_name
+					dict_duplicates[col] += 1
+				else:
+					new_col = col
+
+				new_cols.append(tuple(new_col))
+
+			columns=pd.MultiIndex.from_tuples(tuples=new_cols, names=df.columns.names)
+			df.columns = columns
+			duplicated_col_names2 = df.columns.get_duplicates()
+			logger.warning(('Some results have the same study case name but different values, the user should '
+							'check the results that are being combined and confirm where the mistake has been made.\n'
+							'For now the studycases have been renamed with (1), (2), (etc.) for presentation.\n'
+							'In total {} columns have been renamed')
+						   .format(len(duplicated_col_names)-len(duplicated_col_names2))
+						   )
+			if duplicated_col_names2:
+				raise IOError(' There are still duplicated columns being detected')
 
 		# Check for changes and record differences
 		new_shape = df.shape
@@ -557,6 +591,9 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 							  'Check the script')
 	else:
 		logger.debug('No check for duplicates carried out')
+
+	# Sort the results so that in study_case name order
+	df.sort_index(axis=1, level=[c.lbl_Reference_Terminal, c.lbl_Terminal, c.lbl_StudyCase], inplace=True)
 
 	return df, vars_to_export
 
