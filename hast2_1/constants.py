@@ -177,6 +177,13 @@ class ResultsExtract:
 	chrt_width = 960
 	chrt_height = 576
 
+	# Based on details here:  https://xlsxwriter.readthedocs.io/chart.html
+	grid_lines = {'visible': True,
+				  'line': {
+					  'width': 0.75,
+					  'dash_type': 'dash'}
+				  }
+
 	def __init__(self):
 		"""
 			Initial class

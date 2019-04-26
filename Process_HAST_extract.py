@@ -151,7 +151,6 @@ def process_file(pth_file, dict_of_terms):
 	:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
 	"""
 	c = constants.ResultsExtract
-	# TODO:  Need to account for mutual impedance data to provide in both directions from the single direction produced by HAST
 
 	# Import dataframe
 	_df = pd.read_csv(pth_file, header=[0, 1], index_col=0)
@@ -261,7 +260,7 @@ def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
 		keys = [keys]
 
 	# Create a tuple with name of chart followed by value (tuple used to ensure order matches)
-	grouping = [('_'.join(k),v) for k,v in zip(keys, values)]
+	grouping = [('_'.join(k),v) if k is str else (k,v) for k,v in zip(keys, values)]
 	return grouping
 
 def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
@@ -311,7 +310,6 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 						names = df_to_export.columns.names
 						row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
 
-						# TODO:  Rather than producing chart for all Z1 data should actually produce for each study case
 						add_graph(writer, sheet_name=node_name,
 								  num_cols=num_cols,
 								  col_start=col+1,
@@ -328,11 +326,12 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 
 def split_plots(max_plots, start_col, graph_groups):
 	"""
-		TODO:  Add description
-	:param max_plots:
-	:param start_col:
-	:param graph_groups:
-	:return graphs:
+		Figures out how to split the plots into groups based on the grouping and maximum of 255 plots (or max_plots)
+		Returns the relevant names and column numbers
+	:param int max_plots:  Maximum number of plots to include
+	:param int start_col:  Starting number of column to use
+	:param list graph_groups:  List of graph grouping produced by <graph_grouping>
+	:return collections.OrderedDict graphs:  Dictionary of the graph title and relevant column numbers
 	"""
 	graphs = collections.OrderedDict()
 
@@ -405,13 +404,14 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 			# color_i is used to determine the maximum number of plots that can be stored
 			color_i += 1
 
-	# TODO:  Add grid lines to plots and set x axis limits / tick marks appropriately
-
 	for i, chrt in enumerate(charts):
 		# Add axis labels
-		chrt.set_x_axis({'name': c.lbl_Frequency, 'label_position': c.lbl_position})
-		chrt.set_y_axis({'name': c.lbl_Impedance, 'label_position': c.lbl_position})
+		chrt.set_x_axis({'name': c.lbl_Frequency, 'label_position': c.lbl_position,
+						 'major_gridlines': c.grid_lines})
+		chrt.set_y_axis({'name': c.lbl_Impedance, 'label_position': c.lbl_position,
+						 'major_gridlines': c.grid_lines})
 
+		# Set chart size
 		chrt.set_size({'width': c.chrt_width, 'height': c.chrt_height})
 
 		# Add the legend to the chart
