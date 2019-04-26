@@ -260,7 +260,7 @@ def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
 		keys = [keys]
 
 	# Create a tuple with name of chart followed by value (tuple used to ensure order matches)
-	grouping = [('_'.join(k),v) if k is str else (k,v) for k,v in zip(keys, values)]
+	grouping = [('_'.join(k),v) if type(k) is not str else (k,v) for k,v in zip(keys, values)]
 	return grouping
 
 def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
