@@ -1068,6 +1068,14 @@ class HASTInputs:
 		self.export_z12 = bool()
 		self.export_hrm = bool()
 
+		# Attribute definitions (study_case_details)
+		self.sc_details = dict()
+		self.sc_names = list()
+
+		# Attribute definitions (contingency_details)
+		self.cont_details = dict()
+		self.cont_names = list()
+
 		# Attribute definitions (terminals)
 		self.list_of_terms = list()
 		self.dict_of_terms = dict()
@@ -1078,6 +1086,10 @@ class HASTInputs:
 
 		# Process List of Terminals
 		self.process_terminals(hast_inputs[c.terminals])
+
+		# Process study case details
+		self.sc_names = self.get_study_cases(hast_inputs[c.study_cases])
+		self.cont_names = self.get_contingencies(hast_inputs[c.contingencies])
 
 	def study_settings(self, list_study_settings):
 		"""
@@ -1161,6 +1173,73 @@ class HASTInputs:
 			pf_vars.append(c.pf_z12)
 
 		return pf_vars
+
+	def get_study_cases(self, list_of_studycases):
+		"""
+			Populates dictionary which references all the relevant HAST study case details and then returns a list
+			of the names of all the StudyCases that have been considered.
+		:return list sc_details:  Returns list of study case names and there corresponding technical details
+		"""
+		# If has already been populated then just return the list
+		if not self.sc_details:
+			# Loop through each row of the inported data
+			for sc in list_of_studycases:
+				# Transfer row of inputs to class <StudyCaseDetails>
+				new_sc = StudyCaseDetails(sc)
+				# Add to dictionary
+				self.sc_details[new_sc.name] = new_sc
+
+
+		return list(self.sc_details.keys())
+
+	def get_contingencies(self, list_of_contingencies):
+		"""
+			Populates dictionary which references all the relevant HAST study case details and then returns a list
+			of the names of all the StudyCases that have been considered.
+		:return list sc_details:  Returns list of study case names and there corresponding technical details
+		"""
+		# If has already been populated then just return the list
+		if not self.cont_details:
+			# Loop through each row of the inported data
+			for sc in list_of_contingencies:
+				# Transfer row of inputs to class <StudyCaseDetails>
+				new_cont = ContingencyDetails(sc)
+				# Add to dictionary
+				self.cont_details[new_cont.name] = new_cont
+
+
+		return list(self.cont_details.keys())
+
+class StudyCaseDetails:
+	def __init__(self, list_of_parameters):
+		"""
+			Single row of study case parameters imported from spreadsheet are defined into a class for easy lookup
+		:param list list_of_parameters:  Single row of inputs
+		"""
+		self.name = list_of_parameters[0]
+		self.project = list_of_parameters[1]
+		self.study_case = list_of_parameters[2]
+		self.scenario = list_of_parameters[3]
+
+class ContingencyDetails:
+	def __init__(self, list_of_parameters):
+		"""
+			Single row of contingency parameters imported from spreadsheet are defined into a class for easy lookup
+		:param list list_of_parameters:  Single row of inputs
+		"""
+		self.name = list_of_parameters[0]
+		self.couplers = []
+		for substation, breaker, status in zip(*[iter(list_of_parameters[1:])]*3):
+			if substation != '':
+				new_coupler = CouplerDetails(substation, breaker, status)
+				self.couplers.append(new_coupler)
+
+class CouplerDetails:
+	def __init__(self, substation, breaker, status):
+		self.substation = substation
+		self.breaker = breaker
+		self.status = status
+
 
 #  ----- UNIT TESTS -----
 class TestExcelSetup(unittest.TestCase):

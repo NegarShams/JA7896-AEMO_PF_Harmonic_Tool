@@ -33,11 +33,36 @@ __email__ = 'david.mills@PSCconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Beta'
 
+
+
 logger = logging.getLogger()
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 # Populate the following to avoid a GUI import
 list_of_folders_to_import = []
 target_file = None
+
+# Whether to include graphs when exporting
+PLOT_GRAPHS = True
+# To resolving naming issues with results extract from PowerFactory
+# TODO:  Look into way to limit PF name length to CSV file to avoid naming issue
+MANUAL_ADJUSTMENTS = {'Maynooth 220 kV .ElmMut':'Maynooth 220 kV A.ElmMut',
+					  'Maynooth 2(1).ElmMut': 'Maynooth 220 kV B.ElmMut',
+					  'North Wall 220 k.ElmMut': 'North Wall 220 kV.ElmMut',
+					  'Pollaphuca 110 k.ElmMut': 'Pollaphuca 110 kV.ElmMut',
+					  'Shannonbridge 22.ElmMut': 'Shannonbridge 220 kV.ElmMut',
+					  'Shellybanks 220 .ElmMut': 'Shellybanks 220 kV.ElmMut',
+					  'Thornsberry 110 .ElmMut': 'Thornsberry 110 kV.ElmMut',
+					  'Timahoe North 11.ElmMut': 'Timahoe North 110 kV.ElmMut',
+					  'Timahoe North 110 k.ElmMut': 'Timahoe North 110 kV.ElmMut',
+					  'West Dublin 220.ElmMut': 'West Dublin 220 kV.ElmMut',
+					  'West Dublin 220 .ElmMut': 'West Dublin 220 kV.ElmMut',
+					  'Knockumber 110 k.ElmMut': 'Knockumber 110 kV.ElmMut',
+					  'Muckerstown 110 .ElmMut': 'Muckerstown 110 kV.ElmMut',
+					  'Huntstown 220 kV (CD.ElmMut': 'Huntstown 220 kV (CDU2).ElmMut',
+					  'Huntstown 220 kV (CDU.ElmMut': 'Huntstown 220 kV (CDU2).ElmMut',
+					  'Huntstown 220 kV (CDU2.ElmMut': 'Huntstown 220 kV (CDU2).ElmMut'
+					  }
 
 try:
 	import tkinter as tk
@@ -67,9 +92,9 @@ def extract_var_name(var_name, dict_of_terms):
 		if '.{}'.format(c.pf_mutual) in var:
 			# Two mutual names returns in lists for each direction and each ref_terminal
 			# Mutual name found so exit for loop
-			var_name = var.strip('.{}'.format(c.pf_mutual))
+			var_name = var.replace('.{}'.format(c.pf_mutual), '')
 			ref_terminals = var_name.split('_')
-			ref_terminal = (ref_terminals[0],ref_terminals[1])
+			ref_terminal = (ref_terminals[0], ref_terminals[1])
 
 			if len(ref_terminals) > 2:
 				logger.warning(('Not completely sure if the reference terminals for mutual impedance {} are correct.'
@@ -143,11 +168,70 @@ def split_contingency_filter_values(list_of_terms, starting_point=2):
 		filter_name = '_'.join(list_of_terms[filter_pos:])
 	return contingency_name, filter_name
 
-def process_file(pth_file, dict_of_terms):
+def process_file_name(file_name, sc_names, cont_names):
+	"""
+		Splits up the file name to identify the study type, case, contingency and filter details
+	:param str file_name:  Existing file name
+	:param list sc_names:  List of sc_names considered in study
+	:param list cont_names:  List of cont_names considered in study
+	:return list components: [study_type, study_case, contingency, filter_name) where file_name remaining
+	"""
+	c = constants.ResultsExtract
+	study_type = ''
+	sc_name = ''
+	cont_name = ''
+	filter_name = ''
+
+	# Find the relevant study type
+	for s_type in c.study_types:
+		if s_type in file_name:
+			study_type = s_type
+			file_name = file_name.replace('{}_'.format(study_type), '')
+			break
+
+	# Find which study case is shown
+	for sc in sc_names:
+		if sc in file_name:
+			sc_name = sc
+			file_name = file_name.replace('{}_'.format(sc_name), '')
+			break
+
+	# Find which contingnecy is considered
+	for cont in cont_names:
+		if cont in file_name:
+			cont_name = cont
+			file_name = file_name.replace('{}_'.format(cont_name), '')
+			break
+
+	file_name_splits = file_name.split('_')
+	_, filter_name = split_contingency_filter_values(file_name_splits, starting_point=0)
+
+	return study_type, sc_name, cont_name, filter_name
+
+def manual_adjustments_to_var_names(list_of_var_names, dict_of_adjustments):
+	"""
+
+	:param list_of_var_names:
+	:param dict_of_adjustments:
+	:return:
+	"""
+	new_var_names = []
+	for var in list_of_var_names:
+		for mistake, correction in dict_of_adjustments.items():
+			if mistake in var:
+				var = var.replace(mistake,correction)
+				break
+
+		new_var_names.append(var)
+
+	return new_var_names
+
+
+def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	"""
 		# Process the imported HAST results file into a dataframe with the relevant multi-index
 	:param str pth_file:  Full path to results that need importing
-	:param dict dict_of_terms:  Dictionary of terminals that need updating
+	:param hast2_1.excel_writing.HASTInputs hast_inputs:  Handle to the HAST inputs data
 	:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
 	"""
 	c = constants.ResultsExtract
@@ -164,11 +248,15 @@ def process_file(pth_file, dict_of_terms):
 	#	Node / Mutual Name
 	#	Variable type
 	filename = os.path.splitext(os.path.basename(pth_file))[0]
-	file_split = filename.split('_')
-	study_type = file_split[0]
-	sc_name = file_split[1]
+
+	study_type, sc_name, cont_name, filter_name = process_file_name(file_name=filename,
+																	sc_names=hast_inputs.sc_names,
+																	cont_names=hast_inputs.cont_names)
+	# file_split = filename.split('_')
+	# study_type = file_split[0]
+	# sc_name = file_split[1]
 	# Separate filter and contingency names
-	cont_name, filter_name = split_contingency_filter_values(list_of_terms=file_split)
+	# cont_name, filter_name = split_contingency_filter_values(list_of_terms=file_split)
 
 	if filter_name != '':
 		full_name = '{}_{}_{}'.format(sc_name, cont_name, filter_name)
@@ -176,7 +264,12 @@ def process_file(pth_file, dict_of_terms):
 		full_name = '{}_{}'.format(sc_name, cont_name)
 
 	columns = list(zip(*_df.columns.tolist()))
-	var_names = columns[0]
+	# To manually deal wit renaming of mutual impedance values
+	if manual_adjustments:
+		logger.debug('\t - \t\t Manual adjustment of variable names being completed for file {}'.format(filename))
+		var_names = manual_adjustments_to_var_names(columns[0], dict_of_adjustments=manual_adjustments)
+	else:
+		var_names = columns[0]
 	var_types = columns[1]
 
 	df_mutual = pd.DataFrame().reindex_like(_df)
@@ -189,7 +282,7 @@ def process_file(pth_file, dict_of_terms):
 	new_var_types1 = []
 	new_var_types2 = []
 	for i, var in enumerate(var_names):
-		_var_names, _ref_terms = extract_var_name(var, dict_of_terms)
+		_var_names, _ref_terms = extract_var_name(var_name=var, dict_of_terms=hast_inputs.dict_of_terms)
 		_var_type = extract_var_type(var_types[i])
 		# Mutual impedance data
 		if type(_var_names) is tuple:
@@ -272,6 +365,7 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 	:param bool plot_graphs:  (optional=True) - If set to False then graphs will not be exported
 	:return None:
 	"""
+	logger.info('Exporting imported results to {}'.format(pth_file))
 	# Obtain constants
 	c = constants.ResultsExtract
 	start_row = c.start_row
@@ -282,10 +376,15 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 
 	# Group the data frame by node name
 	list_dfs = df.groupby(level=c.lbl_Reference_Terminal, axis=1)
+	num_nodes = len(list_dfs)
+	logger.info('Exporting results for {} nodes'.format(num_nodes))
 
 	# Export to excel with a new sheet for each node
+	i=0
 	with pd.ExcelWriter(pth_file, engine='xlsxwriter') as writer:
 		for node_name, _df in list_dfs:
+			logger.info(' - \t {}/{} Exporting node {}'.format(i+1, num_nodes, node_name))
+			i += 1
 			col = c.start_col
 			for var in vars_to_export:
 				# Will only include index and header labels if True
@@ -303,6 +402,8 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 
 					# Add graphs if data is self-impedance
 					if var == constants.PowerFactory.pf_z1 and plot_graphs:
+						logger.info(' \t - \t Adding graph for node {}'.format(node_name))
+
 						num_rows = df_to_export.shape[0]
 						num_cols = df_to_export.shape[1]
 						# Get number of columns to include in each graph grouping
@@ -417,25 +518,40 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 		# Add the legend to the chart
 		sht.insert_chart(c.chrt_row, c.chrt_col+(c.chrt_space*i), chrt)
 
-def import_all_results(search_pth, terminals, search_type='FS'):
+def import_all_results(search_pth, hast_inputs, search_type='FS'):
 	"""
 		Function to import all results into a single DataFrame
 	:param str search_pth: Directory which contains the exported results files which are to be imported
-	:param dict terminals: Dictionary of terminals and associated values for lookup
+	:param hast2_1.excel_writing.HASTInputs hast_inputs:  Handle to the HAST inputs data
 	:param str search_type: (Optional='FS') - Leading characters to use in search string
-	:return pd.DataFrame combined_df:  Combined imported files into single DataFrame
+	:return pd.DataFrame single_df:  Combined imported files into single DataFrame
 	"""
 	# Get list of all files in folder for frequency scan
+	t0 = time.time()
 	files = glob.glob('{}\{}*.csv'.format(search_pth, search_type))
+	no_files = len(files)
+	logger.info('Importing {} hast results files in directory: {}'.format(no_files, search_pth))
 
 	# Import each results file and combine into a single dataframe
 	dfs = []
-	for file in files:
-		_df = process_file(pth_file=file, dict_of_terms=terminals)
+	for i, file in enumerate(files):
+		_df = process_file(pth_file=file, hast_inputs=hast_inputs, manual_adjustments=MANUAL_ADJUSTMENTS)
 		dfs.append(_df)
+		logger.info(' - \t {}/{} HAST results file: {} imported'.format(i+1, no_files, os.path.basename(file)))
 
-	combined_df = pd.concat(dfs, axis=1)
-	return combined_df
+	if len(dfs) != no_files:
+		logger.error(('There was an issue in the file import and not all were imported.\n'
+					   'Only {} of {} files were imported\n'
+						'However, the script will continue until something critical occurs')
+					   .format(len(dfs), no_files))
+	t1 = time.time()
+	logger.info('{} of {} results files in the folder: {} imported in {:.2f} seconds'
+				.format(len(dfs), no_files, search_pth, t1-t0))
+
+	single_df = pd.concat(dfs, axis=1)
+	logger.info('Single dataset for all results in folder:  {} produced in {:.2f} seconds'
+				.format(search_pth, time.time()-t0))
+	return single_df
 
 def get_hast_values(search_pth):
 	"""
@@ -469,6 +585,7 @@ def get_hast_values(search_pth):
 
 	# Process the imported workbook into
 	processed_inputs = hast2.excel_writing.HASTInputs(analysis_dict)
+	logger.info('Inputs from HAST file: {} extracted'.format(hast_inputs_workbook))
 	return processed_inputs
 
 def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
@@ -479,6 +596,8 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	:param bool drop_duplicates:  (Optional=True) - If set to False then duplicated columns will be included in the output
 	:return pd.DataFrame df, list vars_to_export:  Combined results into single dataframe, list of variables for export
 	"""
+	t0 = time.time()
+	logger.info('Importing all hast results files in list folders \n {}'.format(search_pths))
 	# Loop through each folder, obtain the hast files and produce the dataframes
 	c = constants.ResultsExtract
 	all_dfs = []
@@ -490,13 +609,16 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 		logger.debug('Importing hast files in folder: {}'.format(folder))
 		_hast_inputs = get_hast_values(search_pth=folder)
 		_combined_df = import_all_results(search_pth=folder,
-										 terminals=_hast_inputs.dict_of_terms)
+										  hast_inputs=_hast_inputs)
 		all_dfs.append(_combined_df)
 		logger.debug('Importing of all results in folder {} completed in {:.2f} seconds'
 					 .format(folder, time.time()-t0))
 
 		# Include list of variables for export
 		vars_to_export.extend(_hast_inputs.vars_to_export())
+
+	t1 = time.time()
+	logger.info('All results imported in {:.2f} seconds'.format(t1-t0))
 
 	# Combine all results together
 	df = pd.concat(all_dfs, axis=1)
@@ -595,6 +717,7 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	# Sort the results so that in study_case name order
 	df.sort_index(axis=1, level=[c.lbl_Reference_Terminal, c.lbl_Terminal, c.lbl_StudyCase], inplace=True)
 
+	logger.info('Imported results combined and duplicates removed in {:.2f}'.format(time.time()-t1))
 	return df, vars_to_export
 
 # Only runs if main script is run
@@ -625,16 +748,16 @@ if __name__ == '__main__':
 		raise IOError('No folders provided for data import')
 
 	time_stamps.append(time.time())
-	logger.debug('User file selection took {:.2f} seconds'.format(time_stamps[-1]-time_stamps[0]))
+	logger.info('User file selection took {:.2f} seconds'.format(time_stamps[-1]-time_stamps[0]))
 
 	combined_df, vars_in_hast = combine_multiple_hast_runs(search_pths=list_of_folders_to_import)
 
 	time_stamps.append(time.time())
-	logger.debug('Processing HAST inputs took {:.2f} seconds'.format(time_stamps[-1] - time_stamps[-2]))
+	logger.info('Processing HAST inputs took {:.2f} seconds'.format(time_stamps[-1] - time_stamps[-2]))
 
-	extract_results(pth_file=target_file, df=combined_df, vars_to_export=vars_in_hast)
+	extract_results(pth_file=target_file, df=combined_df, vars_to_export=vars_in_hast, plot_graphs=PLOT_GRAPHS)
 	time_stamps.append(time.time())
-	logger.debug('Extracting results took'.format(time_stamps[-1] - time_stamps[-2]))
+	logger.info('Extracting results took'.format(time_stamps[-1] - time_stamps[-2]))
 
 	logger.info('Results extracted to {}'.format(target_file))
 

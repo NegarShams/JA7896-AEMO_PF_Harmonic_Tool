@@ -133,6 +133,7 @@ class ResultsExtract:
 	"""
 		Constants used in processing the results
 	"""
+	study_types = ('FS', 'HLF')
 	extension = '.xlsx'
 	# Labels used for frequency scan results extract
 	lbl_StudyCase = 'Study Case'
@@ -238,8 +239,11 @@ class HASTInputs:
 						  fs_term_variables +
 						  hldf_term_variables +
 						  res_values)
+	# Names of worksheets which contain the relevant inputs
 	terminals = 'Terminals'
 	study_settings = 'Study_Settings'
+	study_cases = 'Base_Scenarios'
+	contingencies = 'Contingencies'
 
 analysis_sheets = (
 	(PowerFactory.sht_Study, "B5"),

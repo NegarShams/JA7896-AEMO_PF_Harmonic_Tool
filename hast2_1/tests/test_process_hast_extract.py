@@ -32,7 +32,11 @@ class TestStandAloneFunctions(unittest.TestCase):
 		"""
 		# Dictionary of terminals used in test
 		cls.test_dict_terminals = {('Bracetown.ElmSubstat', '220 kV A2.ElmTerm'): 'Bracetown 220 kV',
-								   ('Clonee.ElmSubstat', '220 kV A1.ElmTerm'): 'Clonee 220 kV'}
+								   ('Clonee.ElmSubstat', '220 kV A1.ElmTerm'): 'Clonee 220 kV',
+								   ('Kellis.ElmSubstat', '220 kV A1.ElmTerm'): 'Kellis 220 kV',
+								   ('Maynooth.ElmSubstat', '220 kV A2.ElmTerm'): 'Maynooth 220 kV A',
+								   ('Maynooth.ElmSubstat', '220 kV B1.ElmTerm'): 'Maynooth 220 kV B'
+								   }
 		# Variables as part of HAST_test_inputs for testing
 		cls.test_vars = ['m:Z', 'c:Z_12']
 
@@ -60,6 +64,12 @@ class TestStandAloneFunctions(unittest.TestCase):
 		test_mut_name3 = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
 						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_04_14_41_06'
 						  r'\Clonee 220 kV_Clonee 110 kV.ElmMut')
+		test_mut_name4 = (r'\user1.IntUser\AIM 2017-MODEL-07022019-TAP_CloneePh3.IntPrj\Network Model.IntPrjfolder'
+						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_15_01_54_25'
+						  r'\Kellis 220 kV_Maynooth 220 kV A.ElmMut')
+		test_mut_name5 = (r'\user1.IntUser\AIM 2017-MODEL-07022019-TAP_CloneePh3.IntPrj\Network Model.IntPrjfolder'
+						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_15_01_54_25'
+						  r'\Maynooth 220 kV A_Maynooth 220 kV B.ElmMut')
 
 		# Main function tests
 		# Test that terminal extraction works correctly
@@ -90,6 +100,18 @@ class TestStandAloneFunctions(unittest.TestCase):
 						  TestModule.extract_var_name,
 						  test_term_name2, self.test_dict_terminals)
 
+		# Test works for different format of variable name (test_mut_name4)
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name4,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, ('Kellis 220 kV_Maynooth 220 kV A', 'Maynooth 220 kV A_Kellis 220 kV'))
+		self.assertEqual(ref_term, ('Kellis 220 kV', 'Maynooth 220 kV A'))
+
+		# Test works for different format of variable name (test_mut_name5)
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name5,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, ('Maynooth 220 kV A_Maynooth 220 kV B', 'Maynooth 220 kV B_Maynooth 220 kV A'))
+		self.assertEqual(ref_term, ('Maynooth 220 kV A', 'Maynooth 220 kV B'))
+
 	def test_extract_var_type(self):
 		"""
 			Tests the extract var type function works correctly
@@ -118,7 +140,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 			Tests the imported HAST results file can be returned in a suitable dataframe
 		"""
 		# Import file to obtain dataframe
-		df = TestModule.process_file(pth_file=HAST_Results1, dict_of_terms=self.test_dict_terminals)
+		df = TestModule.process_file(pth_file=HAST_Results1, hast_inputs=self.hast_file)
 		# Confirm it is the correct dimensions, properties and values
 		self.assertEqual(df.shape[0], 396)
 		self.assertEqual(df.shape[1], 15)
@@ -136,7 +158,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 			Tests that a HAST output containing R12 and X12 data can be handled correctly
 		"""
 		r12_test_file = os.path.join(TESTS_DIR, 'results4','FS_SC1_Base_case.csv')
-		df = TestModule.process_file(pth_file=r12_test_file, dict_of_terms=self.test_dict_terminals)
+		df = TestModule.process_file(pth_file=r12_test_file, hast_inputs=self.hast_file)
 		self.assertEqual(df.shape,(196, 15))
 		self.assertEqual(df.columns.levels[6][1], 'c:R_12')
 		self.assertAlmostEqual(df.iloc[5,10], 78.484256, places=5)
@@ -145,7 +167,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		"""
 			Test to import and combine multiple HAST results files and export them
 		"""
-		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, terminals=self.test_dict_terminals)
+		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, hast_inputs=self.hast_file)
 		# Confirm size correct
 		self.assertEqual(combined_df.shape, (396,30))
 		# Confirm columns correct
@@ -159,7 +181,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 			Tests that importing results with r12 and x12 data works correctly
 		"""
 		search_path = os.path.join(TESTS_DIR, 'results4')
-		combined_df = TestModule.import_all_results(search_pth=search_path, terminals=self.test_dict_terminals)
+		combined_df = TestModule.import_all_results(search_pth=search_path, hast_inputs=self.hast_file)
 		# Confirm size correct
 		self.assertEqual(combined_df.shape, (196,90))
 		# Confirm r12 and x12 headers correct
@@ -201,7 +223,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		if os.path.isfile(target_file):
 			os.remove(target_file)
 
-		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, terminals=self.test_dict_terminals)
+		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, hast_inputs=self.hast_file)
 		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=self.test_vars)
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))
@@ -218,7 +240,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		if os.path.isfile(target_file):
 			os.remove(target_file)
 
-		combined_df = TestModule.import_all_results(search_pth=search_path, terminals=self.test_dict_terminals)
+		combined_df = TestModule.import_all_results(search_pth=search_path, hast_inputs=self.hast_file)
 		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=test_vars)
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))
@@ -234,7 +256,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		if os.path.isfile(target_file):
 			os.remove(target_file)
 
-		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, terminals=self.test_dict_terminals)
+		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, hast_inputs=self.hast_file)
 		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=self.test_vars, plot_graphs=False)
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))
@@ -243,6 +265,10 @@ class TestStandAloneFunctions(unittest.TestCase):
 		"""
 			Confirm the for a variety of filter names they are extracted correctly
 		"""
+		# Set to None to avoid test module error flagging
+		test_cont_name = None
+		file_splits = None
+
 		name = dict()
 		name['FS_SC1_CDU2-CRU2-ckt1_F1_500.0Hz_20.0MVAR'] = ('CDU2-CRU2-ckt1', 'F1_500.0Hz_20.0MVAR')
 		name['FS_SC1_Base_Case'] = ('Base_Case','')
@@ -329,7 +355,7 @@ class TestImportingMultipleResults(unittest.TestCase):
 
 		# Method 2 = defining single folder and terminals for lookup
 		hast_file = TestModule.get_hast_values(search_pth=self.search_pth_1)
-		df2 = TestModule.import_all_results(search_pth=self.search_pth_1, terminals=hast_file.dict_of_terms)
+		df2 = TestModule.import_all_results(search_pth=self.search_pth_1, hast_inputs=hast_file)
 
 		# Sort dataframes to that they are in same order
 		df1.sort_index(axis=1, level=0, inplace=True)
