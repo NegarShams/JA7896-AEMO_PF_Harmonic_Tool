@@ -25,6 +25,7 @@ import hast2_1.constants as constants
 import time
 import collections
 import math
+import shutil
 
 # Meta Data
 __author__ = 'David Mills'
@@ -225,7 +226,6 @@ def manual_adjustments_to_var_names(list_of_var_names, dict_of_adjustments):
 		new_var_names.append(var)
 
 	return new_var_names
-
 
 def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	"""

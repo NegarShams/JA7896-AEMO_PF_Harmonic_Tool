@@ -21,6 +21,8 @@ import scipy.spatial.qhull
 from scipy.spatial import ConvexHull
 import itertools
 import hast2_1.constants as constants
+from pathlib import Path
+import shutil
 
 
 # Meta Data
@@ -212,10 +214,20 @@ class Excel:
 	def __enter__(self):
 		# Launch  new excel instance
 		self.xl = win32com.client.DispatchEx('Excel.Application')
+
 		# Following code ensures that makepy has been run to obtain the excel constants and defines them
 		# TODO: Need to do something to ensure that a new instance is always created so that if excel is opened
 		# TODO: whilst that instance is already active it does not get closed.
-		_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
+		try:
+			_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
+		except AttributeError:
+			f_loc = os.path.join(os.getenv('LOCALAPPDATA'), 'Temp\gen_py')
+			shutil.rmtree(f_loc)
+			# f_loc = r'C:\Users\david\AppData\Local\Temp\gen_py'
+			# for f in Path(f_loc):
+			# 	Path.unlink(f)
+			# Path.rmdir(f_loc)
+			_xl = win32com.gencache.EnsureDispatch('Excel.Application')
 		self.excel_constants = win32com.client.constants
 		del _xl
 		self.log_info('Excel instance initialised')
