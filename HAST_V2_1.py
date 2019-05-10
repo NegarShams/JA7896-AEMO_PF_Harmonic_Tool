@@ -83,6 +83,8 @@ __status__ = 'In Development - Beta'
 # GLOBAL variable used to avoid trying to print to PowerFactory when running in unittest mode, set to true by unittest
 DEBUG_MODE = False
 
+hast_inputs_filename = 'HAST_Inputs.xlsx'
+
 # TODO:  Identify machine running so can adjust target folder appropriately.  May not be required and instead could
 # TODO:  rename inputs file appropriately.
 
@@ -631,7 +633,7 @@ def create_mutual_impedance_list(location, terminal_list, list_of_mutual = [], l
 				if name not in list_of_mutual_names:
 					logger.debug('Term 1 = {} - {}, Term 2 = {} - {}'.format(pf_terminal_1, _y, pf_terminal_2, _x))
 					elmmut = create_mutual_elm(location, name, pf_terminal_1, pf_terminal_2)
-					list_of_mutual.append([str(y[0]), name, elmmut, pf_terminal_1, pf_terminal_2])
+					list_of_mutual.append([str(_y[0]), name, elmmut, pf_terminal_1, pf_terminal_2])
 
 					# Add name in both directions to list_of_mutual created
 					list_of_mutual_names.append(name)
@@ -1276,7 +1278,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 		   bf=2,af=2)
 	return prj_dict
 
-
 def check_terminals(list_of_points): 		# This checks and creates the list of terminals to add to the Results file
 	"""
 		Creates list of terminals to be added to the results file
@@ -1314,7 +1315,6 @@ def check_terminals(list_of_points): 		# This checks and creates the list of ter
 		print1(list_of_points[tm_count], bf=1, af=0)
 		tm_count = tm_count + 1
 	return terminals_index, terminals_ok
-
 
 def check_contingencies(list_of_contingencies): 		# This checks and creates the list of terminals to add to the Results file
 	"""
@@ -1371,7 +1371,6 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 	for item in new_contingency_list:
 		print1(item, bf=1, af=0)
 	return new_contingency_list, contingencies_ok
-
 
 def check_filters(list_of_filters):			# Checks and creates list of terminals to add the Filters to
 	"""
@@ -1472,7 +1471,8 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 # Main Engine ------------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------------------------
 # Following if statement stops the code being run unless it is the main script
-if __name__ == '__main__':
+
+def main(Import_Workbook, Results_Export_Folder=None):
 	""" Ensures this code is only run when run as the main script and not for unittesting """
 	# TODO: If want to unittest PF will need to put this into a function
 	sys.path.append(DIG_PATH)
@@ -1491,16 +1491,19 @@ if __name__ == '__main__':
 
 	import powerfactory  # Power factory module imported here to allow running in unattended mode
 
-	# File location of this script when running
-	filelocation = os.getcwd() + "\\"
-
 	# Start Timer
 	start = time.clock()
+	global start1
 	start1 = (time.strftime("%y_%m_%d_%H_%M_%S"))
 
 	# Power factory commands
 	# --------------------------------------------------------------------------------------------------------------------
 	# TODO:  Need to add in capability here to capture script fail and release so that powerfactory license is released
+	global app
+	global ldf
+	global hldf
+	global frq
+
 	app = powerfactory.GetApplication()  # Start PowerFactory  in engine  mode
 
 	# help("powerfactory")
@@ -1508,11 +1511,6 @@ if __name__ == '__main__':
 	ldf = app.GetFromStudyCase("ComLdf")  # Get load flow command
 	hldf = app.GetFromStudyCase("ComHldf")  # Get Harmonic load flow
 	frq = app.GetFromStudyCase("ComFsweep")  # Get Frequency Sweep Command
-	ini = app.GetFromStudyCase("ComInc")  # Get Dynamic Initialisation
-	sim = app.GetFromStudyCase("ComSim")  # Get Dynamic Simulation
-	shc = app.GetFromStudyCase("ComShc")  # Get short circuit command
-	res = app.GetFromStudyCase("ComRes")  # Get Result Export Command
-	wr = app.GetFromStudyCase("ComWr")  # Get Write command for wmf and bmp files
 	app.ClearOutputWindow()  # Clear Output Window
 
 	Error_Count = 1
@@ -1526,8 +1524,7 @@ if __name__ == '__main__':
 	Mutual_Variables = ["c:Z_12", "c:R_12", "c:X_12"]
 	# THD attribute was not previously included
 	HRM_Terminal_Variables = ['m:HD', 'm:THD']
-	# Import Excel
-	Import_Workbook = filelocation + "HAST_Inputs.xlsx"					# Gets the CWD current working directory
+	global Variation_Name
 	Variation_Name = "Temporary_Variation" + start1
 
 	# Create excel instance to deal with retrieving import data from excel
@@ -1539,18 +1536,20 @@ if __name__ == '__main__':
 	if len(Study_Settings) != 20:
 		print2('Error, Check input Study Settings there should be 20 Items in the list there are only: {} {}'
 			   .format(len(Study_Settings), Study_Settings))
-	if not Study_Settings[0]:											# If there is no output location in the spreadsheet it sets it to the CWD
-		Results_Export_Folder = filelocation
-	else:
-		Results_Export_Folder = Study_Settings[0]								# Folder to Export Excel Results too
+	if Results_Export_Folder is None:
+		if not Study_Settings[0]:											# If there is no output location in the spreadsheet it sets it to the CWD
+			Results_Export_Folder = filelocation
+		else:
+			Results_Export_Folder = Study_Settings[0]								# Folder to Export Excel Results too
 
 	# Declare file names
-	Excel_Results = Results_Export_Folder + Study_Settings[1] + start1			# Name of Exported Results File
+	Excel_Results = os.path.join(Results_Export_Folder, Study_Settings[1] + start1)			# Name of Exported Results File
 	Progress_Log = Results_Export_Folder + Study_Settings[2] + start1 + ".txt"	# Progress File
 	Error_Log = Results_Export_Folder + Study_Settings[3] + start1 + ".txt"		# Error File
 	Debug_Log = Results_Export_Folder + 'DEBUG' + start1 + '.txt'
 
 	# Temporary results folder to store in as exported (create if doesn't exist)
+	global Temp_Results_Export
 	Temp_Results_Export = os.path.join(Results_Export_Folder, start1)
 	if not os.path.exists(Temp_Results_Export):
 		os.makedirs(Temp_Results_Export)
@@ -1558,6 +1557,7 @@ if __name__ == '__main__':
 
 
 	# Setup logger with reference to powerfactory app
+	global logger
 	logger = hast2.logger.Logger(pth_debug_log=Debug_Log,
 								 pth_progress_log=Progress_Log,
 								 pth_error_log=Error_Log,
@@ -1576,46 +1576,62 @@ if __name__ == '__main__':
 		logger.info('Running in debug mode and so output / screen updating is not disabled')
 
 	# Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
+	global Net_Elm
 	Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
+	global Mut_Elm_Fld
 	Mut_Elm_Fld = Study_Settings[5] + start1									# Name of the folder to create under the network elements to store mutual impedances
 	Results_Folder = Study_Settings[6] + start1									# Name of the folder to keep results under studycase
+	global Operation_Scenario_Folder
 	Operation_Scenario_Folder = Study_Settings[7]	+ start1 					# Name of the folder to store Operational Scenarios
+	global Pre_Case_Check
 	Pre_Case_Check = Study_Settings[8]											# Checks the N-1 for load flow convergence and saves operational scenarios.
+	global FS_Sim
 	FS_Sim = Study_Settings[9]													# Carries out Frequency Sweep Analysis
+	global HRM_Sim
 	HRM_Sim = Study_Settings[10]												# Carries out Harmonic Load Flow Analysis
+	global Skip_Unsolved_Ldf
 	Skip_Unsolved_Ldf = Study_Settings[11]										# Skips the frequency sweep if the load flow doesn't solve
+	global Delete_Created_Folders
 	Delete_Created_Folders = Study_Settings[12]									# Deletes the Results folder, Mutual Elements and the Operational Scenario folder
 	Export_to_Excel = Study_Settings[13]										# Export the results to Excel
 	Excel_Visible = Study_Settings[14]											# Makes Excel Visible while plotting, Can be annoying if you are doing other work as if you click the excel screen it stops the simulation
 	Excel_Export_RX = Study_Settings[15]										# Export RX and graph the Impedance Loci in Excel
 	Excel_Convex_Hull = Study_Settings[16]										# This calculates the minimum points for the Loci
 	Excel_Export_Z = Study_Settings[17]											# Graph the Frequency Sweeps in Excel
+	global Excel_Export_Z12
 	Excel_Export_Z12 = Study_Settings[18]										# Export Mutual Impedances to excel
 	Excel_Export_HRM = Study_Settings[19]										# Export Harmonic Data
 	print1(Title, bf=1, af=0)
 	for keys,values in analysis_dict.items():									# Prints all the inputs to progress log
 		print1(keys, bf=1, af=0)
 		print1(values, bf=1, af=0)
+	global List_of_Studycases
 	List_of_Studycases = analysis_dict["Base_Scenarios"]						# Uses the list of Studycases
 	if len(List_of_Studycases) <1:												# Check there are the right number of inputs
 		print2("Error - Check excel input Base_Scenarios there should be at least 1 Item in the list ")
+	global List_of_Contingencies
 	List_of_Contingencies = analysis_dict["Contingencies"]						# Uses the list of Contingencies
 	if len(List_of_Contingencies) <1:											# Check there are the right number of inputs
 		print2("Error - Check excel input Contingencies there should be at least 1 Item in the list ")
+	global List_of_Filters
 	List_of_Filters = analysis_dict[constants.PowerFactory.sht_Filters]  # Imports Settings for the filters
 	if len(List_of_Filters) == 0:
 		logger.info('No harmonic filters listed for studies')
+	global List_of_Points
 	List_of_Points = analysis_dict["Terminals"]									# Uses the list of Terminals
 	if len(List_of_Points) <1:													# Check there are the right number of inputs
 		print2("Error - Check excel input Terminals there should be at least 1 Item in the list ")
+	global Load_Flow_Setting
 	Load_Flow_Setting = analysis_dict["Loadflow_Settings"]						# Imports Settings for LDF calculation
 	if len(Load_Flow_Setting) != 55:											# Check there are the right number of inputs
 		print2('Error - Check excel input Loadflow_Settings there should be 55 Items in the list there are only: {} {}'
 			   .format(len(Load_Flow_Setting), Load_Flow_Setting))
+	global Fsweep_Settings
 	Fsweep_Settings = analysis_dict["Frequency_Sweep"]							# Imports Settings for Frequency Sweep calculation
 	if len(Fsweep_Settings) != 16:												# Check there are the right number of inputs
 		print2('Error - Check excel input Frequency_Sweep there should be 16 Items in the list there are only: {} {}'
 			   .format(len(Fsweep_Settings), Fsweep_Settings))
+	global Harmonic_Loadflow_Settings
 	Harmonic_Loadflow_Settings = analysis_dict["Harmonic_Loadflow"]				# Imports Settings for Harmonic LDF calculation
 	if len(Harmonic_Loadflow_Settings) != 15:									# Check there are the right number of inputs
 		print2('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list there are only: {} {}'
@@ -1723,4 +1739,13 @@ if __name__ == '__main__':
 	logger.close_logging()
 
 	app = None
-	del app
+
+	return Excel_Results + constants.ResultsExtract.extension
+
+if __name__ == '__main__':
+	# Import Excel
+	# File location of this script when running
+	filelocation = os.getcwd() + "\\"
+	Import_Workbook = filelocation + hast_inputs_filename  # Gets the CWD current working directory
+	Results_File = main(Import_Workbook)
+	print(Results_File)
