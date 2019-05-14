@@ -10,6 +10,7 @@
 """
 
 import win32com.client              	# Windows COM clients needed for excel etc. if having trouble see notes
+import win32com.client.gencache
 import unittest
 import re
 import os
@@ -23,6 +24,7 @@ import itertools
 import hast2_1.constants as constants
 from pathlib import Path
 import shutil
+import logging
 
 
 # Meta Data
@@ -220,14 +222,16 @@ class Excel:
 		# TODO: whilst that instance is already active it does not get closed.
 		try:
 			_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
-		except AttributeError:
+		except (AttributeError, TypeError):
 			f_loc = os.path.join(os.getenv('LOCALAPPDATA'), 'Temp\gen_py')
 			shutil.rmtree(f_loc)
 			# f_loc = r'C:\Users\david\AppData\Local\Temp\gen_py'
 			# for f in Path(f_loc):
 			# 	Path.unlink(f)
 			# Path.rmdir(f_loc)
-			_xl = win32com.gencache.EnsureDispatch('Excel.Application')
+			_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
+		finally:
+			_xl = win32com.client.dynamic.Dispatch('Excel.Application')
 		self.excel_constants = win32com.client.constants
 		del _xl
 		self.log_info('Excel instance initialised')
@@ -1156,6 +1160,18 @@ class HASTInputs:
 		"""
 		self.list_of_terms = list_of_terminals
 		self.dict_of_terms = {(k[1], k[2]): k[0] for k in list_of_terminals}
+
+		# Confirm that none of the terminal names are greater than the maximum allowed character length
+		terminal_names = self.dict_of_terms.values()
+		long_names = [x for x in terminal_names if len(x) > constants.HASTInputs.max_terminal_name_length]
+		if long_names:
+			logger = logging.getLogger('HAST')
+			logger.critical('The following terminal names are greater than the maximum allowed length of {} characters'
+							.format(constants.HASTInputs.max_terminal_name_length))
+			for x in long_names:
+				logger.critical('Terminal name: {}'.format(x))
+			raise ValueError('The terminal names in the HAST inputs are too long! Reduce them to less than {} characters.'
+						  .format(constants.HASTInputs.max_terminal_name_length))
 
 		return None
 

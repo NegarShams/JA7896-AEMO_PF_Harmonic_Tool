@@ -14,8 +14,6 @@ Flow or extraction of ConvexHull data to excel.
 
 """
 
-# IMPORT SOME PYTHON MODULES
-# --------------------------------------------------------------------------------------------------------------------
 import os
 import pandas as pd
 import glob
@@ -25,7 +23,6 @@ import hast2_1.constants as constants
 import time
 import collections
 import math
-import shutil
 
 # Meta Data
 __author__ = 'David Mills'
@@ -33,8 +30,6 @@ __version__ = '2.1.2'
 __email__ = 'david.mills@PSCconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Beta'
-
-
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -46,24 +41,6 @@ target_file = None
 # Whether to include graphs when exporting
 PLOT_GRAPHS = True
 # To resolving naming issues with results extract from PowerFactory
-# TODO:  Look into way to limit PF name length to CSV file to avoid naming issue
-MANUAL_ADJUSTMENTS = {'Maynooth 220 kV .ElmMut':'Maynooth 220 kV A.ElmMut',
-					  'Maynooth 2(1).ElmMut': 'Maynooth 220 kV B.ElmMut',
-					  'North Wall 220 k.ElmMut': 'North Wall 220 kV.ElmMut',
-					  'Pollaphuca 110 k.ElmMut': 'Pollaphuca 110 kV.ElmMut',
-					  'Shannonbridge 22.ElmMut': 'Shannonbridge 220 kV.ElmMut',
-					  'Shellybanks 220 .ElmMut': 'Shellybanks 220 kV.ElmMut',
-					  'Thornsberry 110 .ElmMut': 'Thornsberry 110 kV.ElmMut',
-					  'Timahoe North 11.ElmMut': 'Timahoe North 110 kV.ElmMut',
-					  'Timahoe North 110 k.ElmMut': 'Timahoe North 110 kV.ElmMut',
-					  'West Dublin 220.ElmMut': 'West Dublin 220 kV.ElmMut',
-					  'West Dublin 220 .ElmMut': 'West Dublin 220 kV.ElmMut',
-					  'Knockumber 110 k.ElmMut': 'Knockumber 110 kV.ElmMut',
-					  'Muckerstown 110 .ElmMut': 'Muckerstown 110 kV.ElmMut',
-					  'Huntstown 220 kV (CD.ElmMut': 'Huntstown 220 kV (CDU2).ElmMut',
-					  'Huntstown 220 kV (CDU.ElmMut': 'Huntstown 220 kV (CDU2).ElmMut',
-					  'Huntstown 220 kV (CDU2.ElmMut': 'Huntstown 220 kV (CDU2).ElmMut'
-					  }
 
 try:
 	import tkinter as tk
@@ -87,24 +64,36 @@ def extract_var_name(var_name, dict_of_terms):
 
 	# Separate PowerFactory path into individual entries
 	vars_list = var_name.split('\\')
+	terminal_names = dict_of_terms.values()
 
 	# Process each variable to identify the mutual / terminal names
 	for var in vars_list:
 		if '.{}'.format(c.pf_mutual) in var:
-			# Two mutual names returns in lists for each direction and each ref_terminal
-			# Mutual name found so exit for loop
+			# Remove the reference to mutual impedance from the terminal
 			var_name = var.replace('.{}'.format(c.pf_mutual), '')
-			ref_terminals = var_name.split('_')
-			ref_terminal = (ref_terminals[0], ref_terminals[1])
 
-			if len(ref_terminals) > 2:
-				logger.warning(('Not completely sure if the reference terminals for mutual impedance {} are correct.'
+			term1 = None
+			term2 = None
+			for term in terminal_names:
+				if var_name.startswith(term):
+					term1 = term
+				if var_name.endswith(term):
+					term2 = term
+
+			# Combine terminals into name
+			ref_terminal = (term1, term2)
+
+			# Check that names have been determined for each variable
+			if not all(ref_terminal):
+				logger.error(('Not completely sure if the reference terminals for mutual impedance {} are correct.'
 								'In determining the reference terminals it is assumed that the mutual impedance is '
 								'named by HAST as "Terminal 1_Terminal 2" but this seems not to be the case here.'
 								'The following terminals have been used: \n'
 								'{}\n{}').format(var_name, ref_terminal[0], ref_terminal[1]))
+			# Two mutual names returns in lists for each direction and each ref_terminal
 			# Variable names as lists in reverse order
 			var_name = ('_'.join(ref_terminal),'_'.join(ref_terminal[::-1]))
+			# Mutual name found so exit for loop
 			break
 		elif '.{}'.format(c.pf_substation) in var:
 			var_sub = var
@@ -535,7 +524,7 @@ def import_all_results(search_pth, hast_inputs, search_type='FS'):
 	# Import each results file and combine into a single dataframe
 	dfs = []
 	for i, file in enumerate(files):
-		_df = process_file(pth_file=file, hast_inputs=hast_inputs, manual_adjustments=MANUAL_ADJUSTMENTS)
+		_df = process_file(pth_file=file, hast_inputs=hast_inputs)
 		dfs.append(_df)
 		logger.info(' - \t {}/{} HAST results file: {} imported'.format(i+1, no_files, os.path.basename(file)))
 
@@ -652,7 +641,7 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 		# Check if any columns are still duplicated as this must now be due to different result sets
 		# Check and rename results if duplicated study case names at level (Full Results Name)
 		duplicated_col_names = df.columns.get_duplicates()
-		if duplicated_col_names:
+		if not duplicated_col_names.empty:
 			# Produce dictionary for any duplicated names
 			dict_duplicates = {k: 1 for k in duplicated_col_names}
 			idx_sc = df.columns.names.index(c.lbl_StudyCase)
@@ -694,7 +683,7 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 							'In total {} columns have been renamed')
 						   .format(len(duplicated_col_names)-len(duplicated_col_names2))
 						   )
-			if duplicated_col_names2:
+			if not duplicated_col_names2.empty:
 				raise IOError(' There are still duplicated columns being detected')
 
 		# Check for changes and record differences

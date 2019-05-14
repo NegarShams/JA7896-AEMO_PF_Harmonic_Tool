@@ -36,3 +36,16 @@ class TestHast(unittest.TestCase):
 									   Results_Export_Folder=self.results_export_folder)
 		self.assertTrue(os.path.isfile(results_file))
 
+class TestHASTInputsProcessing(unittest.TestCase):
+	"""
+		Class of tests to confirm the input processing is working correctly
+	"""
+	def test_long_terminal_names(self):
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_long_term_names.xlsx')
+		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+			analysis_dict = excel_cls.import_excel_harmonic_inputs(
+				workbookname=hast_inputs_file)
+		with self.assertRaises(ValueError):
+			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict)
+
+

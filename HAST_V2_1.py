@@ -54,7 +54,7 @@ something happens
 
 DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
 DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
-DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.4'
+DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.5'
 DIG_PYTHON_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5\Python\3.5'
 
 # IMPORT SOME PYTHON MODULES
@@ -1531,6 +1531,9 @@ def main(Import_Workbook, Results_Export_Folder=None):
 	# TODO: Make use of class in <hast2.excel_writing> for complete processing of inputs
 	with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
 		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
+	# TODO: Complete processing to convert everything to use class for processing
+	cls_hast_inputs = hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict, uid=start1)
+
 
 	Study_Settings = analysis_dict["Study_Settings"]
 	if len(Study_Settings) != 20:
@@ -1563,9 +1566,11 @@ def main(Import_Workbook, Results_Export_Folder=None):
 								 pth_error_log=Error_Log,
 								 app=app,
 								 debug=DEBUG_MODE)
-	for x,y in analysis_dict.items():
-		print1(x)
-		print1(y)
+	# for x,y in analysis_dict.items():
+	# 	print1(x)
+	# 	print1(y)
+
+
 
 	# Disable graphic updating
 	if not DEBUG_MODE:
@@ -1579,7 +1584,7 @@ def main(Import_Workbook, Results_Export_Folder=None):
 	global Net_Elm
 	Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
 	global Mut_Elm_Fld
-	Mut_Elm_Fld = Study_Settings[5] + start1									# Name of the folder to create under the network elements to store mutual impedances
+	Mut_Elm_Fld = Study_Settings[5]												# Name of the folder to create under the network elements to store mutual impedances
 	Results_Folder = Study_Settings[6] + start1									# Name of the folder to keep results under studycase
 	global Operation_Scenario_Folder
 	Operation_Scenario_Folder = Study_Settings[7]	+ start1 					# Name of the folder to store Operational Scenarios
@@ -1738,6 +1743,7 @@ def main(Import_Workbook, Results_Export_Folder=None):
 	logger.flush()
 	logger.close_logging()
 
+	del logger
 	app = None
 
 	return Excel_Results + constants.ResultsExtract.extension

@@ -244,6 +244,11 @@ class HASTInputs:
 	study_settings = 'Study_Settings'
 	study_cases = 'Base_Scenarios'
 	contingencies = 'Contingencies'
+	# Maximum length of an objects name in PowerFactory 2016 is 40 characters.
+	# Therefore the maximum name that can be used for a single terminal is 19 characters to allow two terminals to be
+	# joined together
+	max_terminal_name_length = 19
+
 
 analysis_sheets = (
 	(PowerFactory.sht_Study, "B5"),

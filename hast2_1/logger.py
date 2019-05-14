@@ -206,6 +206,13 @@ class Logger:
 		self.handler_progress_log.flush()
 		self.handler_error_log.flush()
 
+	def __del__(self):
+		"""
+			To correctly handle deleting and therefore shutting down of logging module
+		:return None:
+		"""
+		self.logger.debug('Logging stopped')
+		logging.shutdown()
 
 #  ----- UNIT TESTS -----
 class TestLoggerSetup(unittest.TestCase):

@@ -19,7 +19,6 @@ RESULTS_EXTRACT_3 = os.path.join(TESTS_DIR, 'Processed Hast Results3.xlsx')
 FULL_TEST = True
 
 # ----- UNIT TESTS -----
-# TODO: Unit tests to be produced
 class TestStandAloneFunctions(unittest.TestCase):
 	"""
 		Test class for all standalone functions
@@ -33,6 +32,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Dictionary of terminals used in test
 		cls.test_dict_terminals = {('Bracetown.ElmSubstat', '220 kV A2.ElmTerm'): 'Bracetown 220 kV',
 								   ('Clonee.ElmSubstat', '220 kV A1.ElmTerm'): 'Clonee 220 kV',
+								   ('Clonee.ElmSubstat', '110 kV A1.ElmTerm'): 'Clonee 110 kV',
 								   ('Kellis.ElmSubstat', '220 kV A1.ElmTerm'): 'Kellis 220 kV',
 								   ('Maynooth.ElmSubstat', '220 kV A2.ElmTerm'): 'Maynooth 220 kV A',
 								   ('Maynooth.ElmSubstat', '220 kV B1.ElmTerm'): 'Maynooth 220 kV B'
@@ -325,6 +325,30 @@ class TestStandAloneFunctions(unittest.TestCase):
 		self.assertEqual(keys[3],'b')
 		self.assertEqual(graphs['c'][2],19)
 
+
+class TestFunctionsWithoutHASTinputs(unittest.TestCase):
+	"""
+		Carries out tests which do not require the HAST inputs to be loaded
+	"""
+	def test_extract_var_name2(self):
+		"""
+			Tests the extract var name function works correctly
+		"""
+		test_dict_terminals = {('Carrigdangan.ElmSubstat', '110 kV A1.ElmTerm'): 'Carrigdangan_110 kV A1',
+							   ('Dunmanway.ElmSubstat', '110 kV A1.ElmTerm'): 'Dunmanway_110 kV A1',
+							   ('Boggeragh.ElmSubstat', '110 kV A1.ElmTerm'): 'Boggeragh_110 kV A1'
+							   }
+		# Mutual name to test as input
+		test_mut_name = (r'\zuelli_r.IntUser\AIM 2019-CP0930_Carrigdangan.IntPrj\Network Model.IntPrjfolder'
+						 r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_05_13_10_18_27'
+						 r'\Dunmanway_110 kV A1_Boggeragh_110 kV A1.ElmMut')
+
+		# Main function tests
+		# Test that terminal extraction works correctly
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name,
+														dict_of_terms=test_dict_terminals)
+		self.assertEqual(new_var, ('Dunmanway_110 kV A1_Boggeragh_110 kV A1',
+								   'Boggeragh_110 kV A1_Dunmanway_110 kV A1'))
 
 @unittest.skipIf(not FULL_TEST, 'Slower tests have been skipped')
 class TestImportingMultipleResults(unittest.TestCase):
