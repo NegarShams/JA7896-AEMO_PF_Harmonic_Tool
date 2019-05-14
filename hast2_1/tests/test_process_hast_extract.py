@@ -1,8 +1,7 @@
 import unittest
-import Process_HAST_extract as TestModule
 import os
-import hast2_1.constants as constants
 import pandas as pd
+import sys
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 SEARCH_PTH = os.path.join(TESTS_DIR, 'results1')
@@ -13,6 +12,10 @@ RESULTS_EXTRACT_1 = os.path.join(TESTS_DIR, 'Processed Hast Results1.xlsx')
 RESULTS_EXTRACT_2 = os.path.join(TESTS_DIR, 'Processed Hast Results2.xlsx')
 RESULTS_EXTRACT_3 = os.path.join(TESTS_DIR, 'Processed Hast Results3.xlsx')
 
+two_up = os.path.abspath(os.path.join(TESTS_DIR, '../..'))
+sys.path.append(two_up)
+import Process_HAST_extract as TestModule
+import hast2_1.constants as constants
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
 # testing for this is done elsewhere and this takes longer to run.  Setting to false skips the longer tests.
