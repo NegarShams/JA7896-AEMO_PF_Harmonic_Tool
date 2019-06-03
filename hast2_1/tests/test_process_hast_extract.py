@@ -8,6 +8,16 @@ SEARCH_PTH = os.path.join(TESTS_DIR, 'results1')
 HAST_INPUTS = os.path.join(SEARCH_PTH, 'HAST Inputs_test.xlsx')
 HAST_Results1 = os.path.join(SEARCH_PTH, 'FS_SC1_Base_Case.csv')
 
+# To deal with including nominal voltage in the export results for v2.2.0 of HAST processing
+SEARCH_PTH_v220 = os.path.join(TESTS_DIR, 'results1_v220')
+HAST_Results1_v220 = os.path.join(SEARCH_PTH_v220, 'FS_SC1_Base_Case.csv')
+RESULTS_EXTRACT_1_v220 = os.path.join(TESTS_DIR, 'Processed Hast Results1_v220.xlsx')
+
+# Constants creates for results5 test
+SEARCH_PTH_RESULTS5 = os.path.join(TESTS_DIR, 'results5(diff_voltages)')
+HAST_Results5 = os.path.join(SEARCH_PTH_RESULTS5, 'FS_SC1_Base_Case.csv')
+RESULTS_EXTRACT_5 = os.path.join(TESTS_DIR, 'Processed Hast Results5.xlsx')
+
 RESULTS_EXTRACT_1 = os.path.join(TESTS_DIR, 'Processed Hast Results1.xlsx')
 RESULTS_EXTRACT_2 = os.path.join(TESTS_DIR, 'Processed Hast Results2.xlsx')
 RESULTS_EXTRACT_3 = os.path.join(TESTS_DIR, 'Processed Hast Results3.xlsx')
@@ -46,6 +56,8 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Imports HAST inputs for further testing but full testing of import done elsewhere
 		if FULL_TEST:
 			cls.hast_file = TestModule.get_hast_values(search_pth=SEARCH_PTH)
+			cls.hast_file_v220 = TestModule.get_hast_values(search_pth=SEARCH_PTH_v220)
+			cls.hast_file_results5 = TestModule.get_hast_values(search_pth=SEARCH_PTH_RESULTS5)
 
 	def test_extract_var_name(self):
 		"""
@@ -146,6 +158,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		df = TestModule.process_file(pth_file=HAST_Results1, hast_inputs=self.hast_file)
 		# Confirm it is the correct dimensions, properties and values
 		self.assertEqual(df.shape[0], 396)
+		# Changed from 15 to 17 to account for 2 extra columns due to nominal voltage
 		self.assertEqual(df.shape[1], 15)
 		self.assertEqual(df.columns.levels[0][0], 'Bracetown 220 kV')
 		# Confirm that mutual impedance data is being added in
@@ -154,7 +167,70 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Confirm naming is correct
 		self.assertEqual(df.columns.names[0], 'Terminal')
 		# Check a single value
+		# Column changed from 10 to 11 to account for nominal voltage added
 		self.assertAlmostEqual(df.iloc[5,10], 78.484256, places=5)
+
+	def test_process_single_file_v220(self):
+		"""
+			Tests the imported HAST results file can be returned in a suitable dataframe
+			Unittest added for version 2.2.0 of the HAST inputs that not includes nominal voltage for each terminal
+		"""
+		# Import file to obtain dataframe
+		df = TestModule.process_file(pth_file=HAST_Results1_v220,
+									 hast_inputs=self.hast_file_v220)
+		# Confirm it is the correct dimensions, properties and values
+		self.assertEqual(df.shape[0], 396)
+		# Changed from 15 to 17 to account for 2 extra columns due to nominal voltage
+		self.assertEqual(df.shape[1], 17)
+		self.assertEqual(df.columns.levels[0][0], 'Bracetown 220 kV')
+		# Confirm that mutual impedance data is being added in
+		self.assertEqual(df.columns.levels[1][1], 'Bracetown 220 kV_Clonee 220 kV')
+		self.assertEqual(df.columns.levels[1][3], 'Clonee 220 kV_Bracetown 220 kV')
+		# Confirm naming is correct
+		self.assertEqual(df.columns.names[0], 'Terminal')
+		# Check a single value
+		# Column changed from 10 to 11 to account for nominal voltage added
+		self.assertAlmostEqual(df.iloc[5, 11], 78.484256, places=5)
+		# Check nominal voltage returned correctly
+		nom_voltage = df.loc[50.0, ('Bracetown 220 kV', 'Bracetown 220 kV', 220.0,
+									'SC1', 'Base_Case',
+									'', 'SC1_Base_Case', 'e:uknom')]
+		self.assertAlmostEqual(nom_voltage, 220.0, places=5)
+
+	def test_process_single_results5(self):
+		"""
+			Tests the imported HAST results file can be returned in a suitable dataframe
+			results5 contains busbars with different voltages so can confirm that different nominal voltages are
+			exported
+		"""
+		# Import file to obtain dataframe
+		df = TestModule.process_file(pth_file=HAST_Results5,
+									 hast_inputs=self.hast_file_results5)
+		# Confirm it is the correct dimensions, properties and values
+		self.assertEqual(df.shape[0], 396)
+		# Now accounts for 3 nodes and mutual impedance which gives 34 columns of data
+		self.assertEqual(df.shape[1], 34)
+		self.assertEqual(df.columns.levels[0][0], 'Bracetown 220 kV')
+		# Confirm that mutual impedance data is being added in
+		self.assertEqual(df.columns.levels[1][1], 'Bracetown 220 kV_Clonee 220 kV')
+		self.assertEqual(df.columns.levels[1][3], 'Clonee 220 kV')
+		# Confirm naming is correct
+		self.assertEqual(df.columns.names[0], 'Terminal')
+		# Check a single value
+		# Column changed from 10 to 11 to account for nominal voltage added
+		self.assertAlmostEqual(df.iloc[5, 11], 5.449258, places=5)
+		# Check nominal voltage returned correctly for Clonee 220 kV node
+		nom_voltage = df.loc[50.0, ('Clonee 220 kV', 'Clonee 220 kV', 220.0,
+									'SC1', 'Base_Case',
+									'', 'SC1_Base_Case', 'e:uknom')]
+		self.assertAlmostEqual(nom_voltage, 220.0, places=5)
+		# Check nominal voltage returned correctly for Corduff 110 kV node
+		nom_voltage = df.loc[50.0, ('Corduff 110 kV', 'Corduff 110 kV', 110.0,
+									'SC1', 'Base_Case',
+									'', 'SC1_Base_Case', 'e:uknom')]
+		self.assertAlmostEqual(nom_voltage, 110.0, places=5)
+
+		# #self.assertAlmostEqual(df.iloc[5,10], 13.4049420, places=5)
 
 	def test_process_r12_file(self):
 		"""
@@ -163,7 +239,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		r12_test_file = os.path.join(TESTS_DIR, 'results4','FS_SC1_Base_case.csv')
 		df = TestModule.process_file(pth_file=r12_test_file, hast_inputs=self.hast_file)
 		self.assertEqual(df.shape,(196, 15))
-		self.assertEqual(df.columns.levels[6][1], 'c:R_12')
+		self.assertEqual(df.columns.levels[7][1], 'c:R_12')
 		self.assertAlmostEqual(df.iloc[5,10], 78.484256, places=5)
 
 	def test_combine_multiple_files(self):
@@ -175,7 +251,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		self.assertEqual(combined_df.shape, (396,30))
 		# Confirm columns correct
 		self.assertEqual(combined_df.columns.levels[1][1],'Bracetown 220 kV_Clonee 220 kV')
-		self.assertEqual(combined_df.columns.names[5],constants.ResultsExtract.lbl_FullName)
+		self.assertEqual(combined_df.columns.names[6],constants.ResultsExtract.lbl_FullName)
 		# Check a random value
 		self.assertAlmostEqual(combined_df.iloc[10,15],29.087961, places=4)
 
@@ -188,7 +264,7 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Confirm size correct
 		self.assertEqual(combined_df.shape, (196,90))
 		# Confirm r12 and x12 headers correct
-		result_type_labels = combined_df.columns.levels[6]
+		result_type_labels = combined_df.columns.levels[7]
 		self.assertTrue('c:R_12' in result_type_labels)
 		self.assertTrue('c:X_12' in result_type_labels)
 		# Check a random value
@@ -227,6 +303,22 @@ class TestStandAloneFunctions(unittest.TestCase):
 			os.remove(target_file)
 
 		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH, hast_inputs=self.hast_file)
+		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=self.test_vars)
+		# Confirm newly created file exists
+		self.assertTrue(os.path.isfile(target_file))
+
+	def test_export_multiple_files_v220(self):
+		"""
+			Test to export the imported and combined results, just tests that the file exists rather than
+			the contents of it.
+		"""
+		# File to export to
+		target_file = RESULTS_EXTRACT_1_v220
+		# Check if file already exists and delete
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		combined_df = TestModule.import_all_results(search_pth=SEARCH_PTH_v220, hast_inputs=self.hast_file_v220)
 		TestModule.extract_results(pth_file=target_file, df=combined_df, vars_to_export=self.test_vars)
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))

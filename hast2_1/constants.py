@@ -144,6 +144,7 @@ class ResultsExtract:
 	lbl_Terminal = 'Terminal Name'
 	lbl_Reference_Terminal = 'Terminal'
 	lbl_Result = 'Result Type'
+	idx_nom_voltage = 'Nom Voltage (kV)'
 	# Location of m:R, m:X, m:Z, etc.
 	loc_pf_variable = 4
 	# Location of m:R12, m:X12, m:Z12, etc.
@@ -231,7 +232,7 @@ class HASTInputs:
 	file_format = '.xlsx'
 	base_case = 'Base_Case'
 	mutual_variables = ["c:Z_12", "c:R_12", "c:X_12"]
-	fs_term_variables = ["m:R", "m:X", "m:Z", "m:phiz"]
+	fs_term_variables = ["m:R", "m:X", "m:Z", "m:phiz", "e:uknom"]
 	hldf_term_variables = ['m:HD', 'm:THD']
 	res_values = ['b:fnow','b:ifnow']
 	# For checking variable extraction only

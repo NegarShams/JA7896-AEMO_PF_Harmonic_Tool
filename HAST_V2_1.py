@@ -1472,8 +1472,16 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 # ------------------------------------------------------------------------------------------------------------------
 # Following if statement stops the code being run unless it is the main script
 
-def main(Import_Workbook, Results_Export_Folder=None):
-	""" Ensures this code is only run when run as the main script and not for unittesting """
+def main(Import_Workbook, Results_Export_Folder=None, uid=None):
+	"""
+		Ensures this code is only run when run as the main script and not for unittesting
+	:param str Import_Workbook: Target HAST workbook for import
+	:param str Results_Export_Folder: (optional=None) String to results export folder,
+		if None provided then uses the value in the HAST inputs or the existing folder
+	:param str uid: (optional=None) String to use for unique identified,
+		if None provided then based on running time of script
+	:return:
+	"""
 	# TODO: If want to unittest PF will need to put this into a function
 	sys.path.append(DIG_PATH)
 	sys.path.append(DIG_PATH_REMOTE)
@@ -1494,7 +1502,10 @@ def main(Import_Workbook, Results_Export_Folder=None):
 	# Start Timer
 	start = time.clock()
 	global start1
-	start1 = (time.strftime("%y_%m_%d_%H_%M_%S"))
+	if uid is None:
+		start1 = (time.strftime("%y_%m_%d_%H_%M_%S"))
+	else:
+		start1 = uid
 
 	# Power factory commands
 	# --------------------------------------------------------------------------------------------------------------------
@@ -1513,17 +1524,8 @@ def main(Import_Workbook, Results_Export_Folder=None):
 	frq = app.GetFromStudyCase("ComFsweep")  # Get Frequency Sweep Command
 	app.ClearOutputWindow()  # Clear Output Window
 
-	Error_Count = 1
+	error_count = 1
 
-	# Enter what Variables you want to look at for terminals
-	FS_Terminal_Variables = ["m:R", "m:X", "m:Z", "m:phiz"]
-	# # Mutual_Variables = ["c:Z_12"]
-	# TODO:  Because mutual data is saved as part of network data it is not possible to get different mutual data from
-	# TODO:  results when parallel processing unless results extraction is completed as part of processing.  DM
-	# TODO:  imagines this would require adding a ComTask for the results extraction.
-	Mutual_Variables = ["c:Z_12", "c:R_12", "c:X_12"]
-	# THD attribute was not previously included
-	HRM_Terminal_Variables = ['m:HD', 'm:THD']
 	global Variation_Name
 	Variation_Name = "Temporary_Variation" + start1
 
@@ -1532,7 +1534,7 @@ def main(Import_Workbook, Results_Export_Folder=None):
 	with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
 		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
 	# TODO: Complete processing to convert everything to use class for processing
-	cls_hast_inputs = hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict, uid=start1)
+	cls_hast_inputs = hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict, uid_time=start1)
 
 
 	Study_Settings = analysis_dict["Study_Settings"]

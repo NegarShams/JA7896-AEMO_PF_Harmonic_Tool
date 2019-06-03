@@ -16,6 +16,7 @@ Flow or extraction of ConvexHull data to excel.
 
 import os
 import pandas as pd
+import numpy as np
 import glob
 import logging
 import hast2_1 as hast2
@@ -221,6 +222,7 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 		# Process the imported HAST results file into a dataframe with the relevant multi-index
 	:param str pth_file:  Full path to results that need importing
 	:param hast2_1.excel_writing.HASTInputs hast_inputs:  Handle to the HAST inputs data
+	:param dict manual_adjustments:  Contains naming conversions to use for the variables if they need adjusting
 	:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
 	"""
 	c = constants.ResultsExtract
@@ -238,15 +240,11 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	#	Variable type
 	filename = os.path.splitext(os.path.basename(pth_file))[0]
 
+	# Process the file name to understand the study case being considered
 	study_type, sc_name, cont_name, filter_name = process_file_name(file_name=filename,
 																	sc_names=hast_inputs.sc_names,
 																	cont_names=hast_inputs.cont_names)
-	# file_split = filename.split('_')
-	# study_type = file_split[0]
-	# sc_name = file_split[1]
-	# Separate filter and contingency names
-	# cont_name, filter_name = split_contingency_filter_values(list_of_terms=file_split)
-
+	# Determine if different filter modelling has been included
 	if filter_name != '':
 		full_name = '{}_{}_{}'.format(sc_name, cont_name, filter_name)
 	else:
@@ -313,6 +311,27 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 
 	# Combine dataframes into one and return
 	_df = pd.concat([_df, df_mutual], axis=1)
+
+	# Obtain nominal voltage for each terminal
+	idx = pd.IndexSlice
+	# Add in row to contain the nominal voltage
+	df_nom_voltage = pd.DataFrame(index=[c.idx_nom_voltage], columns=_df.columns)
+	_df.loc[c.idx_nom_voltage, :] = np.nan
+	# print(df_nom_voltage)
+	for term, df in _df.groupby(axis=1, level=c.lbl_Reference_Terminal):
+		idx_filter = idx[:,:,:,:,:,:,'e:uknom']
+		try:
+			# Obtain nominal voltage and then set row values appropriately to include in results
+			nom_voltage = df.loc[:,idx_filter].iloc[0,0]
+			_df.loc[c.idx_nom_voltage, idx[term,:,:,:,:,:,:]] = nom_voltage
+		except KeyError:
+			pass
+
+	# Add the new nominal voltage into the index data
+	_df = _df.T.set_index(c.idx_nom_voltage, append=True).T
+	_df = _df.reorder_levels([c.lbl_Reference_Terminal, c.lbl_Terminal, c.idx_nom_voltage,
+							  c.lbl_StudyCase, c.lbl_Contingency, c.lbl_Filter_ID,
+							  c.lbl_FullName, c.lbl_Result], axis=1)
 
 	return _df
 

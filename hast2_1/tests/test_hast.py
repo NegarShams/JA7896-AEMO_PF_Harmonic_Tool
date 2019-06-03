@@ -36,6 +36,30 @@ class TestHast(unittest.TestCase):
 									   Results_Export_Folder=self.results_export_folder)
 		self.assertTrue(os.path.isfile(results_file))
 
+	def test_results1_v2_0_processing(self):
+		"""
+			Produces a new set of HAST results based on update to include nominal voltage in v2.2.0
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'results1', 'HAST Inputs_test.xlsx')
+		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
+									   Results_Export_Folder=TESTS_DIR,
+									   uid='results1_v220')
+		self.assertTrue(os.path.isfile(results_file))
+
+	def test_results5_production(self):
+		"""
+			Produces a new set of HAST results using a HAST inputs file which contains different
+			nominal voltages
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST Inputs_test_different_voltages.xlsx')
+		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
+									   Results_Export_Folder=TESTS_DIR,
+									   uid='results5(diff_voltages)')
+		# results file should = False since Export to Excel = False in inputs spreadsheet
+		self.assertFalse(os.path.isfile(results_file))
+
 class TestHASTInputsProcessing(unittest.TestCase):
 	"""
 		Class of tests to confirm the input processing is working correctly
