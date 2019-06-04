@@ -23,10 +23,12 @@ class TestHast(unittest.TestCase):
 		"""
 			Produces stage 0 results that are needed for the harmonic limits calculation
 		"""
+		# Nominal voltage not included
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage0.xlsx')
 		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
 									   Results_Export_Folder=self.results_export_folder,
-									   uid='stage0')
+									   uid='stage0',
+									   include_nom_voltage=False)
 		self.assertTrue(os.path.isfile(results_file))
 
 	def test_stage0_processing_v220(self):

@@ -1472,7 +1472,7 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 # ------------------------------------------------------------------------------------------------------------------
 # Following if statement stops the code being run unless it is the main script
 
-def main(Import_Workbook, Results_Export_Folder=None, uid=None):
+def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_voltage=True):
 	"""
 		Ensures this code is only run when run as the main script and not for unittesting
 	:param str Import_Workbook: Target HAST workbook for import
@@ -1480,9 +1480,15 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None):
 		if None provided then uses the value in the HAST inputs or the existing folder
 	:param str uid: (optional=None) String to use for unique identified,
 		if None provided then based on running time of script
+	:param bool include_nom_voltage:  (optional=True) - If set to False then nominal voltage is removed from
+		list of variables
 	:return:
 	"""
-	# TODO: If want to unittest PF will need to put this into a function
+
+	# Removes nominal voltage from list of variables to ensure backwards compatibility
+	if not include_nom_voltage:
+		constants.HASTInputs.fs_term_variables.remove(constants.PowerFactory.pf_nom_voltage)
+
 	sys.path.append(DIG_PATH)
 	sys.path.append(DIG_PATH_REMOTE)
 	sys.path.append(DIG_PYTHON_PATH)
