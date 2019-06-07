@@ -1,5 +1,6 @@
 import unittest
 import HAST_V2_1 as TestModule
+import Process_HAST_extract
 import os
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
@@ -49,7 +50,8 @@ class TestHast(unittest.TestCase):
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage1.xlsx')
 		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
 									   Results_Export_Folder=self.results_export_folder,
-									   uid='stage1')
+									   uid='stage1',
+									   include_nom_voltage=False)
 		self.assertTrue(os.path.isfile(results_file))
 
 	def test_stage1_processing_v220(self):
@@ -71,7 +73,8 @@ class TestHast(unittest.TestCase):
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage2.xlsx')
 		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
 									   Results_Export_Folder=self.results_export_folder,
-									   uid='stage2')
+									   uid='stage2',
+									   include_nom_voltage=False)
 		self.assertTrue(os.path.isfile(results_file))
 
 	def test_stage2_processing_v220(self):

@@ -41,6 +41,10 @@ target_file = None
 
 # Whether to include graphs when exporting
 PLOT_GRAPHS = True
+
+# For Backwards compatibility
+INCLUDE_NOM_VOLTAGE = True
+
 # To resolving naming issues with results extract from PowerFactory
 
 try:
@@ -333,6 +337,11 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 							  c.lbl_StudyCase, c.lbl_Contingency, c.lbl_Filter_ID,
 							  c.lbl_FullName, c.lbl_Result], axis=1)
 
+	# For backwards compatibility, remove multi-level index if required
+	if not INCLUDE_NOM_VOLTAGE:
+		cols = _df.columns.droplevel(c.idx_nom_voltage)
+		_df.columns = cols
+
 	return _df
 
 def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
@@ -399,14 +408,13 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 				# include_index = col <= c.start_col
 				include_index = True
 
-
 				df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
 				if not df_to_export.empty:
 					# Results are sorted in study case then contingency then filter order
 					df_to_export.to_excel(writer, merge_cells=True,
-														sheet_name=node_name,
-														startrow=start_row, startcol=col,
-														header=include_index, index_label=False)
+										  sheet_name=node_name,
+										  startrow=start_row, startcol=col,
+										  header=include_index, index_label=False)
 
 					# Add graphs if data is self-impedance
 					if var == constants.PowerFactory.pf_z1 and plot_graphs:

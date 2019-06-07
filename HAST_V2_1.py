@@ -1487,7 +1487,16 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 
 	# Removes nominal voltage from list of variables to ensure backwards compatibility
 	if not include_nom_voltage:
-		constants.HASTInputs.fs_term_variables.remove(constants.PowerFactory.pf_nom_voltage)
+		try:
+			constants.HASTInputs.fs_term_variables.remove(constants.PowerFactory.pf_nom_voltage)
+		except ValueError:
+			# Must have already been removed from list
+			pass
+		Process_HAST_extract.INCLUDE_NOM_VOLTAGE = False
+	# In case it is removed and needs adding back in again
+	elif constants.PowerFactory.pf_nom_voltage not in constants.HASTInputs.fs_term_variables:
+		constants.HASTInputs.fs_term_variables.append(constants.PowerFactory.pf_nom_voltage)
+
 
 	sys.path.append(DIG_PATH)
 	sys.path.append(DIG_PATH_REMOTE)

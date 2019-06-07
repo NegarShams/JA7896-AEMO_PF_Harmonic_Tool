@@ -237,10 +237,10 @@ class HASTInputs:
 	hldf_term_variables = ['m:HD', 'm:THD']
 	res_values = ['b:fnow','b:ifnow']
 	# For checking variable extraction only
-	all_variable_types = [mutual_variables +
+	all_variable_types = (mutual_variables +
 						  fs_term_variables +
 						  hldf_term_variables +
-						  res_values]
+						  res_values)
 	# Names of worksheets which contain the relevant inputs
 	terminals = 'Terminals'
 	study_settings = 'Study_Settings'
