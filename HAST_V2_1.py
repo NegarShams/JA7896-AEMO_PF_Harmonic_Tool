@@ -64,6 +64,7 @@ import sys
 import importlib
 import time
 import shutil
+import tkinter as tk
 
 # HAST module package requires reload during code development since python does not reload itself
 # HAST module package used as functions start to be transferred for efficiency
@@ -1766,9 +1767,31 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	return Excel_Results + constants.ResultsExtract.extension
 
 if __name__ == '__main__':
-	# Import Excel
-	# File location of this script when running
+	# Determine whether to use GUI for file selection or just HAST_Inputs.xlsx file
 	filelocation = os.getcwd() + "\\"
 	Import_Workbook = filelocation + hast_inputs_filename  # Gets the CWD current working directory
+
+	# Determine if a file already exists in the script folder that conforms to the standard input of
+	# HAST_Inputs.xlsx, if not then ask user to select the file.
+	if not os.path.isfile(Import_Workbook):
+		if tk:
+			# Load GUI for user to select file for HAST imports
+			Import_Workbook = hast2.gui.file_selector(
+				initial_pth=filelocation,
+				open_file=True,
+				lbl_file_select='Select HAST Inputs.xlsx file',
+				openfile_types=(('XLSX files','*.xlsx'),
+								('All Files','*.*'))
+			)
+			if Import_Workbook == '':
+				raise IOError('User did not select a file for HAST Inputs.xlsx')
+			else:
+				# gui.file_selector returns a list of which first element is the file required
+				Import_Workbook = Import_Workbook[0]
+		else:
+			# Captures an error with both the file not existing and the GUI not loading
+			raise IOError('No HAST_Inputs.xlsx and GUI unable to run. Place HAST_Inputs.xlsx in script directory')
+
+
+	# Run HAST with the selected Import Workbook
 	Results_File = main(Import_Workbook)
-	print(Results_File)

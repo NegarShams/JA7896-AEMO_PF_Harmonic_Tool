@@ -16,7 +16,10 @@ def file_selector(initial_pth='', open_file=False, save_dir=False,
 				  save_file=False,
 				  lbl_file_select='Select results file(s) to add',
 				  lbl_folder_select='Select folder to store results in',
-				  def_ext=constants.ResultsExtract.extension):
+				  def_ext=constants.ResultsExtract.extension,
+				  openfile_types=(('CSV files', '*.csv'),
+							  ('All Files', '*.*'))
+				  ):
 	"""
 		Function to allow the user to select a file to either open or save
 	:param str initial_pth: (optional='') Path to use as starting location
@@ -26,6 +29,7 @@ def file_selector(initial_pth='', open_file=False, save_dir=False,
 	:param str lbl_file_select: (optional) = Title for dialog box that pops up and asks for user to select results file
 	:param str lbl_folder_select: (optional) = Title for dialog box when asking user to select a folder
 	:param str def_ext: (optional) = Default extension for results export
+	:param tuple openfile_types: (optional) = Extension options for selecting a filetype to open
 	:return list file_paths:  List of paths or if target folder returned then this is the only item in the list
 	"""
 	file_paths = ['']
@@ -49,8 +53,7 @@ def file_selector(initial_pth='', open_file=False, save_dir=False,
 		# Load window asking user to select files for import
 		_files = tkinter.filedialog.askopenfilenames(initialdir=initial_pth,
 											   title=lbl_file_select,
-											   filetypes=(('CSV files', '*.csv'),
-														  ('All Files', '*.*')))
+											   filetypes=openfile_types)
 		file_paths = _files
 		root.destroy()
 	elif save_file:
