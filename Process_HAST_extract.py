@@ -319,9 +319,9 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	# Obtain nominal voltage for each terminal
 	idx = pd.IndexSlice
 	# Add in row to contain the nominal voltage
-	df_nom_voltage = pd.DataFrame(index=[c.idx_nom_voltage], columns=_df.columns)
+	# #df_nom_voltage = pd.DataFrame(index=[c.idx_nom_voltage], columns=_df.columns)
 	_df.loc[c.idx_nom_voltage, :] = np.nan
-	# print(df_nom_voltage)
+
 	for term, df in _df.groupby(axis=1, level=c.lbl_Reference_Terminal):
 		idx_filter = idx[:,:,:,:,:,:,'e:uknom']
 		try:
