@@ -141,12 +141,12 @@ def activate_project(project): 		# Activate project
 	pro = app.ActivateProject(project) 										# Activate project
 	if pro == 0:															# Project Activate Successfully
 		# Print Information to progress log and PowerFactory window
-		print1('Activated Project Successfully: {}'.format(project), bf=1, af=0)
+		logger.info('Activated Project Successfully: {}'.format(project))
 		# prj renamed _prj to avoid shadowing name from parent project
 		_prj = app.GetActiveProject()										# Get active project
 	else:																	# Project Failed to Activate
 		# Print Information to progress log and PowerFactory window and Error Log
-		print2(('Error Not able to Activate Project: {}.........................'.format(project)))
+		logger.error('Error Not able to Activate Project: {}....................'.format(project))
 		# prj renamed _prj to avoid shadowing name from parent project
 		_prj = []
 	return _prj
@@ -164,11 +164,12 @@ def activate_study_case(study_case): 		# Activate Study case
 	if len(study_case1) > 0:
 		cas = study_case1[0].Activate() 														# Activate Study case
 		if cas == 0:
-			print1('Activated Study Case Successfully: {}'.format(study_case1[0]), bf=1, af=0)
+			logger.debug('Activated Study Case Successfully: {}'.format(study_case1[0]))
 		else:
-			print2('Error Unsuccessfully Activated Study Case: {}.............................'.format(study_case))
+			logger.error('Error Unable to Activate Study Case: {}.............................'
+						 .format(study_case))
 	else:
-		print2('Could not activate StudyCase as no matching name in case: {}'.format(study_case))
+		logger.error('Could not activate StudyCase as no matching name in case: {}'.format(study_case))
 		cas = 1
 		study_case1 = [[]]
 
@@ -188,12 +189,11 @@ def deactivate_study_case(): 		# Deactivate Scenario
 		if sce == 0:
 			pass
 			logger.debug('Deactivated active study <{}> case successfully'.format(study))
-			# print1(1,"Deactivated Active Study Case Successfully : " + str(Study),0)
 		elif sce > 0:
 			print2('Error Unsuccessfully Deactivated Study Case: {}..............................'.format(study))
 			print2('Unsuccessfully Deactivated Scenario Error Code: {}'.format(sce))
 	else:
-		print1("No Study Case active to deactivate ................................", bf=2, af=0)
+		logger.debug("No Study Case active to deactivate ................................")
 	return None
 
 
@@ -209,7 +209,7 @@ def activate_scenario(scenario): 		# Activate Scenario
 	#print2('Scenarios :{}'.format(scenario1))
 	sce = scenario1[0].Activate() 											# Activate Study case
 	if sce == 0:
-		print1('Activated Scenario Successfully: {}'.format(scenario1[0]), bf=1, af=0)
+		logger.debug('Activated Scenario Successfully: {}'.format(scenario1[0]))
 	elif sce > 0:
 		print2('Error Unsuccessfully Activated Scenario: {}.........................'.format(scenario1[0]))
 		print2('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
@@ -224,10 +224,10 @@ def activate_scenario1(scenario): 		# Activate Scenario
 	"""
 	sce = scenario.Activate() 											# Activate Study case
 	if sce == 0:
-		print1('Activated Scenario Successfully: {}'.format(scenario), bf=1, af=0)
+		logger.debug('Activated Scenario Successfully: {}'.format(scenario))
 	elif sce == 1:
-		print2('Error Unsuccessfully Activated Scenario: {}...............................'.format(scenario))
-		print2('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
+		logger.error('Error Unsuccessfully Activated Scenario: {}...............................'.format(scenario))
+		logger.error('Unsuccessfully Activated Scenario Error Code: {}'.format(sce))
 	return sce
 
 
@@ -242,13 +242,11 @@ def deactivate_scenario(): 		# Deactivate Scenario
 		sce = scenario1.Deactivate() 											# Deactivate Study case
 		if sce == 0:
 			pass
-			# TODO:  Should add in debug statement if successful
-			# print1(1,("Deactivated Active Scenario Successfully : " + str(Scenario1)),0)
 		elif sce > 0:
-			print2('Error Unsuccessfully Deactivated Scenario: {}..............................'.format(scenario1))
-			print2('Unsuccessfully Deactivated Scenario Error Code: {}'.format(sce))
+			logger.error('Error Unsuccessfully Deactivated Scenario: {}............'.format(scenario1))
+			logger.error('Unsuccessfully Deactivated Scenario Error Code: {}'.format(sce))
 	else:
-		print1('No Scenario Active to Deactivate ................................', bf=1, af=0)
+		logger.debug('No Scenario Active to Deactivate ................................')
 	return None
 
 
@@ -260,12 +258,12 @@ def save_active_scenario(): 		# Save active scenario
 	scenario1 = app.GetActiveScenario()
 	sce = scenario1.Save()
 	if sce==0:
-		print1('Saved active scenario successfully: {}'.format(scenario1), bf=1, af=0)
+		logger.debug('Saved active scenario successfully: {}'.format(scenario1))
 	elif sce == 1 and scenario1 is None:
-		print2('Error unsuccessfully saved scenario: {}'.format(scenario1))
-		print2('Unsuccessfully saved scenario error code: {}'.format(sce))
+		logger.error('Error unsuccessfully saved scenario: {}'.format(scenario1))
+		logger.error('Unsuccessfully saved scenario error code: {}'.format(sce))
 	else:
-		print1('No Scenario Active to Save.........................................', bf=2, af=0)
+		logger.debug('No Scenario Active to Save.........................................')
 	return None
 
 
@@ -275,18 +273,18 @@ def get_active_variations():			# Get Active Network Variations
 	:return list variations: Returns list of variations currently active
 	"""
 	variations =  app.GetActiveNetworkVariations()
-	print1('Current Active Variations: ', bf=2, af=0)
+	logger.info('Current Active Variations: ')
 	if len(variations) > 1:
 		for item in variations:
 			aa = str(item)
 			pp = aa.split("Variations.IntPrjfolder\\")
 			ss = pp[1]
 			tt = ss.split(".IntScheme")
-			print1(tt[0], bf=1, af=0)
+			logger.info('\t{}'.format(tt[0]))
 	elif len(variations) == 1:
-		print1(variations, bf=1, af=0)
+		logger.info(variations)
 	else:
-		print1('No Variations Active', bf=1, af=0)
+		logger.info('No Variations Active')
 	return variations
 
 
@@ -307,7 +305,7 @@ def create_variation(folder, pfclass, name):
 
 	# Change color of variation
 	variation.icolor = 1
-	print1('Variation {} created'.format(variation))
+	logger.debug('Variation {} created'.format(variation))
 	# #else:
 	# #	# Returns list object so need to get first item
 	# #	variation = variation[0]
@@ -324,10 +322,10 @@ def activate_variation(variation): 		# Activate Scenario
 	"""
 	sce = variation.Activate() 											# Activate Study case
 	if sce == 0:
-		print1('Activated Variation Successfully: {}'.format(variation), bf=1, af=0)
+		logger.debug('Activated Variation Successfully: {}'.format(variation))
 	elif sce == 1:
-		print2('Error Unsuccessfully Activated Variation: {}........................'.format(variation))
-		print2('Unsuccessfully Activated Variation Error Code: {}'.format(sce))
+		logger.error('Error Unsuccessfully Activated Variation: {}........................'.format(variation))
+		logger.error('Unsuccessfully Activated Variation Error Code: {}'.format(sce))
 	return sce
 
 
@@ -353,7 +351,7 @@ def activate_stage(stage):
 	"""
 	sce = stage.Activate()
 	if sce == 0:
-		print1('Activated Variation Stage Successfully: {}'.format(stage), bf=1, af=0)
+		logger.debug('Activated Variation Stage Successfully: {}'.format(stage))
 	elif sce != 0:
 		print2('Error Unsuccessfully Activated Variation Stage: {}........................'.format(stage))
 		print2('Unsuccessfully Activated Variation Stage Error Code: {}'.format(sce))
@@ -448,11 +446,11 @@ def load_flow(load_flow_settings):		# Inputs load flow settings and executes loa
 	error_code = ldf.Execute()
 	t2 = time.clock() - t1
 	if error_code == 0:
-		print1('Load Flow calculation successful, time taken: {:.2f} seconds'.format(t2), bf=1, af=0)
+		logger.info('\t - Load Flow calculation successful, time taken: {:.2f} seconds'.format(t2))
 	elif error_code == 1:
-		print2('Load Flow failed due to divergence of inner loops, time taken: {:.2f} seconds..............'.format(t2))
+		logger.error('Load Flow failed due to divergence of inner loops, time taken: {:.2f} seconds'.format(t2))
 	elif error_code == 2:
-		print2('Load Flow failed due to divergence of outer loops, time taken: {:.2f} seconds..............'.format(t2))
+		logger.error('Load Flow failed due to divergence of outer loops, time taken: {:.2f} seconds'.format(t2))
 	return error_code
 
 
@@ -490,9 +488,9 @@ def harm_load_flow(results, harmonic_loadflow_settings):		# Inputs load flow set
 	error_code = hldf.Execute()
 	t2 = time.clock() - t1
 	if error_code == 0:
-		print1('Harmonic Load Flow calculation successful: {:.2f} seconds'.format(t2), bf=1, af=0)
+		logger.debug('Harmonic Load Flow calculation successful: {:.2f} seconds'.format(t2))
 	elif error_code > 0:
-		print2('Harmonic Load Flow calculation unsuccessful: {:.2f} seconds...............................'.format(t2))
+		logger.error('Harmonic Load Flow calculation unsuccessful: {:.2f} seconds.............'.format(t2))
 	return error_code
 
 
@@ -531,9 +529,9 @@ def freq_sweep(results, fsweep_settings):		# Inputs Frequency Sweep Settings and
 	error_code = frq.Execute()	
 	t2 = time.clock() - t1
 	if error_code == 0:
-		print1('Frequency Sweep calculation successful, time taken: {:.2f} seconds'.format(t2), bf=1, af=0)
+		logger.debug('Frequency Sweep calculation successful, time taken: {:.2f} seconds'.format(t2))
 	elif error_code > 0:
-		print2('Frequency Sweep calculation unsuccessful, time taken: {:.2f} seconds.......................'.format(t2))
+		logger.error('Frequency Sweep calculation unsuccessful, time taken: {:.2f} seconds.......'.format(t2))
 	return error_code
 
 
@@ -546,9 +544,9 @@ def switch_coup(element, service):			# Switches an Coupler out if 0 in if 1
 	"""
 	element.on_off = service
 	if service == 0:
-		print1('Switching Element: {} Out of service "'.format(element), bf=1, af=0)
+		logger.debug('Switching Element: {} Out of service "'.format(element))
 	if service == 1:
-		print1('Switching Element: {} In to service '.format(element), bf=1, af=0)
+		logger.debug('Switching Element: {} In to service '.format(element))
 	return None
 
 
@@ -562,7 +560,7 @@ def check_if_folder_exists(location, name):		# Checks if the folder exists
 	_new_object = location.GetContents('{}.IntFolder'.format(name))
 	folder_exists = 0
 	if len(_new_object) > 0:
-		print1('Folder already exists: {}'.format(name), bf=2, af=0)
+		logger.debug('Folder already exists: {}'.format(name))
 		folder_exists = 1
 	return _new_object, folder_exists
 
@@ -607,7 +605,7 @@ def create_mutual_impedance_list(location, terminal_list, list_of_mutual = [], l
 		(these are included in both directions 'from_to', 'to_from' to avoid duplication)
 	:return list list_of_mutual: List of mutual impedances
 	"""
-	print1('Creating: Mutual Impedance List of Terminals', bf=1, af=0)
+	logger.info('Creating: Mutual Impedance List of Terminals')
 	terminal_list1 = list(terminal_list)
 	# #logger.info(terminal_list1)
 
@@ -676,9 +674,9 @@ def get_object(object_to_retrieve):			# retrieves an object based on filter stri
 def delete_object(object_to_delete):			# retrieves an object based on filter strings
 	ob1 = object_to_delete.Delete()
 	if ob1 == 0:
-		print1('Object Successfully Deleted: {}'.format(object_to_delete), bf=1, af=0)
+		logger.debug('Object Successfully Deleted: {}'.format(object_to_delete))
 	else:
-		print2('Error deleting object: {}.....................'.format(object_to_delete))
+		logger.info('Error deleting object: {}.....................'.format(object_to_delete))
 	return None
 
 
@@ -689,12 +687,12 @@ def check_if_object_exists(location, name):  	# Check if the object exists
 	:param str name: Name of object to look for 
 	:return object_exists, new_object: True / False on whether object exists, handle for powerfactory.Object 
 	"""
-	print1('{} {}'.format(location, name), bf=2, af=0)
+	logger.debug('{} {}'.format(location, name))
 	#_new_object used instead of new_object to avoid shadowing
 	_new_object = location.GetContents(name)
 	object_exists = 0
 	if len(_new_object) > 0:
-		print1('Object Exists: {}'.format(name), bf=2, af=0)
+		logger.debug('Object Exists: {}'.format(name))
 		object_exists = 1
 	return object_exists, _new_object
 
@@ -709,9 +707,9 @@ def add_copy(folder, object, name1):		# copies an object to a new folder Name 1 
 	"""
 	new_object = folder.AddCopy(object, name1)
 	if new_object is not None:
-		print1('Copying object {} successful'.format(object), bf=1, af=0)
+		logger.debug('Copying object {} successful'.format(object))
 	else:
-		print2('Error AddCopy Unsuccessful: {} to {} as {}'.format(object, folder, name1))
+		logger.error('Error AddCopy Unsuccessful: {} to {} as {}'.format(object, folder, name1))
 	return new_object
 
 
@@ -840,7 +838,7 @@ def create_study_case_results_files(cls_sc, cls_prj):
 		# #_ = cls_sc.create_freq_sweep(results_file=cls_sc.fs_res, settings=Fsweep_Settings)
 	else:
 	# Frequency sweep not carried out so no need to add to task automation
-		print1('No frequency sweep included for study case {}'.format(cls_sc.name))
+		logger.info('No frequency sweep included for study case {}'.format(cls_sc.name))
 
 	if HRM_Sim:
 		# During task automation each process only has access to single study case and therefore results
@@ -860,10 +858,10 @@ def create_study_case_results_files(cls_sc, cls_prj):
 		# #print1('Harmonic load flow added for study case {}'.format(study_cls.name))
 
 	else:
-		print1('No Harmonic load flow added for study case {}'.format(cls_sc.name))
+		logger.info('No Harmonic load flow added for study case {}'.format(cls_sc.name))
 
-	print1('Creating of commands for studies in project {} completed in {:0.2f} seconds'
-		   .format(cls_prj.name, time.clock() - _t1_prj_start))
+	logger.info('Creating of commands for studies in project {} completed in {:0.2f} seconds'
+				.format(cls_prj.name, time.clock() - _t1_prj_start))
 	return None
 
 
@@ -1001,9 +999,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	time_sc_check = time.clock()
 	# TODO: Check function since there are a lot of unresolved references
 	print1('___________________________________________________________________________________________________', bf=2, af=0)
-	print1(('Checking all Projects, Study Cases and Scenarios Solve for Load Flow, it will also check N-1 and create ' +
-		 'the operational scenarios if Pre_Case_Check is True\n'),
-		   bf=2, af=0)
+	logger.info(('Checking all Projects, Study Cases and Scenarios Solve for Load Flow, it will also check N-1 and ' 
+				 ' create the operational scenarios if Pre_Case_Check is True\n'))
 	# _count_studycase used instead of count_studycase to avoid shadowing
 	_count_studycase = 0
 	new_list =[]
@@ -1026,15 +1023,12 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 				if scen_err == 0:
 					print1('Load flow being run for study case {}'.format(list_to_check[_count_studycase]))
 					ldf_err = load_flow(Load_Flow_Setting)																			# Perform Load Flow
-					print1('Load flow study completed with error code {}'.format(ldf_err))
+					logger.debug('Load flow study completed with error code {}'.format(ldf_err))
 					if ldf_err == 0 or Skip_Unsolved_Ldf == False:
 						new_list.append(list_to_check[_count_studycase])
 
-						print1("Studycase Scenario Solving added to analysis list: " + str(list_to_check[_count_studycase]),
-							   bf=2, af=0)
-
-						# TODO: If no pre-case check then nothing will be run, need to add in alternative options here
-
+						logger.debug('Studycase Scenario Solving added to analysis list {}'
+									 .format(list_to_check[_count_studycase]))
 
 						if Pre_Case_Check:																	# Checks all the contingencies and terminals are in the prj,cas
 							new_contingency_list, con_ok = check_contingencies(List_of_Contingencies) 				# Checks to see all the elements in the contingency list are in the case file
@@ -1141,8 +1135,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 								create_studies=True)
 
 							while cont_count < len(new_contingency_list):
-								print1('Carrying out Contingency Pre Stage Check: {}'.format(new_contingency_list[cont_count][0]),
-									   bf=2, af=0)
+								logger.debug('Carrying out Contingency Pre Stage Check: {}'
+											 .format(new_contingency_list[cont_count][0]))
 								# sc_base and op_base now reflect base case so no need to check
 								if new_contingency_list[cont_count][0] == "Base_Case":
 									cont_count += 1
@@ -1274,7 +1268,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 			print2('Problem Activating Project: {} {}'
 				   .format(list_to_check[_count_studycase][0], list_to_check[_count_studycase][1]))
 		_count_studycase += 1
-	print1('Finished Checking Study Cases in {:.2f}'.format(time.clock() - time_sc_check), bf=1, af=0)
+	logger.info('Finished Checking Study Cases in {:.2f}'.format(time.clock() - time_sc_check))
 	print1("___________________________________________________________________________________________________",
 		   bf=2,af=2)
 	return prj_dict
@@ -1310,10 +1304,10 @@ def check_terminals(list_of_points): 		# This checks and creates the list of ter
 							 .format(list_of_points[tm_count][1], list_of_points[tm_count][2]))
 				terminals_ok = 1
 		tm_count = tm_count + 1
-	print1("Terminals Used for Analysis: ", bf=2, af=0)
+	logger.info("Terminals Used for Analysis: ")
 	tm_count = 0
 	while tm_count < len(list_of_points):
-		print1(list_of_points[tm_count], bf=1, af=0)
+		logger.info('\t - {}'.format(list_of_points[tm_count]))
 		tm_count = tm_count + 1
 	return terminals_index, terminals_ok
 
@@ -1368,9 +1362,9 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 			contingencies_ok = 1
 		elif not skip_contingency:
 			new_contingency_list.append(list_of_couplers)
-	print1("Contingencies Used for Analysis:", bf=2, af=0)
+	logger.info("Contingencies Used for Analysis:")
 	for item in new_contingency_list:
-		print1(item, bf=1, af=0)
+		logger.info('\t - {}'.format(item))
 	return new_contingency_list, contingencies_ok
 
 def check_filters(list_of_filters):			# Checks and creates list of terminals to add the Filters to
@@ -1584,11 +1578,6 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 								 pth_error_log=Error_Log,
 								 app=app,
 								 debug=DEBUG_MODE)
-	# for x,y in analysis_dict.items():
-	# 	print1(x)
-	# 	print1(y)
-
-
 
 	# Disable graphic updating
 	if not DEBUG_MODE:
@@ -1690,15 +1679,15 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 				continue
 
 			t1_prj_start = time.clock()
-			print1('Creating studies for Study Cases associated with project {}'.format(prj_cls.name))
+			logger.info('Creating studies for Study Cases associated with project {}'.format(prj_cls.name))
 			prj_cls.update_auto_exec(fs=FS_Sim, hldf=HRM_Sim)
 
-			print1('Creating of commands for studies in project {} completed in {:0.2f} seconds'
-				   .format(prj_cls.name, time.clock()-t1_prj_start))
+			logger.info('Creating of commands for studies in project {} completed in {:0.2f} seconds'
+						.format(prj_cls.name, time.clock()-t1_prj_start))
 			t1_prj_studies = time.clock()
 
-			print1('Parallel running of frequency scans and harmonic load flows associated with project {}'
-				.format(prj_cls.name))
+			logger.info('Parallel running of frequency scans and harmonic load flows associated with project {}'
+						.format(prj_cls.name))
 
 			# Task Auto Execute seems to break logger so flush progress and error
 			# log commands here and then retrieve again
@@ -1713,13 +1702,13 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 			# TODO: Check logger is still functioning correctly at this point
 
 
-			print1('Studies for project {} completed in {:0.2f} seconds'
-				   .format(prj_cls.name, time.clock()-t1_prj_studies))
+			logger.info('Studies for project {} completed in {:0.2f} seconds'
+						.format(prj_cls.name, time.clock()-t1_prj_studies))
 
 			# Once studies complete, deactivate project
 			prj_cls.prj.Deactivate()
 
-		print1('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
+		logger.info('PowerFactory studies all completed in {:0.2f} seconds'.format(time.clock()-t1))
 
 	# Deleting newly created folders which will include study_cases and operational_scenarios
 	if Delete_Created_Folders:
@@ -1749,7 +1738,8 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	if Export_to_Excel:
 		combined_df, vars_in_hast = Process_HAST_extract.combine_multiple_hast_runs(
 			search_pths=[Temp_Results_Export],
-			drop_duplicates=False)
+			drop_duplicates=False
+		)
 		Process_HAST_extract.extract_results(
 			pth_file=Excel_Results + constants.ResultsExtract.extension,
 			df=combined_df,

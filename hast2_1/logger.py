@@ -119,13 +119,15 @@ class Logger:
 		self.handler_progress_log.flush()
 		self.handler_error_log.flush()
 
+		# Specifically remove the debug_handler
+		self.logger.removeHandler(self.handler_debug_log)
+
 		# Close and delete file handlers so no more logs will be written to file
 		for handler in reversed(self.file_handlers):
 			handler.close()
 			del handler
 
-		# Specifically remove the debug_handler
-		self.logger.removeHandler(self.handler_debug_log)
+
 
 	def get_file_handlers(self, pth, min_level=logging.INFO, buffer=False, flush_level=logging.INFO, buffer_cap=10,
 						  formatter=logging.Formatter()):

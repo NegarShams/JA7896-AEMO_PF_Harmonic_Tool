@@ -133,17 +133,17 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 				 .format(filter_name, hdl_cubicle, q, freq))
 
 	# TODO:  Rather that writing messages to confirm this could instead validate using
-	logger.info(hdl_filter)
-	logger.info('Connected cubicle = {} = {}'.format(hdl_cubicle, hdl_filter.GetAttribute(c.pf_shn_term)))
-	logger.info('Nominal voltage = {}kV = {}kV'.format(filter_ref.nom_voltage, hdl_filter.GetAttribute(c.pf_shn_voltage)))
-	logger.info('Shunt type = {} = {}'.format(filter_ref.type, hdl_filter.GetAttribute(c.pf_shn_type)))
-	logger.info('Shunt Q = {}MVAR = {}MVAR'.format(q, hdl_filter.GetAttribute(c.pf_shn_q)))
-	logger.info('Shunt tuning frequency = {:.2f}Hz = {:.2f}Hz'.format(freq, hdl_filter.GetAttribute(c.pf_shn_freq)))
-	logger.info('Shunt tuning order = {:.1f} = {:.1f}'.format(freq/constants.nom_freq, hdl_filter.GetAttribute(c.pf_shn_tuning)))
-	logger.info('Shunt Q factor = {} = {}'.format(filter_ref.quality_factor, hdl_filter.GetAttribute(c.pf_shn_qfactor)))
-	logger.info('Shunt Rp = {} = {}'.format(filter_ref.resistance_parallel, hdl_filter.GetAttribute(c.pf_shn_rp)))
+	logger.info('Filter {} added to model'.format(hdl_filter))
+	logger.debug('Connected cubicle = {} = {}'.format(hdl_cubicle, hdl_filter.GetAttribute(c.pf_shn_term)))
+	logger.debug('Nominal voltage = {}kV = {}kV'.format(filter_ref.nom_voltage, hdl_filter.GetAttribute(c.pf_shn_voltage)))
+	logger.debug('Shunt type = {} = {}'.format(filter_ref.type, hdl_filter.GetAttribute(c.pf_shn_type)))
+	logger.debug('Shunt Q = {}MVAR = {}MVAR'.format(q, hdl_filter.GetAttribute(c.pf_shn_q)))
+	logger.debug('Shunt tuning frequency = {:.2f}Hz = {:.2f}Hz'.format(freq, hdl_filter.GetAttribute(c.pf_shn_freq)))
+	logger.debug('Shunt tuning order = {:.1f} = {:.1f}'.format(freq/constants.nom_freq, hdl_filter.GetAttribute(c.pf_shn_tuning)))
+	logger.debug('Shunt Q factor = {} = {}'.format(filter_ref.quality_factor, hdl_filter.GetAttribute(c.pf_shn_qfactor)))
+	logger.debug('Shunt Rp = {} = {}'.format(filter_ref.resistance_parallel, hdl_filter.GetAttribute(c.pf_shn_rp)))
 
-	# Update drawing
+	# Update drawing so will appear if go and investigate study case
 	_app.ExecuteCmd('grp/abi')
 
 	return None
