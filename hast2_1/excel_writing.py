@@ -22,7 +22,6 @@ import scipy.spatial.qhull
 from scipy.spatial import ConvexHull
 import itertools
 import hast2_1.constants as constants
-from pathlib import Path
 import shutil
 import logging
 
@@ -33,6 +32,8 @@ __version__ = '1.4.1'
 __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Alpha'
+
+#TODO: Improve processing speed by using DataFrame import rather than line by line
 
 """ Following functions are used purely for processing the inputs of the HAST worksheet """
 def add_contingency(row_data):
@@ -69,9 +70,19 @@ def add_scenarios(row_data):
 def add_terminals(row_data):
 	"""
 		Function to read in the terminals data and save to list
-			:param list row_data:
-			:return list combined_entry:
-			"""
+	:param list row_data: Single row of data from excel workbook to be imported
+	:return list combined_entry: List of data as a combined entry
+	"""
+	logger = logging.getLogger(constants.logger_name)
+	if len(row_data) < 3:
+		# If row_data is less than 3 then it means an old HAST inputs sheet has probable been used and so a default
+		# value will be assumed instead
+		logger.warning(('No status given for whether mutual impedance should be included for terminal {} and '
+						'so default value of {} assumed.  If this has happend for every node then it may be because '
+						'an old HAST Input format has been used.')
+					   .format(row_data[0], constants.HASTInputs.default_include_mutual))
+		row_data.append(constants.HASTInputs.default_include_mutual)
+
 	combined_entry = [
 		row_data[0],
 		'{}.{}'.format(row_data[1], constants.PowerFactory.pf_substation),
@@ -79,6 +90,7 @@ def add_terminals(row_data):
 		# Third column now contains TRUE or FALSE.  If True then data will be included including
 		# transfer impedance from other nodes to this node.  If False then no data will be included.
 		row_data[3]]
+
 	return combined_entry
 
 class SubstationFilter:

@@ -20,6 +20,7 @@ __phone__ = '+44 7899 984158'
 __status__ = 'Constants'
 
 nom_freq = 50.0
+logger_name = 'HAST'
 
 # When parallel processing will ensure this number of cpus are kept free
 cpu_keep_free = 1
@@ -250,6 +251,8 @@ class HASTInputs:
 	# Therefore the maximum name that can be used for a single terminal is 19 characters to allow two terminals to be
 	# joined together
 	max_terminal_name_length = 19
+	# Default value on whether mutual impedance data should be included or not
+	default_include_mutual = True
 
 
 analysis_sheets = (

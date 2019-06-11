@@ -12,6 +12,7 @@
 """
 import logging
 import logging.handlers
+import hast2_1.constants as constants
 import sys
 import os
 import unittest
@@ -61,7 +62,7 @@ class Logger:
 			Function to setup the logging functionality
 		:return object logger:  Handle to the logger for writing messages
 		"""
-		logger = logging.getLogger('HAST')
+		logger = logging.getLogger(constants.logger_name)
 		# Ensures that even debug messages are captured even if they are not written to log file
 		logger.setLevel(logging.DEBUG)
 
