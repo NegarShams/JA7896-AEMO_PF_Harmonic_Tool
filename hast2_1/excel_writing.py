@@ -24,6 +24,7 @@ import itertools
 import hast2_1.constants as constants
 import shutil
 import logging
+from pywintypes import com_error # pywintypes used for Error Catching
 
 
 # Meta Data
@@ -70,18 +71,18 @@ def add_scenarios(row_data):
 def add_terminals(row_data):
 	"""
 		Function to read in the terminals data and save to list
-	:param list row_data: Single row of data from excel workbook to be imported
+	:param tuple row_data: Single row of data from excel workbook to be imported
 	:return list combined_entry: List of data as a combined entry
 	"""
 	logger = logging.getLogger(constants.logger_name)
-	if len(row_data) < 3:
-		# If row_data is less than 3 then it means an old HAST inputs sheet has probable been used and so a default
+	if len(row_data) < 4:
+		# If row_data is less than 4 then it means an old HAST inputs sheet has probable been used and so a default
 		# value will be assumed instead
 		logger.warning(('No status given for whether mutual impedance should be included for terminal {} and '
 						'so default value of {} assumed.  If this has happend for every node then it may be because '
 						'an old HAST Input format has been used.')
 					   .format(row_data[0], constants.HASTInputs.default_include_mutual))
-		row_data.append(constants.HASTInputs.default_include_mutual)
+		row_data = list(row_data) + [constants.HASTInputs.default_include_mutual]
 
 	combined_entry = [
 		row_data[0],
@@ -265,7 +266,8 @@ class Excel:
 		:param str workbookname: Name of workbook to be imported
 		:return analysis_dict: Dictionary of the settings for the analysis work
 		"""
-		# TODO: Rewrite analysis_dict as class
+		logger = logging.getLogger(constants.logger_name)
+
 		# Initialise empty dictionary
 		analysis_dict = dict()
 
@@ -278,7 +280,23 @@ class Excel:
 		# Loop through each worksheet defined in <analysis_sheets>
 		for x in self.analysis_sheets:
 			# Select and activate each worksheet
-			ws = wb.Sheets(x[0])  # Set Active Sheet
+			try:
+				# Tru statement to capture when worksheet doesn't exist
+				ws = wb.Sheets(x[0])  # Set Active Sheet
+			except com_error as error:
+				if error.excepinfo[5] == -2147352565:
+					logger.debug(('Old HAST inputs workbook used which is missing the worksheet {}. '
+								 'Therefore importing of this worksheet is skipped')
+								 .format(x[0]))
+					continue
+				else:
+					logger.critical('Unknown error when trying to load worksheet {} from workbook {}'
+									.format(x[0], workbookname))
+					raise error
+
+
+
+
 			# Don't think sheet needs to be activated
 			ws.Activate()  # Activate Sheet
 			cell_start = x[1]  # Starting Cell

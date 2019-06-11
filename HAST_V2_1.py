@@ -57,6 +57,12 @@ DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
 DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.5'
 DIG_PYTHON_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5\Python\3.5'
 
+# DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2019'
+# DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
+# DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2019\Python\3.5'
+# DIG_PYTHON_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5\Python\3.5'
+
+
 # IMPORT SOME PYTHON MODULES
 # --------------------------------------------------------------------------------------------------------------------
 import os
@@ -65,6 +71,7 @@ import importlib
 import time
 import shutil
 import tkinter as tk
+import distutils.version
 
 # HAST module package requires reload during code development since python does not reload itself
 # HAST module package used as functions start to be transferred for efficiency
@@ -1525,10 +1532,22 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	global hldf
 	global frq
 
-	app = powerfactory.GetApplication()  # Start PowerFactory  in engine  mode
+	# TODO: Write unittest to check exception raised if powerfactory not loaded
+	if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
+		# powerfactory after 2017 has an error handler when trying to load
+		try:
+			app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine  mode
+		except powerfactory.ExitError as error:
+			print('An error occured trying to start PowerFactory, there error was {}'.format(error))
+			print('Error Code returned by PowerFactory = {}'.format(error.code))
+			raise SyntaxError('Power Factory Load Error - Unable to run HAST')
+	else:
+		# Incase of an older version of PowerFactory being run
+		app = powerfactory.GetApplication()
+		if app is None:
+			print('Unable to load PowerFactory')
+			raise SyntaxError('PowerFactory Load Error - Unable to run HAST')
 
-	# help("powerfactory")
-	user = app.GetCurrentUser()  # Get the current active user
 	ldf = app.GetFromStudyCase("ComLdf")  # Get load flow command
 	hldf = app.GetFromStudyCase("ComHldf")  # Get Harmonic load flow
 	frq = app.GetFromStudyCase("ComFsweep")  # Get Frequency Sweep Command

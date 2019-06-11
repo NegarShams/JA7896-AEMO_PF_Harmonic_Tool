@@ -1,6 +1,5 @@
 import unittest
 import HAST_V2_1 as TestModule
-import Process_HAST_extract
 import os
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
@@ -65,7 +64,6 @@ class TestHast(unittest.TestCase):
 									   uid='stage1_v220')
 		self.assertTrue(os.path.isfile(results_file))
 
-
 	def test_stage2_processing(self):
 		"""
 			Produces stage 2 results that are needed for the harmonic limits calculation
@@ -87,7 +85,6 @@ class TestHast(unittest.TestCase):
 									   Results_Export_Folder=self.results_export_folder_v220,
 									   uid='stage2_v220')
 		self.assertTrue(os.path.isfile(results_file))
-
 
 	def test_results1_v2_0_processing(self):
 		"""
@@ -124,5 +121,4 @@ class TestHASTInputsProcessing(unittest.TestCase):
 				workbookname=hast_inputs_file)
 		with self.assertRaises(ValueError):
 			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict)
-
 
