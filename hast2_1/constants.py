@@ -43,8 +43,10 @@ class PowerFactory:
 	sht_HLF = 'Harmonic_Loadflow'
 	HAST_Input_Scenario_Sheets = (sht_Contingencies, sht_Scenarios, sht_Terminals, sht_Filters)
 	HAST_Input_Settings_Sheets = (sht_Study, sht_LF, sht_Freq, sht_HLF)
+	# Different filter types available in PowerFactory 2016
 	Filter_type = {'C-Type':4,
-				   'Single':0}
+				   'Single':0,
+				   'High Pass':3}
 	pf_substation = 'ElmSubstat'
 	pf_terminal =  'ElmTerm'
 	pf_coupler = 'ElmCoup'
