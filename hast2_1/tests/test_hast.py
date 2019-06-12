@@ -1,6 +1,7 @@
 import unittest
 import HAST_V2_1 as TestModule
 import os
+import shutil
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
 # testing for this is done elsewhere and this takes longer to run.  Setting to false skips the longer tests.
@@ -109,6 +110,30 @@ class TestHast(unittest.TestCase):
 									   uid='results5(diff_voltages)')
 		# results file should = False since Export to Excel = False in inputs spreadsheet
 		self.assertFalse(os.path.isfile(results_file))
+
+	def test_path_not_found(self):
+		"""
+			Tests that if a path is provided that cannot be created the script still runs and a folder is created
+			elsewhere
+		:return:
+		"""
+		test_uid = 'results(path_not_found)'
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage0.xlsx')
+		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
+									   Results_Export_Folder=r'D:\Test Fail\Newly created\not possible',
+									   uid=test_uid)
+		# results file should = False since Export to Excel = False in inputs spreadsheet
+		self.assertTrue(os.path.isfile(results_file))
+		path_to_raw_results = os.path.join(os.path.dirname(results_file), test_uid)
+		self.assertTrue(os.path.isdir(path_to_raw_results))
+
+		# Tidy up by deleting path and results file (shutil deletes a non-empty tree)
+		shutil.rmtree(path_to_raw_results)
+		os.remove(results_file)
+		# Confirm deleted successfully
+		self.assertFalse(os.path.isfile(results_file))
+		self.assertFalse(os.path.isdir(path_to_raw_results))
+
 
 class TestHASTInputsProcessing(unittest.TestCase):
 	"""

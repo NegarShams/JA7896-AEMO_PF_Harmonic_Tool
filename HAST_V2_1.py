@@ -93,6 +93,9 @@ DEBUG_MODE = False
 
 hast_inputs_filename = 'HAST_Inputs.xlsx'
 
+# Location of this script so can be used for any files that need to be located
+filelocation = os.path.dirname(os.path.abspath(__file__))
+
 # TODO:  Identify machine running so can adjust target folder appropriately.  May not be required and instead could
 # TODO:  rename inputs file appropriately.
 
@@ -1486,7 +1489,6 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 		list of variables
 	:return:
 	"""
-
 	# Removes nominal voltage from list of variables to ensure backwards compatibility
 	if not include_nom_voltage:
 		try:
@@ -1576,19 +1578,39 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 		else:
 			Results_Export_Folder = Study_Settings[0]								# Folder to Export Excel Results too
 
+	# Temporary results folder to store in as exported (create if doesn't exist)
+	global Temp_Results_Export
+	Temp_Results_Export = os.path.join(Results_Export_Folder, start1)
+	if not os.path.exists(Temp_Results_Export):
+		# Try/except statement added in case poor path given in HAST Inputs that cannot be found or created
+		try:
+			os.makedirs(Temp_Results_Export)
+		except (FileNotFoundError, OSError):
+			# Since folder cannot be created assume issue with full path provided
+			Temp_Results_Export_Original = Temp_Results_Export
+			Results_Export_Folder = filelocation
+			Temp_Results_Export = os.path.join(Results_Export_Folder, start1)
+			# Have to use print statement since logger has not been enabled yet
+			print(('Not able to create the following folder for saving the PowerFactory raw results:  {}\n'
+				   'Instead the raw results will be saved in: {}\n'
+				   'and the processed results will be saved in: {}')
+				  .format(Temp_Results_Export_Original, Temp_Results_Export, Results_Export_Folder))
+			# Additional Try / Except clause in case fails on next attempt as well such as because read / write
+			# permissions not possible
+			try:
+				os.makedirs(Temp_Results_Export)
+			except (FileNotFoundError, OSError):
+				print(('Unable to create a folder in {} either and so the script will stop!\n'
+					   'Check the HAST Inputs file: {}')
+					  .format(Temp_Results_Export, Import_Workbook))
+				raise FileNotFoundError('Unable to create folder for PowerFactory Results')
+
+
 	# Declare file names
 	Excel_Results = os.path.join(Results_Export_Folder, Study_Settings[1] + start1)			# Name of Exported Results File
 	Progress_Log = Results_Export_Folder + Study_Settings[2] + start1 + ".txt"	# Progress File
 	Error_Log = Results_Export_Folder + Study_Settings[3] + start1 + ".txt"		# Error File
 	Debug_Log = Results_Export_Folder + 'DEBUG' + start1 + '.txt'
-
-	# Temporary results folder to store in as exported (create if doesn't exist)
-	global Temp_Results_Export
-	Temp_Results_Export = os.path.join(Results_Export_Folder, start1)
-	if not os.path.exists(Temp_Results_Export):
-		os.makedirs(Temp_Results_Export)
-	shutil.copy(src=Import_Workbook, dst=os.path.join(Temp_Results_Export,'HAST Inputs_{}.xlsx'.format(start1)))
-
 
 	# Setup logger with reference to powerfactory app
 	global logger
@@ -1605,6 +1627,8 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 		app.EchoOff()
 	else:
 		logger.info('Running in debug mode and so output / screen updating is not disabled')
+
+	shutil.copy(src=Import_Workbook, dst=os.path.join(Temp_Results_Export,'HAST Inputs_{}.xlsx'.format(start1)))
 
 	# Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
 	global Net_Elm
@@ -1777,7 +1801,6 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 
 if __name__ == '__main__':
 	# Determine whether to use GUI for file selection or just HAST_Inputs.xlsx file
-	filelocation = os.getcwd() + "\\"
 	Import_Workbook = filelocation + hast_inputs_filename  # Gets the CWD current working directory
 
 	# Determine if a file already exists in the script folder that conforms to the standard input of
