@@ -629,7 +629,8 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	:return pd.DataFrame df, list vars_to_export:  Combined results into single dataframe, list of variables for export
 	"""
 	t0 = time.time()
-	logger.info('Importing all hast results files in list folders \n {}'.format(search_pths))
+	logger.info('Importing all hast results files in list folders: \n' +
+				 '\n'.join('\t{}' for  _ in range(len(search_pths))).format(*search_pths))
 	# Loop through each folder, obtain the hast files and produce the dataframes
 	c = constants.ResultsExtract
 	all_dfs = []

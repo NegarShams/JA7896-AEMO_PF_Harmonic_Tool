@@ -26,8 +26,8 @@ class TestHast(unittest.TestCase):
 		"""
 		# Nominal voltage not included
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage0.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=self.results_export_folder,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=self.results_export_folder,
 									   uid='stage0',
 									   include_nom_voltage=False)
 		self.assertTrue(os.path.isfile(results_file))
@@ -38,8 +38,8 @@ class TestHast(unittest.TestCase):
 			v220 - This now takes into consideration the nominal voltage of the node being investigated
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage0.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=self.results_export_folder_v220,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=self.results_export_folder_v220,
 									   uid='stage0_v220')
 		self.assertTrue(os.path.isfile(results_file))
 
@@ -48,8 +48,8 @@ class TestHast(unittest.TestCase):
 			Produces stage 1 results that are needed for the harmonic limits calculation
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage1.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=self.results_export_folder,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=self.results_export_folder,
 									   uid='stage1',
 									   include_nom_voltage=False)
 		self.assertTrue(os.path.isfile(results_file))
@@ -60,8 +60,8 @@ class TestHast(unittest.TestCase):
 			v220 - This now takes into consideration the nominal voltage of the node being investigated
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage1.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=self.results_export_folder_v220,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=self.results_export_folder_v220,
 									   uid='stage1_v220')
 		self.assertTrue(os.path.isfile(results_file))
 
@@ -70,8 +70,8 @@ class TestHast(unittest.TestCase):
 			Produces stage 2 results that are needed for the harmonic limits calculation
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage2.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=self.results_export_folder,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=self.results_export_folder,
 									   uid='stage2',
 									   include_nom_voltage=False)
 		self.assertTrue(os.path.isfile(results_file))
@@ -82,8 +82,8 @@ class TestHast(unittest.TestCase):
 			v220 - This now takes into consideration the nominal voltage of the node being investigated
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage2.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=self.results_export_folder_v220,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=self.results_export_folder_v220,
 									   uid='stage2_v220')
 		self.assertTrue(os.path.isfile(results_file))
 
@@ -93,8 +93,8 @@ class TestHast(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'results1', 'HAST Inputs_test.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=TESTS_DIR,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=TESTS_DIR,
 									   uid='results1_v220')
 		self.assertTrue(os.path.isfile(results_file))
 
@@ -105,8 +105,8 @@ class TestHast(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST Inputs_test_different_voltages.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=TESTS_DIR,
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=TESTS_DIR,
 									   uid='results5(diff_voltages)')
 		# results file should = False since Export to Excel = False in inputs spreadsheet
 		self.assertFalse(os.path.isfile(results_file))
@@ -119,8 +119,8 @@ class TestHast(unittest.TestCase):
 		"""
 		test_uid = 'results(path_not_found)'
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage0.xlsx')
-		results_file = TestModule.main(Import_Workbook=hast_inputs_file,
-									   Results_Export_Folder=r'D:\Test Fail\Newly created\not possible',
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=r'D:\Test Fail\Newly created\not possible',
 									   uid=test_uid)
 		# results file should = False since Export to Excel = False in inputs spreadsheet
 		self.assertTrue(os.path.isfile(results_file))

@@ -88,6 +88,10 @@ class PowerFactory:
 	pf_z12 = 'c:Z_12'
 	pf_nom_voltage = 'e:uknom'
 
+	ldf_command = 'ComLdf'
+	hldf_command = 'ComHldf'
+	frq_sweep_command = 'ComFsweep'
+
 	class ComRes:
 		# Power Factory class name
 		pf_comres = 'ComRes'

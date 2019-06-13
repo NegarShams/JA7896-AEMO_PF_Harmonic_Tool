@@ -53,15 +53,7 @@ something happens
 """
 
 DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
-DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
 DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.5'
-DIG_PYTHON_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5\Python\3.5'
-
-# DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2019'
-# DIG_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5'
-# DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2019\Python\3.5'
-# DIG_PYTHON_PATH_REMOTE = r'C:\Program Files\DIgSILENT\PowerFactory 2017 SP5\Python\3.5'
-
 
 # IMPORT SOME PYTHON MODULES
 # --------------------------------------------------------------------------------------------------------------------
@@ -379,6 +371,8 @@ def load_flow(load_flow_settings):		# Inputs load flow settings and executes loa
 	t1 = time.clock()
 	## Loadflow settings
 	## -------------------------------------------------------------------------------------
+	# Get handle for load flow command from study case
+	ldf = app.GetFromStudyCase(constants.PowerFactory.ldf_command)
 	# Basic
 	ldf.iopt_net = load_flow_settings[0]          		# Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
 	ldf.iopt_at = load_flow_settings[1]            		# Automatic Tap Adjustment
@@ -474,6 +468,9 @@ def harm_load_flow(results, harmonic_loadflow_settings):		# Inputs load flow set
 	t1 = time.clock()
 	## Loadflow settings
 	## -------------------------------------------------------------------------------------
+	# Get handle for harmonic load flow command from study case
+	hldf = app.GetFromStudyCase(constants.PowerFactory.hldf_command)
+
 	# Basic
 	hldf.iopt_net = harmonic_loadflow_settings[0]               	# Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
 	hldf.iopt_allfrq = harmonic_loadflow_settings[1]				# Calculate Harmonic Load Flow 0 - Single Frequency 1 - All Frequencies
@@ -514,11 +511,9 @@ def freq_sweep(results, fsweep_settings):		# Inputs Frequency Sweep Settings and
 	t1 = time.clock()
 	## Frequency Sweep Settings
 	## -------------------------------------------------------------------------------------
+	# Get handle for harmonic load flow command from study case
+	frq = app.GetFromStudyCase(constants.PowerFactory.frq_sweep_command)
 	# Basic
-	# nomfreq and maxfrq reported as not being used
-	# TODO: Check whether input frq.frnom should actually be nomfreq
-	# nomfreq = fsweep_settings[0]                  # Nominal Frequency
-	# maxfrq = fsweep_settings[1]                 	# Maximum Frequency
 	frq.iopt_net = fsweep_settings[2]                # Network Representation (0=Balanced 1=Unbalanced)
 	frq.fstart = fsweep_settings[3]                	# Impedance Calculation Start frequency
 	frq.fstop = fsweep_settings[4]              # Stop Frequency
@@ -1477,11 +1472,11 @@ def retrieve_results(elmres, res_type):			# Reads results into python lists from
 # ------------------------------------------------------------------------------------------------------------------
 # Following if statement stops the code being run unless it is the main script
 
-def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_voltage=True):
+def main(import_workbook, results_export_folder=None, uid=None, include_nom_voltage=True):
 	"""
 		Ensures this code is only run when run as the main script and not for unittesting
-	:param str Import_Workbook: Target HAST workbook for import
-	:param str Results_Export_Folder: (optional=None) String to results export folder,
+	:param str import_workbook: Target HAST workbook for import
+	:param str results_export_folder: (optional=None) String to results export folder,
 		if None provided then uses the value in the HAST inputs or the existing folder
 	:param str uid: (optional=None) String to use for unique identified,
 		if None provided then based on running time of script
@@ -1503,12 +1498,10 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 
 
 	sys.path.append(DIG_PATH)
-	sys.path.append(DIG_PATH_REMOTE)
 	sys.path.append(DIG_PYTHON_PATH)
-	sys.path.append(DIG_PYTHON_PATH_REMOTE)
 
-	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH + ';' + DIG_PATH_REMOTE
-	Title = ('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n' +
+	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
+	title = ('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n' +
 		'NAME:           Harmonics Automated Simulation Tool (HAST)\n' +
 		'VERSION:        {}\n' +
 		'AUTHOR:         {}, {}, {}\n' +
@@ -1530,9 +1523,6 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	# --------------------------------------------------------------------------------------------------------------------
 	# TODO:  Need to add in capability here to capture script fail and release so that powerfactory license is released
 	global app
-	global ldf
-	global hldf
-	global frq
 
 	# TODO: Write unittest to check exception raised if powerfactory not loaded
 	if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
@@ -1544,18 +1534,14 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 			print('Error Code returned by PowerFactory = {}'.format(error.code))
 			raise SyntaxError('Power Factory Load Error - Unable to run HAST')
 	else:
-		# Incase of an older version of PowerFactory being run
+		# In case of an older version of PowerFactory being run
 		app = powerfactory.GetApplication()
 		if app is None:
 			print('Unable to load PowerFactory')
 			raise SyntaxError('PowerFactory Load Error - Unable to run HAST')
 
-	ldf = app.GetFromStudyCase("ComLdf")  # Get load flow command
-	hldf = app.GetFromStudyCase("ComHldf")  # Get Harmonic load flow
-	frq = app.GetFromStudyCase("ComFsweep")  # Get Frequency Sweep Command
+	# Get commands from PowerFactory that are used in multiple locations
 	app.ClearOutputWindow()  # Clear Output Window
-
-	error_count = 1
 
 	global Variation_Name
 	Variation_Name = "Temporary_Variation" + start1
@@ -1563,38 +1549,41 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	# Create excel instance to deal with retrieving import data from excel
 	# TODO: Make use of class in <hast2.excel_writing> for complete processing of inputs
 	with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
-		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=Import_Workbook) 			# Reads in the Settings from the spreadsheet
+		# Reads in the Settings from the spreadsheet
+		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=import_workbook)
 	# TODO: Complete processing to convert everything to use class for processing
 	cls_hast_inputs = hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict, uid_time=start1)
 
 
-	Study_Settings = analysis_dict["Study_Settings"]
-	if len(Study_Settings) != 20:
+	study_settings = analysis_dict[constants.HASTInputs.study_settings]
+	if len(study_settings) != 20:
 		print2('Error, Check input Study Settings there should be 20 Items in the list there are only: {} {}'
-			   .format(len(Study_Settings), Study_Settings))
-	if Results_Export_Folder is None:
-		if not Study_Settings[0]:											# If there is no output location in the spreadsheet it sets it to the CWD
-			Results_Export_Folder = filelocation
+			   .format(len(study_settings), study_settings))
+	if results_export_folder is None:
+		if not study_settings[0]:
+			# If there is no output location in the spreadsheet it sets it to the CWD
+			results_export_folder = filelocation
 		else:
-			Results_Export_Folder = Study_Settings[0]								# Folder to Export Excel Results too
+			# Folder to Export Excel Results too
+			results_export_folder = study_settings[0]
 
 	# Temporary results folder to store in as exported (create if doesn't exist)
 	global Temp_Results_Export
-	Temp_Results_Export = os.path.join(Results_Export_Folder, start1)
+	Temp_Results_Export = os.path.join(results_export_folder, start1)
 	if not os.path.exists(Temp_Results_Export):
 		# Try/except statement added in case poor path given in HAST Inputs that cannot be found or created
 		try:
 			os.makedirs(Temp_Results_Export)
 		except (FileNotFoundError, OSError):
 			# Since folder cannot be created assume issue with full path provided
-			Temp_Results_Export_Original = Temp_Results_Export
-			Results_Export_Folder = filelocation
-			Temp_Results_Export = os.path.join(Results_Export_Folder, start1)
+			temp_results_export_original = Temp_Results_Export
+			results_export_folder = filelocation
+			Temp_Results_Export = os.path.join(results_export_folder, start1)
 			# Have to use print statement since logger has not been enabled yet
 			print(('Not able to create the following folder for saving the PowerFactory raw results:  {}\n'
 				   'Instead the raw results will be saved in: {}\n'
 				   'and the processed results will be saved in: {}')
-				  .format(Temp_Results_Export_Original, Temp_Results_Export, Results_Export_Folder))
+				  .format(temp_results_export_original, Temp_Results_Export, results_export_folder))
 			# Additional Try / Except clause in case fails on next attempt as well such as because read / write
 			# permissions not possible
 			try:
@@ -1602,21 +1591,21 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 			except (FileNotFoundError, OSError):
 				print(('Unable to create a folder in {} either and so the script will stop!\n'
 					   'Check the HAST Inputs file: {}')
-					  .format(Temp_Results_Export, Import_Workbook))
+					  .format(Temp_Results_Export, import_workbook))
 				raise FileNotFoundError('Unable to create folder for PowerFactory Results')
 
 
 	# Declare file names
-	Excel_Results = os.path.join(Results_Export_Folder, Study_Settings[1] + start1)			# Name of Exported Results File
-	Progress_Log = Results_Export_Folder + Study_Settings[2] + start1 + ".txt"	# Progress File
-	Error_Log = Results_Export_Folder + Study_Settings[3] + start1 + ".txt"		# Error File
-	Debug_Log = Results_Export_Folder + 'DEBUG' + start1 + '.txt'
+	excel_results = os.path.join(results_export_folder, study_settings[1] + start1)			# Name of Exported Results File
+	progress_log = os.path.join(results_export_folder, study_settings[2] + start1 + ".txt")	# Progress File
+	error_log = os.path.join(results_export_folder, study_settings[3] + start1 + ".txt")	# Error File
+	debug_log = os.path.join(results_export_folder + 'DEBUG' + start1 + '.txt')
 
 	# Setup logger with reference to powerfactory app
 	global logger
-	logger = hast2.logger.Logger(pth_debug_log=Debug_Log,
-								 pth_progress_log=Progress_Log,
-								 pth_error_log=Error_Log,
+	logger = hast2.logger.Logger(pth_debug_log=debug_log,
+								 pth_progress_log=progress_log,
+								 pth_error_log=error_log,
 								 app=app,
 								 debug=DEBUG_MODE)
 
@@ -1628,35 +1617,30 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	else:
 		logger.info('Running in debug mode and so output / screen updating is not disabled')
 
-	shutil.copy(src=Import_Workbook, dst=os.path.join(Temp_Results_Export,'HAST Inputs_{}.xlsx'.format(start1)))
+	shutil.copy(src=import_workbook, dst=os.path.join(Temp_Results_Export, 'HAST Inputs_{}.xlsx'.format(start1)))
 
-	# Random_Log = Results_Export_Folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
+	# Random_Log = results_export_folder + "Random_Log_" + start1 + ".txt"		# For printing random info solely for development
 	global Net_Elm
-	Net_Elm = Study_Settings[4]													# Where all the Network elements are stored
+	Net_Elm = study_settings[4]													# Where all the Network elements are stored
 	global Mut_Elm_Fld
-	Mut_Elm_Fld = Study_Settings[5]												# Name of the folder to create under the network elements to store mutual impedances
-	Results_Folder = Study_Settings[6] + start1									# Name of the folder to keep results under studycase
+	Mut_Elm_Fld = study_settings[5]												# Name of the folder to create under the network elem to store mutual impedances
 	global Operation_Scenario_Folder
-	Operation_Scenario_Folder = Study_Settings[7]	+ start1 					# Name of the folder to store Operational Scenarios
+	Operation_Scenario_Folder = study_settings[7]	+ start1 					# Name of the folder to store Operational Scenarios
 	global Pre_Case_Check
-	Pre_Case_Check = Study_Settings[8]											# Checks the N-1 for load flow convergence and saves operational scenarios.
+	Pre_Case_Check = study_settings[8]											# Checks the N-1 for load flow convergence and saves operational scenarios.
 	global FS_Sim
-	FS_Sim = Study_Settings[9]													# Carries out Frequency Sweep Analysis
+	FS_Sim = study_settings[9]													# Carries out Frequency Sweep Analysis
 	global HRM_Sim
-	HRM_Sim = Study_Settings[10]												# Carries out Harmonic Load Flow Analysis
+	HRM_Sim = study_settings[10]												# Carries out Harmonic Load Flow Analysis
 	global Skip_Unsolved_Ldf
-	Skip_Unsolved_Ldf = Study_Settings[11]										# Skips the frequency sweep if the load flow doesn't solve
+	Skip_Unsolved_Ldf = study_settings[11]										# Skips the frequency sweep if the load flow doesn't solve
 	global Delete_Created_Folders
-	Delete_Created_Folders = Study_Settings[12]									# Deletes the Results folder, Mutual Elements and the Operational Scenario folder
-	Export_to_Excel = Study_Settings[13]										# Export the results to Excel
-	Excel_Visible = Study_Settings[14]											# Makes Excel Visible while plotting, Can be annoying if you are doing other work as if you click the excel screen it stops the simulation
-	Excel_Export_RX = Study_Settings[15]										# Export RX and graph the Impedance Loci in Excel
-	Excel_Convex_Hull = Study_Settings[16]										# This calculates the minimum points for the Loci
-	Excel_Export_Z = Study_Settings[17]											# Graph the Frequency Sweeps in Excel
+	Delete_Created_Folders = study_settings[12]									# Deletes the Results folder, Mutual Elements and the Operational Scenario folder
+	export_to_excel = study_settings[13]										# Export the results to Excel
 	global Excel_Export_Z12
-	Excel_Export_Z12 = Study_Settings[18]										# Export Mutual Impedances to excel
-	Excel_Export_HRM = Study_Settings[19]										# Export Harmonic Data
-	print1(Title, bf=1, af=0)
+	Excel_Export_Z12 = study_settings[18]										# Export Mutual Impedances to excel
+
+	print1(title, bf=1, af=0)
 	for keys,values in analysis_dict.items():									# Prints all the inputs to progress log
 		print1(keys, bf=1, af=0)
 		print1(values, bf=1, af=0)
@@ -1699,12 +1683,6 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 
 	# Excel export contained within this loop
 	if FS_Sim or HRM_Sim:
-		FS_Contingency_Results, HRM_Contingency_Results = [], []
-		count_studycase = 0
-
-		# List of projects are created and then a unique list is used to iterate through for running studies in parallel
-		prj_list = []
-
 		# Get and deactivate current project
 		current_prj = app.GetActiveProject()
 		current_prj.Deactivate()
@@ -1778,13 +1756,13 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	app.EchoOn()
 
 	# Plot results to excel
-	if Export_to_Excel:
+	if export_to_excel:
 		combined_df, vars_in_hast = Process_HAST_extract.combine_multiple_hast_runs(
 			search_pths=[Temp_Results_Export],
 			drop_duplicates=False
 		)
 		Process_HAST_extract.extract_results(
-			pth_file=Excel_Results + constants.ResultsExtract.extension,
+			pth_file=excel_results + constants.ResultsExtract.extension,
 			df=combined_df,
 			vars_to_export=vars_in_hast)
 
@@ -1797,7 +1775,7 @@ def main(Import_Workbook, Results_Export_Folder=None, uid=None, include_nom_volt
 	del logger
 	app = None
 
-	return Excel_Results + constants.ResultsExtract.extension
+	return excel_results + constants.ResultsExtract.extension
 
 if __name__ == '__main__':
 	# Determine whether to use GUI for file selection or just HAST_Inputs.xlsx file
