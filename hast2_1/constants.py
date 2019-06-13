@@ -10,6 +10,7 @@
 """
 
 import pandas as pd
+import numpy as np
 import os
 import unittest
 
@@ -157,6 +158,7 @@ class ResultsExtract:
 
 	# Chart grouping
 	chart_grouping = (lbl_StudyCase, lbl_Contingency)
+	chart_grouping_base_case = (lbl_Contingency, )
 
 	# Default positions
 	start_row = 31 # (0 referenced so will be Excel row 32)
@@ -171,7 +173,8 @@ class ResultsExtract:
 	chrt_row = 1
 	chrt_col = 1
 	# Number of columns between each chart
-	chrt_space = 20
+	chrt_space = 18
+	chrt_vert_space = 30
 
 	# Labels for processing
 	# This label is used for the column headers when an entry should be deleted post processing
@@ -208,7 +211,11 @@ class ResultsExtract:
 			:param str value:  Value to be converted
 			:return str value:  Returns value with leading #
 			"""
-			return '#{}'.format(value)
+			# Confirm haven't got a nan value before returning so that nan values can be removed
+			if value is np.nan:
+				return value
+			else:
+				return '#{}'.format(value)
 
 		if not refresh and len(self.color_map) > 0:
 			return self.color_map
@@ -220,8 +227,11 @@ class ResultsExtract:
 		# Import data into a DataFrame in case there is any other processing that needs to be done
 		df_colormap = pd.read_excel(pth_color_map, header=0,
 									usecols=1, converters={1: hex_converter})
-		df_colormap.dropna(axis=0, inplace=True)
+		# Set the index of the dataframe equal to the first column
 		df_colormap.set_index(df_colormap.columns[0], inplace=True)
+		# Remove any nan values so that only actual colous remain and the length of the dataframe can be used
+		# to determine the plots
+		df_colormap.dropna(axis=0, inplace=True)
 
 		# Extract the index and color values
 		index = df_colormap.index

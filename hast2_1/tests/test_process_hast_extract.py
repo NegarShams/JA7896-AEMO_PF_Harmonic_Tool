@@ -2,6 +2,7 @@ import unittest
 import os
 import pandas as pd
 import sys
+import collections
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 SEARCH_PTH = os.path.join(TESTS_DIR, 'results1')
@@ -32,7 +33,7 @@ import hast2_1.constants as constants
 FULL_TEST = True
 
 # ----- UNIT TESTS -----
-class TestStandAloneFunctions(unittest.TestCase):
+class TestHASTImportFunctions(unittest.TestCase):
 	"""
 		Test class for all standalone functions
 	"""
@@ -58,97 +59,6 @@ class TestStandAloneFunctions(unittest.TestCase):
 			cls.hast_file = TestModule.get_hast_values(search_pth=SEARCH_PTH)
 			cls.hast_file_v220 = TestModule.get_hast_values(search_pth=SEARCH_PTH_v220)
 			cls.hast_file_results5 = TestModule.get_hast_values(search_pth=SEARCH_PTH_RESULTS5)
-
-	def test_extract_var_name(self):
-		"""
-			Tests the exctract var name function works correctly
-		"""
-		# Terminal name to test as input
-		test_term_name = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
-						r'\Network Data.IntPrjfolder\EirGrid.ElmNet\Bracetown.ElmSubstat\220 kV A2.ElmTerm')
-		test_term_name2 = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
-						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\Bracetown.ElmSubstat\110 kV A2.ElmTerm')
-
-		# Mutual name to test as input
-		test_mut_name = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
-						 r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_04_14_41_06'
-						 r'\Bracetown 220 kV_Clonee 220 kV.ElmMut')
-		test_mut_name2 = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
-						 r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_04_14_41_06'
-						 r'\Clonee 220 kV_Bracetown 220 kV.ElmMut')
-		test_mut_name3 = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
-						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_04_14_41_06'
-						  r'\Clonee 220 kV_Clonee 110 kV.ElmMut')
-		test_mut_name4 = (r'\user1.IntUser\AIM 2017-MODEL-07022019-TAP_CloneePh3.IntPrj\Network Model.IntPrjfolder'
-						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_15_01_54_25'
-						  r'\Kellis 220 kV_Maynooth 220 kV A.ElmMut')
-		test_mut_name5 = (r'\user1.IntUser\AIM 2017-MODEL-07022019-TAP_CloneePh3.IntPrj\Network Model.IntPrjfolder'
-						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_15_01_54_25'
-						  r'\Maynooth 220 kV A_Maynooth 220 kV B.ElmMut')
-
-		# Main function tests
-		# Test that terminal extraction works correctly
-		new_var, ref_term = TestModule.extract_var_name(var_name=test_term_name,
-														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, 'Bracetown 220 kV')
-
-		# Test that mutual extaction works correctly
-		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name,
-														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, ('Bracetown 220 kV_Clonee 220 kV', 'Clonee 220 kV_Bracetown 220 kV'))
-		self.assertEqual(ref_term, ('Bracetown 220 kV', 'Clonee 220 kV'))
-
-		# Test that mutual extraction works correctly the other way around
-		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name2,
-														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, ('Clonee 220 kV_Bracetown 220 kV', 'Bracetown 220 kV_Clonee 220 kV'))
-		self.assertEqual(ref_term, ('Clonee 220 kV', 'Bracetown 220 kV'))
-
-		# Test that mutual extraction works correctly when testing nodes which are not defined
-		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name3,
-														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, ('Clonee 220 kV_Clonee 110 kV', 'Clonee 110 kV_Clonee 220 kV'))
-		self.assertEqual(ref_term, ('Clonee 220 kV', 'Clonee 110 kV'))
-
-		# Test raises an error if terminal has not been defined in dictionary
-		self.assertRaises(KeyError,
-						  TestModule.extract_var_name,
-						  test_term_name2, self.test_dict_terminals)
-
-		# Test works for different format of variable name (test_mut_name4)
-		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name4,
-														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, ('Kellis 220 kV_Maynooth 220 kV A', 'Maynooth 220 kV A_Kellis 220 kV'))
-		self.assertEqual(ref_term, ('Kellis 220 kV', 'Maynooth 220 kV A'))
-
-		# Test works for different format of variable name (test_mut_name5)
-		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name5,
-														dict_of_terms=self.test_dict_terminals)
-		self.assertEqual(new_var, ('Maynooth 220 kV A_Maynooth 220 kV B', 'Maynooth 220 kV B_Maynooth 220 kV A'))
-		self.assertEqual(ref_term, ('Maynooth 220 kV A', 'Maynooth 220 kV B'))
-
-	def test_extract_var_type(self):
-		"""
-			Tests the extract var type function works correctly
-		"""
-		# Variable types for testing
-		test_var_type = 'c:R_12 in Ohms'
-		test_var_type2 = 'c:R_12'
-		test_var_type3 = 'b:fnow in Hz'
-		test_var_type4 = 'An other sort of value'
-
-		# Conduct tests of different input arrangements
-		res_type = TestModule.extract_var_type(test_var_type)
-		self.assertEqual(res_type,'c:R_12')
-		res_type = TestModule.extract_var_type(test_var_type2)
-		self.assertEqual(res_type, 'c:R_12')
-
-		# Check suitably detects a frequency input
-		res_type = TestModule.extract_var_type(test_var_type3)
-		self.assertEqual(res_type, 'b:fnow')
-
-		# Ensure fails if input is a value that is not a correct variable type
-		self.assertRaises(IOError, TestModule.extract_var_type, test_var_type4)
 
 	def test_process_single_file(self):
 		"""
@@ -229,8 +139,6 @@ class TestStandAloneFunctions(unittest.TestCase):
 									'SC1', 'Base_Case',
 									'', 'SC1_Base_Case', 'e:uknom')]
 		self.assertAlmostEqual(nom_voltage, 110.0, places=5)
-
-		# #self.assertAlmostEqual(df.iloc[5,10], 13.4049420, places=5)
 
 	def test_process_r12_file(self):
 		"""
@@ -356,6 +264,179 @@ class TestStandAloneFunctions(unittest.TestCase):
 		# Confirm newly created file exists
 		self.assertTrue(os.path.isfile(target_file))
 
+class TestFunctionsWithoutHASTinputs(unittest.TestCase):
+	"""
+		Carries out tests which do not require the HAST inputs to be loaded
+	"""
+	@classmethod
+	def setUpClass(cls):
+		"""
+			Setup the test class with parameters that are used in several different tests
+		:return:
+		"""
+		# Dictionary of terminals used in test
+		cls.test_dict_terminals = {('Bracetown.ElmSubstat', '220 kV A2.ElmTerm'): 'Bracetown 220 kV',
+								   ('Clonee.ElmSubstat', '220 kV A1.ElmTerm'): 'Clonee 220 kV',
+								   ('Clonee.ElmSubstat', '110 kV A1.ElmTerm'): 'Clonee 110 kV',
+								   ('Kellis.ElmSubstat', '220 kV A1.ElmTerm'): 'Kellis 220 kV',
+								   ('Maynooth.ElmSubstat', '220 kV A2.ElmTerm'): 'Maynooth 220 kV A',
+								   ('Maynooth.ElmSubstat', '220 kV B1.ElmTerm'): 'Maynooth 220 kV B'
+								   }
+		# Variables as part of HAST_test_inputs for testing
+		cls.test_vars = ['m:Z', 'c:Z_12']
+
+	def test_extract_var_name2(self):
+		"""
+			Tests the extract var name function works correctly
+		"""
+		test_dict_terminals = {('Carrigdangan.ElmSubstat', '110 kV A1.ElmTerm'): 'Carrigdangan_110 kV A1',
+							   ('Dunmanway.ElmSubstat', '110 kV A1.ElmTerm'): 'Dunmanway_110 kV A1',
+							   ('Boggeragh.ElmSubstat', '110 kV A1.ElmTerm'): 'Boggeragh_110 kV A1'
+							   }
+		# Mutual name to test as input
+		test_mut_name = (r'\zuelli_r.IntUser\AIM 2019-CP0930_Carrigdangan.IntPrj\Network Model.IntPrjfolder'
+						 r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_05_13_10_18_27'
+						 r'\Dunmanway_110 kV A1_Boggeragh_110 kV A1.ElmMut')
+
+		# Main function tests
+		# Test that terminal extraction works correctly
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name,
+														dict_of_terms=test_dict_terminals)
+		self.assertEqual(new_var, ('Dunmanway_110 kV A1_Boggeragh_110 kV A1',
+								   'Boggeragh_110 kV A1_Dunmanway_110 kV A1'))
+
+	def test_grouping(self):
+		"""
+			Test that if dataframe is passed it will return the correct grouping numbers
+			# TODO: Move to True Standalone
+		"""
+		# Create test dataframe
+		data = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
+		df = pd.DataFrame(data)
+
+		cols = [['ab', 'ab', 'ab'], ['abc', 'bac', 'abc'], ['1', '2', '3']]
+		index = pd.MultiIndex.from_arrays(cols, names=('A', 'B', 'C'))
+		df.columns = index
+		# Confirm if multiple results then are split by 2nd level
+		df_grouping = TestModule.graph_grouping(df=df, group_by=('A', 'B'))
+		self.assertEqual(df_grouping['ab_abc'], [0, 2])
+		self.assertEqual(df_grouping['ab_bac'], [1])
+
+		# Confirm if only 1 result then they are moved up a level
+		df_grouping = TestModule.graph_grouping(df=df, group_by=('A', 'C'))
+		self.assertEqual(df_grouping['ab'], [0, 1, 2])
+
+		# Confirm if only 1 result then they are moved up a level
+		df_grouping = TestModule.graph_grouping(df=df, group_by=('A',))
+		self.assertEqual(df_grouping['ab'], [0, 1, 2])
+
+	def test_split_plots(self):
+		"""
+			Test that it is suitable extracted
+		"""
+		max_plots = 5
+		graph_grouping = collections.OrderedDict()
+		graph_grouping['a'] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+		graph_grouping['b'] = [5, 7, 8, 12]
+		graph_grouping['c'] = [13, 15, 15]
+		graphs = TestModule.split_plots(max_plots=max_plots,
+										graph_groups=graph_grouping)
+		keys = list(graphs.keys())
+		self.assertEqual(keys[0], 'a(1)')
+		self.assertEqual(keys[3], 'b')
+		self.assertEqual(graphs['c'][2], 15)
+
+	def test_extract_var_name(self):
+		"""
+			Tests the exctract var name function works correctly
+		"""
+		# Terminal name to test as input
+		test_term_name = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
+						r'\Network Data.IntPrjfolder\EirGrid.ElmNet\Bracetown.ElmSubstat\220 kV A2.ElmTerm')
+		test_term_name2 = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
+						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\Bracetown.ElmSubstat\110 kV A2.ElmTerm')
+
+		# Mutual name to test as input
+		test_mut_name = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
+						 r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_04_14_41_06'
+						 r'\Bracetown 220 kV_Clonee 220 kV.ElmMut')
+		test_mut_name2 = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
+						 r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_04_14_41_06'
+						 r'\Clonee 220 kV_Bracetown 220 kV.ElmMut')
+		test_mut_name3 = (r'\david.IntUser\AIM 2017-MODEL-07022019-TAP_TEST.IntPrj\Network Model.IntPrjfolder'
+						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_04_14_41_06'
+						  r'\Clonee 220 kV_Clonee 110 kV.ElmMut')
+		test_mut_name4 = (r'\user1.IntUser\AIM 2017-MODEL-07022019-TAP_CloneePh3.IntPrj\Network Model.IntPrjfolder'
+						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_15_01_54_25'
+						  r'\Kellis 220 kV_Maynooth 220 kV A.ElmMut')
+		test_mut_name5 = (r'\user1.IntUser\AIM 2017-MODEL-07022019-TAP_CloneePh3.IntPrj\Network Model.IntPrjfolder'
+						  r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_04_15_01_54_25'
+						  r'\Maynooth 220 kV A_Maynooth 220 kV B.ElmMut')
+
+		# Main function tests
+		# Test that terminal extraction works correctly
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_term_name,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, 'Bracetown 220 kV')
+
+		# Test that mutual extaction works correctly
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, ('Bracetown 220 kV_Clonee 220 kV', 'Clonee 220 kV_Bracetown 220 kV'))
+		self.assertEqual(ref_term, ('Bracetown 220 kV', 'Clonee 220 kV'))
+
+		# Test that mutual extraction works correctly the other way around
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name2,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, ('Clonee 220 kV_Bracetown 220 kV', 'Bracetown 220 kV_Clonee 220 kV'))
+		self.assertEqual(ref_term, ('Clonee 220 kV', 'Bracetown 220 kV'))
+
+		# Test that mutual extraction works correctly when testing nodes which are not defined
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name3,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, ('Clonee 220 kV_Clonee 110 kV', 'Clonee 110 kV_Clonee 220 kV'))
+		self.assertEqual(ref_term, ('Clonee 220 kV', 'Clonee 110 kV'))
+
+		# Test raises an error if terminal has not been defined in dictionary
+		self.assertRaises(KeyError,
+						  TestModule.extract_var_name,
+						  test_term_name2, self.test_dict_terminals)
+
+		# Test works for different format of variable name (test_mut_name4)
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name4,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, ('Kellis 220 kV_Maynooth 220 kV A', 'Maynooth 220 kV A_Kellis 220 kV'))
+		self.assertEqual(ref_term, ('Kellis 220 kV', 'Maynooth 220 kV A'))
+
+		# Test works for different format of variable name (test_mut_name5)
+		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name5,
+														dict_of_terms=self.test_dict_terminals)
+		self.assertEqual(new_var, ('Maynooth 220 kV A_Maynooth 220 kV B', 'Maynooth 220 kV B_Maynooth 220 kV A'))
+		self.assertEqual(ref_term, ('Maynooth 220 kV A', 'Maynooth 220 kV B'))
+
+	def test_extract_var_type(self):
+		"""
+			Tests the extract var type function works correctly
+		"""
+		# Variable types for testing
+		test_var_type = 'c:R_12 in Ohms'
+		test_var_type2 = 'c:R_12'
+		test_var_type3 = 'b:fnow in Hz'
+		test_var_type4 = 'An other sort of value'
+
+		# Conduct tests of different input arrangements
+		res_type = TestModule.extract_var_type(test_var_type)
+		self.assertEqual(res_type,'c:R_12')
+		res_type = TestModule.extract_var_type(test_var_type2)
+		self.assertEqual(res_type, 'c:R_12')
+
+		# Check suitably detects a frequency input
+		res_type = TestModule.extract_var_type(test_var_type3)
+		self.assertEqual(res_type, 'b:fnow')
+
+		# Ensure fails if input is a value that is not a correct variable type
+		self.assertRaises(IOError, TestModule.extract_var_type, test_var_type4)
+
 	def test_split_contingency_filter_values(self):
 		"""
 			Confirm the for a variety of filter names they are extracted correctly
@@ -380,70 +461,6 @@ class TestStandAloneFunctions(unittest.TestCase):
 		cont_name, filter_name = TestModule.split_contingency_filter_values(list_of_terms=file_splits,
 																			starting_point=3)
 		self.assertNotEqual(cont_name, test_cont_name)
-
-	def test_grouping(self):
-		"""
-			Test that if dataframe is passed it will return the correct grouping numbers
-		"""
-		# Create test dataframe
-		data = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
-		df = pd.DataFrame(data)
-
-		cols = [['ab', 'ab', 'ab'], ['abc', 'bac', 'abc'], ['1', '2', '3']]
-		index = pd.MultiIndex.from_arrays(cols, names=('A', 'B', 'C'))
-		df.columns = index
-		# Confirm if multiple results then are split by 2nd level
-		df_grouping = TestModule.graph_grouping(df=df, group_by=('A','B'))
-		self.assertEqual(df_grouping[0],('ab_abc', 2))
-		self.assertEqual(df_grouping[1], ('ab_bac', 1))
-
-		# Confirm if only 1 result then they are moved up a level
-		df_grouping = TestModule.graph_grouping(df=df, group_by=('A', 'C'))
-		self.assertEqual(df_grouping[0], ('ab', 3))
-
-		# Confirm if only 1 result then they are moved up a level
-		df_grouping = TestModule.graph_grouping(df=df, group_by=('A',))
-		self.assertEqual(df_grouping[0], ('ab', 3))
-
-	def test_split_plots(self):
-		"""
-			Test that it is suitable extracted
-		"""
-		max_plots = 5
-		start_col=1
-		graph_grouping = [('a',15),('b',1),('c',4)]
-		graphs = TestModule.split_plots(max_plots=max_plots,
-										start_col=start_col,
-										graph_groups=graph_grouping)
-		keys = list(graphs.keys())
-		self.assertEqual(keys[0],'a(1)')
-		self.assertEqual(keys[3],'b')
-		self.assertEqual(graphs['c'][2],19)
-
-
-class TestFunctionsWithoutHASTinputs(unittest.TestCase):
-	"""
-		Carries out tests which do not require the HAST inputs to be loaded
-	"""
-	def test_extract_var_name2(self):
-		"""
-			Tests the extract var name function works correctly
-		"""
-		test_dict_terminals = {('Carrigdangan.ElmSubstat', '110 kV A1.ElmTerm'): 'Carrigdangan_110 kV A1',
-							   ('Dunmanway.ElmSubstat', '110 kV A1.ElmTerm'): 'Dunmanway_110 kV A1',
-							   ('Boggeragh.ElmSubstat', '110 kV A1.ElmTerm'): 'Boggeragh_110 kV A1'
-							   }
-		# Mutual name to test as input
-		test_mut_name = (r'\zuelli_r.IntUser\AIM 2019-CP0930_Carrigdangan.IntPrj\Network Model.IntPrjfolder'
-						 r'\Network Data.IntPrjfolder\EirGrid.ElmNet\ElmMut19_05_13_10_18_27'
-						 r'\Dunmanway_110 kV A1_Boggeragh_110 kV A1.ElmMut')
-
-		# Main function tests
-		# Test that terminal extraction works correctly
-		new_var, ref_term = TestModule.extract_var_name(var_name=test_mut_name,
-														dict_of_terms=test_dict_terminals)
-		self.assertEqual(new_var, ('Dunmanway_110 kV A1_Boggeragh_110 kV A1',
-								   'Boggeragh_110 kV A1_Dunmanway_110 kV A1'))
 
 @unittest.skipIf(not FULL_TEST, 'Slower tests have been skipped')
 class TestImportingMultipleResults(unittest.TestCase):
@@ -571,4 +588,39 @@ class TestImportingMultipleResults(unittest.TestCase):
 		self.assertTrue(os.path.isfile(target_file))
 
 
+class TestProcessStages(unittest.TestCase):
+	"""
+		Class to test importing and combining multiple results into a single export
+	"""
+	@classmethod
+	def setUpClass(cls):
+		"""
+			Setup the test class with parameters that are used in several different tests
+		:return:
+		"""
+		# Search paths that will be used for combining results
+		cls.TESTS_DIR = os.path.join(TESTS_DIR,'STAGES_v220')
+		cls.search_pth_0 = os.path.join(cls.TESTS_DIR, 'stage0_v220')
+		cls.search_pth_1 = os.path.join(cls.TESTS_DIR, 'stage1_v220')
+		cls.search_pth_2 = os.path.join(cls.TESTS_DIR, 'stage2_v220')
 
+	def test_stages_all_combine(self):
+		"""
+			Tests combining of multiple study cases into single results file with graphs accordingly
+		:return:
+		"""
+		# File to export to
+		target_file = os.path.join(self.TESTS_DIR, 'Results_stages_all_v220.xlsx')
+		# Check if file already exists and delete
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		df, vars_to_export = TestModule.combine_multiple_hast_runs(
+			search_pths=[self.search_pth_0,
+						 self.search_pth_1,
+						 self.search_pth_2]
+		)
+
+		TestModule.extract_results(pth_file=target_file, df=df, vars_to_export=vars_to_export)
+		# Confirm newly created file exists
+		self.assertTrue(os.path.isfile(target_file))

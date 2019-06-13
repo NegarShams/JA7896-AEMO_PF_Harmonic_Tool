@@ -320,7 +320,7 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	idx = pd.IndexSlice
 	# Add in row to contain the nominal voltage
 	# #df_nom_voltage = pd.DataFrame(index=[c.idx_nom_voltage], columns=_df.columns)
-	_df.loc[c.idx_nom_voltage, :] = np.nan
+	_df.loc[c.idx_nom_voltage, :] = ''
 
 	for term, df in _df.groupby(axis=1, level=c.lbl_Reference_Terminal):
 		idx_filter = idx[:,:,:,:,:,:,'e:uknom']
@@ -344,34 +344,37 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 
 	return _df
 
-def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping):
+def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping, startcol=0):
 	"""
 		Determines sizes for grouping of graphs together
+		CAVEAT:  Assumes that the DataFrame order matches with the order in Excel
 	:param pd.DataFrame df: Dataframe to calculate grouping for
 	:param tuple group_by: (optional = constants.ResultsExtract.graph_grouping) = Levels to group by
-	:return list grouping:  {Name of graph, number of columns for results
+	:param int startcol: (optional=0) Column which graphs start from to be added to the dataframe columns
+	:return dict col_nums:  {Name of graph: Relative column numbers for results
 	"""
-	# Determine number of columns to consider in each graph
-	df_grouping = df.groupby(axis=1, level=group_by).size()
-
-	# Obtain index keys and values
-	keys = df_grouping.index.tolist()
-	values = list(df_grouping)
+	# Determine number of results in each group so that it can determine whether multiple graphs are needed
+	df_groups = list(df.groupby(axis=1, level=group_by).size())
 
 	# If only single plot on each graph then no need to separate at this level so go up 1 level
-	if max(values) == 1:
+	if max(df_groups) == 1 and len(group_by)>1:
 		logger.debug('Only single value for each entry so no need to split across multiple graphs')
 		group_by = group_by[:-1]
-		df_grouping = df.groupby(axis=1, level=group_by).size()
-		keys = df_grouping.index.tolist()
-		values = list(df_grouping)
 
-	if len(keys) == 1:
-		keys = [keys]
+	# Produce dictionary which looks up column numbers for each set of results that are to be grouped by
+	col_nums = collections.OrderedDict()
+	for key, v in df.groupby(axis=1, level=group_by):
+		if type(key) is not str:
+			k = '_'.join(key)
+		else:
+			k = key
+		list_col_nums = list(df.columns.get_locs(list(map(list, zip(*v.columns.to_list())))))
+		col_nums[k] =[x+startcol for x in list_col_nums]
 
+	# # May need to add back in the tuple
 	# Create a tuple with name of chart followed by value (tuple used to ensure order matches)
-	grouping = [('_'.join(k),v) if type(k) is not str else (k,v) for k,v in zip(keys, values)]
-	return grouping
+	# grouping = [('_'.join(k),v) if type(k) is not str else (k,v) for k,v in zip(keys, values)]
+	return col_nums
 
 def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 	"""
@@ -421,68 +424,81 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 						logger.info(' \t - \t Adding graph for node {}'.format(node_name))
 
 						num_rows = df_to_export.shape[0]
-						num_cols = df_to_export.shape[1]
 						# Get number of columns to include in each graph grouping
-						dict_graph_grouping = graph_grouping(df=df_to_export)
+						dict_graph_grouping = graph_grouping(df=df_to_export, startcol=col+1)
 						names = df_to_export.columns.names
 						row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
 
+
 						add_graph(writer, sheet_name=node_name,
-								  num_cols=num_cols,
-								  col_start=col+1,
 								  row_cont=row_cont,
 								  row_start=start_row + len(names) + 1,
 								  col_freq=col,
 								  num_rows=num_rows,
-								  graph_groups=dict_graph_grouping)
+								  graph_groups=dict_graph_grouping,
+								  chrt_row_num=0)
+
+						# Get grouping of graphs to compare study cases
+						dict_graph_grouping = graph_grouping(df=df_to_export,
+															 group_by=constants.ResultsExtract.chart_grouping_base_case,
+															 startcol=col+1)
+
+						add_graph(writer, sheet_name=node_name,
+								  row_cont=row_cont,
+								  row_start=start_row + len(names) + 1,
+								  col_freq=col,
+								  num_rows=num_rows,
+								  graph_groups=dict_graph_grouping,
+								  chrt_row_num=1)
+
 					col = col + df_to_export.shape[1] + c.col_spacing
 				else:
 					logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
 
 	return None
 
-def split_plots(max_plots, start_col, graph_groups):
+def split_plots(max_plots, graph_groups):
 	"""
 		Figures out how to split the plots into groups based on the grouping and maximum of 255 plots (or max_plots)
-		Returns the relevant names and column numbers
+		Returns the relevant names and excel column number
 	:param int max_plots:  Maximum number of plots to include
-	:param int start_col:  Starting number of column to use
-	:param list graph_groups:  List of graph grouping produced by <graph_grouping>
+	:param collections.OrderedDict graph_groups:  Dictionary of graph grouping in the format
+		key:[list of relative column numbers]
+	List of graph grouping produced by <graph_grouping>
 	:return collections.OrderedDict graphs:  Dictionary of the graph title and relevant column numbers
 	"""
 	graphs = collections.OrderedDict()
 
-	for title, num in graph_groups:
+	for title, list_of_cols in graph_groups.items():
 		# Get all columns in range associated with this group
-		# Plot 0 removed and added back in as starting plot
-		all_cols = list(range(start_col + 1, start_col + num))
 		# Number of plots this group needs to be split into
-		number_of_plots = math.ceil((num-1) / max_plots)
+		number_of_plots = math.ceil(len(list_of_cols) / max_plots)
 
 		# If greater than 1 then split into equal size groups with basecase plot at starting point
 		if number_of_plots > 1:
-			steps = math.ceil((num-1) / number_of_plots)
-			a = [all_cols[i * steps:(i + 1) * steps] for i in range(math.ceil(len(all_cols) / steps))]
-			a = [[start_col] + x for x in a]
+			steps = math.ceil(len(list_of_cols) / number_of_plots)
+			a = [list_of_cols[i * steps:(i + 1) * steps] for i in range(int(math.ceil(len(list_of_cols) / steps)))]
+
 			for i, group in enumerate(a):
 				graphs['{}({})'.format(title, i + 1)] = group
 		else:
-			graphs['{}'.format(title)] = [start_col] + all_cols
-
-		if not all_cols:
-			start_col = start_col+1
-		else:
-			start_col = max(all_cols) + 1
+			graphs['{}'.format(title)] = list_of_cols
 
 	return graphs
 
-def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_freq, num_rows,
-			  graph_groups):
+def add_graph(writer, sheet_name, row_cont, row_start, col_freq, num_rows,
+			  graph_groups, chrt_row_num):
 	"""
 		Add graph to HAST export
-	:param pd.ExcelWriter writer:
-	:param str sheet_name:
-	:param list graph_groups:  Names and groups to use for graph grouping
+	:param pd.ExcelWriter writer:  Handle for the workbook that will be controlling the excel instance
+	:param str sheet_name: Name of sheet to add graph to
+	:param int row_cont: Row number which contains the contingency description
+	:param int row_start: Start row for results to plot
+	:param int col_freq: Number of column which contains the frequency data
+	:param int num_rows:  Number of rows containing the data to be plotted
+	:param collections.OrderedDict graph_groups:  Names and groups to use for graph grouping in the form
+			key:[column numbers relative to the first column]
+	:param int chrt_row_num:  Number for this chart which determines the vertical row number the chart is added to
 	:return:
 	"""
 	c = constants.ResultsExtract
@@ -499,7 +515,7 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 	charts = []
 	max_plots = len(color_map) - 1
 
-	plots = split_plots(max_plots, col_start, graph_groups)
+	plots = split_plots(max_plots, graph_groups)
 
 	for chart_name, cols in plots.items():
 		chrt = wkbk.add_chart(c.chart_type)
@@ -532,7 +548,7 @@ def add_graph(writer, sheet_name, num_cols, col_start, row_cont, row_start, col_
 		chrt.set_size({'width': c.chrt_width, 'height': c.chrt_height})
 
 		# Add the legend to the chart
-		sht.insert_chart(c.chrt_row, c.chrt_col+(c.chrt_space*i), chrt)
+		sht.insert_chart(c.chrt_row+(c.chrt_vert_space*chrt_row_num), c.chrt_col+(c.chrt_space*i), chrt)
 
 def import_all_results(search_pth, hast_inputs, search_type='FS'):
 	"""
