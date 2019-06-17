@@ -91,6 +91,7 @@ class PowerFactory:
 	ldf_command = 'ComLdf'
 	hldf_command = 'ComHldf'
 	frq_sweep_command = 'ComFsweep'
+	autotasks_command = '.ComTasks'
 
 	class ComRes:
 		# Power Factory class name

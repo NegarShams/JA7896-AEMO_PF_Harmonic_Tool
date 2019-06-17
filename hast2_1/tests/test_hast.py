@@ -134,6 +134,28 @@ class TestHast(unittest.TestCase):
 		self.assertFalse(os.path.isfile(results_file))
 		self.assertFalse(os.path.isdir(path_to_raw_results))
 
+	def test_non_convergent_base_case(self):
+		"""
+			Checks that if there is a non-convergent base case for all studies it fails
+		"""
+		# Nominal voltage not included
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_non_convergent.xlsx')
+		self.assertRaises(RuntimeError, TestModule.main,
+						  import_workbook=hast_inputs_file,
+						  results_export_folder=self.results_export_folder,
+						  uid='non_convergent')
+
+
+	def test_one_convergent_base_case(self):
+		"""
+			Checks that if there is a single non-convergent base case then it continues, returning a single error
+		"""
+		# Nominal voltage not included
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_partially_convergent.xlsx')
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=TESTS_DIR,
+									   uid='partially_convergent')
+		self.assertTrue(os.path.isfile(results_file))
 
 class TestHASTInputsProcessing(unittest.TestCase):
 	"""
@@ -147,3 +169,44 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		with self.assertRaises(ValueError):
 			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict)
 
+	def test_duplicated_study_case_names(self):
+		"""
+			Test confirms that if a HAST inputs file is used which contains duplicated study case names
+			then a critical error will be raised
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_study_cases.xlsx')
+		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+			analysis_dict = excel_cls.import_excel_harmonic_inputs(
+				workbookname=hast_inputs_file)
+		with self.assertRaises(ValueError):
+			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+													  filename=hast_inputs_file)
+
+	def test_duplicated_contingency_names(self):
+		"""
+			Test confirms that if a HAST inputs file is used which contains duplicated contingency case names
+			then a critical error will be raised
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_contingencies.xlsx')
+		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+			analysis_dict = excel_cls.import_excel_harmonic_inputs(
+				workbookname=hast_inputs_file)
+		with self.assertRaises(ValueError):
+			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+													  filename=hast_inputs_file)
+
+	def test_duplicated_terminals(self):
+		"""
+			Test confirms that if a HAST inputs file is used which contains duplicated terminals names
+			then a critical error will be raised
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_terminals.xlsx')
+		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+			analysis_dict = excel_cls.import_excel_harmonic_inputs(
+				workbookname=hast_inputs_file)
+		with self.assertRaises(ValueError):
+			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+													  filename=hast_inputs_file)

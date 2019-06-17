@@ -217,6 +217,14 @@ class Logger:
 		self.logger.debug('Logging stopped')
 		logging.shutdown()
 
+	def __exit__(self):
+		"""
+			To correctly handle deleting and therefore shutting down of logging module
+		:return None:
+		"""
+		self.logger.debug('Logging stopped')
+		logging.shutdown()
+
 #  ----- UNIT TESTS -----
 class TestLoggerSetup(unittest.TestCase):
 	"""

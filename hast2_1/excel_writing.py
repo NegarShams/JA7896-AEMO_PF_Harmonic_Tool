@@ -24,7 +24,8 @@ import itertools
 import hast2_1.constants as constants
 import shutil
 import logging
-from pywintypes import com_error # pywintypes used for Error Catching
+import pywintypes
+
 
 
 # Meta Data
@@ -234,7 +235,7 @@ class Excel:
 		# TODO: Need to do something to ensure that a new instance is always created so that if excel is opened
 		# TODO: whilst that instance is already active it does not get closed.
 		try:
-			_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
+			_ = win32com.client.gencache.EnsureDispatch('Excel.Application')
 		except (AttributeError, TypeError):
 			f_loc = os.path.join(os.getenv('LOCALAPPDATA'), 'Temp\gen_py')
 			shutil.rmtree(f_loc)
@@ -242,11 +243,10 @@ class Excel:
 			# for f in Path(f_loc):
 			# 	Path.unlink(f)
 			# Path.rmdir(f_loc)
-			_xl = win32com.client.gencache.EnsureDispatch('Excel.Application')
+			_ = win32com.client.gencache.EnsureDispatch('Excel.Application')
 		finally:
-			_xl = win32com.client.dynamic.Dispatch('Excel.Application')
+			_ = win32com.client.dynamic.Dispatch('Excel.Application')
 		self.excel_constants = win32com.client.constants
-		del _xl
 		self.log_info('Excel instance initialised')
 		return self
 
@@ -283,7 +283,7 @@ class Excel:
 			try:
 				# Tru statement to capture when worksheet doesn't exist
 				ws = wb.Sheets(x[0])  # Set Active Sheet
-			except com_error as error:
+			except pywintypes.com_error as error:
 				if error.excepinfo[5] == -2147352565:
 					logger.debug(('Old HAST inputs workbook used which is missing the worksheet {}. '
 								 'Therefore importing of this worksheet is skipped')
@@ -1082,13 +1082,16 @@ class HASTInputs:
 		Class that the HAST Spreadsheet is fed into for processing
 		TODO: At the moment only study settings are processed
 	"""
-	def __init__(self, hast_inputs, uid_time=time.strftime('%y_%m_%d_%H_%M_%S')):
+	def __init__(self, hast_inputs, uid_time=time.strftime('%y_%m_%d_%H_%M_%S'), filename=''):
 		"""
 			Initialises the settings based on the HAST Study Settings spreadsheet
 		:param dict hast_inputs:  Dictionary of input data returned from excel_writing.Excel.import_excel_harmonic_inputs
 		:param str uid_time:  Time string to use as the uid for these files
+		:param str filename:  Filename of the HAST Inputs file used from which this data is extracted
 		"""
 		c = constants.HASTInputs
+		# General constants
+		self.filename=filename
 
 		# Attribute definitions (study settings)
 		self.pth_results_folder = str()
@@ -1186,22 +1189,37 @@ class HASTInputs:
 			Processes the terminals from the HAST input into a dictionary so can lookup the name to use based on
 			substation and terminal
 		:param list list_of_terminals: List of terminals from HAST inputs, expected in the form
+			[name, substation, terminal, include mutual]
 		:return None
 		"""
-		self.list_of_terms = list_of_terminals
-		self.dict_of_terms = {(k[1], k[2]): k[0] for k in list_of_terminals}
+		# Get handle for logger
+		logger = logging.getLogger(constants.logger_name)
+		# #self.list_of_terms = list_of_terminals
+		self.list_of_terms = [TerminalDetails(k[0], k[1], k[2], k[3]) for k in list_of_terminals]
+		# #self.dict_of_terms = {(k[1], k[2]): k[0] for k in list_of_terminals}
+		self.dict_of_terms = {(k.substation, k.terminal): k.name for k in self.list_of_terms}
 
 		# Confirm that none of the terminal names are greater than the maximum allowed character length
-		terminal_names = self.dict_of_terms.values()
+		terminal_names = [k.name for k in self.list_of_terms]
 		long_names = [x for x in terminal_names if len(x) > constants.HASTInputs.max_terminal_name_length]
 		if long_names:
-			logger = logging.getLogger('HAST')
+
 			logger.critical('The following terminal names are greater than the maximum allowed length of {} characters'
 							.format(constants.HASTInputs.max_terminal_name_length))
 			for x in long_names:
 				logger.critical('Terminal name: {}'.format(x))
-			raise ValueError('The terminal names in the HAST inputs are too long! Reduce them to less than {} characters.'
-						  .format(constants.HASTInputs.max_terminal_name_length))
+			raise ValueError(('The terminal names in the HAST inputs {} are too long! Reduce them to less than {} '
+							 'characters.').format(self.filename, constants.HASTInputs.max_terminal_name_length))
+
+		# Check all terminal names are unique
+		if len(terminal_names) != len(set(terminal_names)):
+			msg = ('The user defined Terminal names given in the HAST Inputs workbook {} are not unique for '
+				  'each entry.  Please check rename some of the terminals').format(self.filename)
+			logger.critical(msg)
+			logger.critical('The names that have been provided are as follows:')
+			for name in terminal_names:
+				logger.critical('\t - User Defined Terminal Name: {}'.format(name))
+			raise ValueError(msg)
 
 		return None
 
@@ -1238,14 +1256,30 @@ class HASTInputs:
 			of the names of all the StudyCases that have been considered.
 		:return list sc_details:  Returns list of study case names and there corresponding technical details
 		"""
+		# Get handle for logger
+		logger = logging.getLogger(constants.logger_name)
+
 		# If has already been populated then just return the list
 		if not self.sc_details:
-			# Loop through each row of the inported data
+			# Loop through each row of the imported data
+			sc_names = list()
 			for sc in list_of_studycases:
 				# Transfer row of inputs to class <StudyCaseDetails>
 				new_sc = StudyCaseDetails(sc)
+				sc_names.append(new_sc.name)
 				# Add to dictionary
 				self.sc_details[new_sc.name] = new_sc
+
+			# Get list of study_case names and confirm they are all unique
+			if len(sc_names) != len(set(sc_names)):
+				msg = ('The user defined Study Case names given in the HAST Inputs workbook {} are not unique for '
+					   'each entry.  Please check rename some of the user defined names').format(self.filename)
+				logger.critical(msg)
+				logger.critical('The names that have been provided are as follows:')
+				for name in sc_names:
+					logger.critical('\t - Study Case Name: {}'.format(name))
+				raise ValueError(msg)
+
 
 
 		return list(self.sc_details.keys())
@@ -1256,14 +1290,29 @@ class HASTInputs:
 			of the names of all the StudyCases that have been considered.
 		:return list sc_details:  Returns list of study case names and there corresponding technical details
 		"""
+		# Get handle for logger
+		logger = logging.getLogger(constants.logger_name)
+
 		# If has already been populated then just return the list
 		if not self.cont_details:
-			# Loop through each row of the inported data
+			# Loop through each row of the imported data
+			cont_names = list()
 			for sc in list_of_contingencies:
 				# Transfer row of inputs to class <StudyCaseDetails>
 				new_cont = ContingencyDetails(sc)
+				cont_names.append(new_cont.name)
 				# Add to dictionary
 				self.cont_details[new_cont.name] = new_cont
+
+			# Get list of contingency names and confirm they are all unique
+			if len(cont_names) != len(set(cont_names)):
+				msg = ('The user defined Contingency names given in the HAST Inputs workbook {} are not unique for '
+					   'each entry.  Please check and rename some of the user defined names').format(self.filename)
+				logger.critical(msg)
+				logger.critical('The names that have been provided are as follows:')
+				for name in cont_names:
+					logger.critical('\t - Contingency Name: {}'.format(name))
+				raise ValueError(msg)
 
 
 		return list(self.cont_details.keys())
@@ -1298,6 +1347,25 @@ class CouplerDetails:
 		self.breaker = breaker
 		self.status = status
 
+class TerminalDetails:
+	"""
+		Details for each terminal that data is required for from HAST processing
+		TODO: Not implemented in initial code
+	"""
+	def __init__(self, name, substation, terminal, include_mutual=True):
+		"""
+		:param str name:  HAST Input name to use
+		:param str substation:  Name of substation within which terminal is contained
+		:param str terminal:   Name of terminal in substation
+		:param bool include_mutual:  (optional=True) - If mutual impedance data is not required for this terminal then
+			set to False
+		"""
+		self.name = name
+		self.substation = substation
+		self.terminal = terminal
+		self.include_mutual = include_mutual
+		# Reference to PowerFactory established as part of HAST_V2_1.check_terminals
+		self.pf_handle = None
 
 #  ----- UNIT TESTS -----
 class TestExcelSetup(unittest.TestCase):
