@@ -210,3 +210,33 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		with self.assertRaises(ValueError):
 			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
 													  filename=hast_inputs_file)
+
+	def test_duplicated_filters(self):
+		"""
+			Test confirms that if a HAST inputs file is used which contains duplicated filter names
+			then a critical error will be raised
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_filters.xlsx')
+		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+			analysis_dict = excel_cls.import_excel_harmonic_inputs(
+				workbookname=hast_inputs_file)
+		with self.assertRaises(ValueError):
+			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+													  filename=hast_inputs_file)
+
+	def test_missing_study_case_names(self):
+		"""
+			Confirm that if a study case name is missing it is skipped but
+			suitable warning is raised.
+			# TODO: Detect warning created
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_missing_study_case_names.xlsx')
+		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+			analysis_dict = excel_cls.import_excel_harmonic_inputs(
+				workbookname=hast_inputs_file)
+		# Get handle to hast
+		cls_hast = TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict)
+		# Confirm that length is only 1
+		self.assertTrue(len(cls_hast.sc_names) == 1)

@@ -95,71 +95,6 @@ def add_terminals(row_data):
 
 	return combined_entry
 
-class SubstationFilter:
-	"""
-		Class for each filter from the HAST import spreadsheet with a new entry for each substation
-	"""
-	def __init__(self, row_data):
-		"""
-			Function to read in the filters and save to list
-		:param list row_data:  List of values in the form:
-			[name to use for filters,
-			substation filter belongs to,
-			terminal at which filter should be connected,
-			type of filter to use (integer based on PF type),
-			Q start, Q stop, number of sizes
-			freq start, freq stop, number of freq steps,
-			quality factor to use,
-			parallel resistance (Rp) value to use
-			]
-		:return list combined_entry:
-		"""
-		# Variable initialisation
-		self.include = True
-		self.nom_voltage = 0.0
-
-		# Confirm row data exists
-		if row_data[0] is None:
-			self.include = False
-			return
-
-		# Name to use for filter
-		self.name = row_data[0]
-		# Substation and terminal within substation that filter should be connected to
-		self.sub ='{}.{}'.format(row_data[1], constants.PowerFactory.pf_substation)
-		self.term = '{}.{}'.format(row_data[2], constants.PowerFactory.pf_terminal)
-		# Type of filter to use
-		self.type = constants.PowerFactory.Filter_type[row_data[3]]
-		# Q values for filters (start, stop, no. steps)
-		self.q_range = list(np.linspace(row_data[4], row_data[5], row_data[6]))
-		self.f_range = list(np.linspace(row_data[7], row_data[8], row_data[9]))
-		# Quality factor and parallel resistance values to use
-		self.quality_factor = row_data[10]
-		self.resistance_parallel = row_data[11]
-
-		# Produce lists of each Q step for each frequency so multiple filters can be tested
-		self.f_q_values = list(itertools.product(self.f_range, self.q_range))
-
-# REMOVED:  Now considered as a class above
-# def add_filters(row_data):
-# 	"""
-# 		Function to read in the filters and save to list
-# 	:param list row_data:
-# 	:return list combined_entry:
-# 	"""
-# 	combined_entry = [
-# 		row_data[0],		# Name to use
-# 		'{}{}'.format(row_data[1],Constants.pf_substation),		# Substation name + PF identifier
-# 		'{}{}'.format(row_data[2],Constants.pf_terminal),		# Terminal to use + PF identifier
-# 		Constants.Filter_type[row_data[3]],
-# 		[np.linspace(row_data[4], row_data[5], row_data[6])],
-# 		[np.linspace(row_data[7], row_data[8], row_data[9])],
-# 		row_data[10],
-# 		row_data[11]
-# 	]
-#
-# 	return combined_entry
-
 def add_lf_settings(row_data):
 	"""
 		Function to read in the load flow settings and save to list
@@ -294,9 +229,6 @@ class Excel:
 									.format(x[0], workbookname))
 					raise error
 
-
-
-
 			# Don't think sheet needs to be activated
 			ws.Activate()  # Activate Sheet
 			cell_start = x[1]  # Starting Cell
@@ -325,12 +257,25 @@ class Excel:
 					aces = [cell_start_alph + str(no) for no in cell_range_num]  #
 
 				# Initialise row counter and loop through each row of input data
-				count_row = 0
-				while count_row < len(aces):
+				# #count_row = 0
+				for count_row in range(len(aces)):
 					ws.Range(aces[count_row]).End(c.xlToRight).Select()
 					col_end = self.xl.Selection.Address  # Returns address of last cells
 					row_value = ws.Range(aces[count_row] + ":" + col_end).Value
 					row_value = row_value[0]
+					# If no input name is provided then continue to next entry
+					if row_value[0] is None:
+						row_data = [x for x in row_value if x is not None]
+						if len(row_data)>0:
+							logger.warning(('For worksheet {} in HAST inputs workbook {}, there is no name '
+											'provided in cell {} but there are details in the rest of the row as '
+											'shown below. This entry is being skipped and the user may wish to check '
+											'if they actually meant this to be included')
+										   .format(current_worksheet, workbookname, aces[count_row]))
+							for entry in row_data:
+								logger.warning('\t - {}'.format(entry))
+						# The code will continue with the next row
+						continue
 
 					# Routine only for 'Contingencies' worksheet
 					if current_worksheet == constants.PowerFactory.sht_Contingencies:
@@ -346,12 +291,12 @@ class Excel:
 
 					# Routine for Filters worksheet
 					elif current_worksheet == constants.PowerFactory.sht_Filters:
-						row_value = SubstationFilter(row_data=row_value)
+						row_value = FilterDetails(row_data=row_value)
 
 						# #row_value = add_filters(row_data=row_value)
 
 					row_input.append(row_value)
-					count_row = count_row + 1
+					# #count_row = count_row + 1
 
 			# More efficiently checking which worksheet looking at
 			elif current_worksheet in constants.PowerFactory.HAST_Input_Settings_Sheets:
@@ -1089,7 +1034,7 @@ class HASTInputs:
 		:param str uid_time:  Time string to use as the uid for these files
 		:param str filename:  Filename of the HAST Inputs file used from which this data is extracted
 		"""
-		c = constants.HASTInputs
+		c = constants.PowerFactory
 		# General constants
 		self.filename=filename
 
@@ -1129,16 +1074,20 @@ class HASTInputs:
 		self.list_of_terms = list()
 		self.dict_of_terms = dict()
 
+		# Attribute definitions (filters)
+		self.list_of_filters = list()
+
 		# Process study settings
 		self.uid = uid_time
-		self.study_settings(hast_inputs[c.study_settings])
+		self.study_settings(hast_inputs[c.sht_Study])
 
 		# Process List of Terminals
-		self.process_terminals(hast_inputs[c.terminals])
+		self.process_terminals(hast_inputs[c.sht_Terminals])
+		self.process_filters(hast_inputs[c.sht_Filters])
 
 		# Process study case details
-		self.sc_names = self.get_study_cases(hast_inputs[c.study_cases])
-		self.cont_names = self.get_contingencies(hast_inputs[c.contingencies])
+		self.sc_names = self.get_study_cases(hast_inputs[c.sht_Scenarios])
+		self.cont_names = self.get_contingencies(hast_inputs[c.sht_Contingencies])
 
 	def study_settings(self, list_study_settings):
 		"""
@@ -1223,6 +1172,31 @@ class HASTInputs:
 
 		return None
 
+	def process_filters(self, list_of_filters):
+		"""
+			Processes the filters from the HAST input into a list of all filters
+		:param list list_of_filters: List of handles to type excel_writing.FilterDetails
+		:return None
+		"""
+		# Get handle for logger
+		logger = logging.getLogger(constants.logger_name)
+		# Filters already converted to the correct type on initial import so just reference list
+		# TODO: Move processing of filters to here rather than initial import
+		self.list_of_filters = list_of_filters
+
+		# Check no filter names are duplicated
+		filter_names = [k.name for k in self.list_of_filters]
+		# Check all filter names are unique
+		if len(filter_names) != len(set(filter_names)):
+			msg = ('The user defined Filter names given in the HAST Inputs workbook {} are not unique for '
+				  'each entry.  Please check rename some of the terminals').format(self.filename)
+			logger.critical(msg)
+			logger.critical('The names that have been provided are as follows:')
+			for name in filter_names:
+				logger.critical('\t - User Defined Filter Name: {}'.format(name))
+			raise ValueError(msg)
+		return None
+
 	def vars_to_export(self):
 		"""
 			Determines the variables that will be exported from PowerFactory and they will be exported in this order
@@ -1279,8 +1253,6 @@ class HASTInputs:
 				for name in sc_names:
 					logger.critical('\t - Study Case Name: {}'.format(name))
 				raise ValueError(msg)
-
-
 
 		return list(self.sc_details.keys())
 
@@ -1366,6 +1338,52 @@ class TerminalDetails:
 		self.include_mutual = include_mutual
 		# Reference to PowerFactory established as part of HAST_V2_1.check_terminals
 		self.pf_handle = None
+
+class FilterDetails:
+	"""
+		Class for each filter from the HAST import spreadsheet with a new entry for each substation
+	"""
+	def __init__(self, row_data):
+		"""
+			Function to read in the filters and save to list
+		:param list row_data:  List of values in the form:
+			[name to use for filters,
+			substation filter belongs to,
+			terminal at which filter should be connected,
+			type of filter to use (integer based on PF type),
+			Q start, Q stop, number of sizes
+			freq start, freq stop, number of freq steps,
+			quality factor to use,
+			parallel resistance (Rp) value to use
+			]
+		:return list combined_entry:
+		"""
+		# Variable initialisation
+		self.include = True
+		self.nom_voltage = 0.0
+
+		# Confirm row data exists
+		if row_data[0] is None:
+			self.include = False
+			return
+
+		# Name to use for filter
+		self.name = row_data[0]
+		# Substation and terminal within substation that filter should be connected to
+		self.sub ='{}.{}'.format(row_data[1], constants.PowerFactory.pf_substation)
+		self.term = '{}.{}'.format(row_data[2], constants.PowerFactory.pf_terminal)
+		# Type of filter to use
+		self.type = constants.PowerFactory.Filter_type[row_data[3]]
+		# Q values for filters (start, stop, no. steps)
+		self.q_range = list(np.linspace(row_data[4], row_data[5], row_data[6]))
+		self.f_range = list(np.linspace(row_data[7], row_data[8], row_data[9]))
+		# Quality factor and parallel resistance values to use
+		self.quality_factor = row_data[10]
+		self.resistance_parallel = row_data[11]
+
+		# Produce lists of each Q step for each frequency so multiple filters can be tested
+		self.f_q_values = list(itertools.product(self.f_range, self.q_range))
+
 
 #  ----- UNIT TESTS -----
 class TestExcelSetup(unittest.TestCase):

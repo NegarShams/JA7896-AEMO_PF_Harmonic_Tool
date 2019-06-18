@@ -44,7 +44,9 @@ class Logger:
 		self.handler_stream_log = None
 
 		# Counter for each error message that occurs
+		self.warning_count = 0
 		self.error_count = 0
+		self.critical_count = 0
 
 		self.pth_debug_log = pth_debug_log
 		self.pth_progress_log = pth_progress_log
@@ -54,16 +56,45 @@ class Logger:
 
 		self.file_handlers=[]
 
-		# Set up logger a
+		# Determine status of whether PowerFactory is running script or if being run from Python
+		self.pf_executed = self.pf_terminal_running()
+
+		# Set up logger and establish handle for logger
 		self.logger = self.setup_logging()
+		self.initial_log_messages()
+
+	def pf_terminal_running(self):
+		"""
+			Function determines whether powerfactory is being run from Python or from PowerFactory.  If it is being
+			run from PowerFactory then returns True if run from Python then returns False
+		:return bool status:  True = PowerFactory, False = Python terminal
+		"""
+		# Determines whether Python is running or it is being run from PowerFactory directly, if the former then want
+		# to ensure log messages are not sent to StdOut as well as the log store
+		if self.app:
+			# Returns the currently set interface version or 0 if PowerFactory is started from external and
+			# SetInerfaceVersion() is not called
+			interface = self.app.GetInterfaceVersion()
+			if interface > 0:
+				status = True
+			else:
+				status = False
+		else:
+			status = False
+
+		return status
 
 	def setup_logging(self):
 		"""
 			Function to setup the logging functionality
 		:return object logger:  Handle to the logger for writing messages
 		"""
+		# logging.getLogger().setLevel(logging.CRITICAL)
+		# logging.getLogger().disabled = True
 		logger = logging.getLogger(constants.logger_name)
+		logger.handlers = []
 		# Ensures that even debug messages are captured even if they are not written to log file
+
 		logger.setLevel(logging.DEBUG)
 
 		# Produce formatter for log entries
@@ -83,17 +114,15 @@ class Logger:
 														min_level=logging.ERROR,
 														formatter=log_formatter)
 
-		self.handler_stream_log = logging.StreamHandler(sys.stdout)
+		#self.handler_stream_log = logging.StreamHandler(sys.stdout)
+		self.handler_stream_log = logging.StreamHandler(stream=None)
 
 		# If running in DEBUG mode then will export all the debug logs to the window as well
+		self.handler_stream_log.setFormatter(log_formatter)
 		if self.debug_mode:
 			self.handler_stream_log.setLevel(logging.DEBUG)
 		else:
 			self.handler_stream_log.setLevel(logging.INFO)
-		self.handler_stream_log.setFormatter(log_formatter)
-
-
-
 
 		# Add handlers to logger
 		logger.addHandler(self.handler_progress_log)
@@ -101,13 +130,26 @@ class Logger:
 		logger.addHandler(self.handler_error_log)
 		logger.addHandler(self.handler_stream_log)
 
-		logger.info('Path for debug log is {}'.format(self.pth_debug_log))
-		logger.info('Path for process log is {}'.format(self.pth_progress_log))
-		logger.info('Path for error log is {}'.format(self.pth_error_log))
-		logger.debug('Stream output is going to stdout')
-		self.handler_progress_log.flush()
-
 		return logger
+
+	def initial_log_messages(self):
+		"""
+			Display initial messages for logger including paths where log files will be stored
+		:return:
+		"""
+		# Initial announcement of directories for log messages to be saved in
+		self.info('Path for debug log is {} and will be created if any WARNING messages occur'
+				  .format(self.pth_debug_log))
+		self.info('Path for process log is {} and will contain all INFO and higher messages'
+				  .format(self.pth_progress_log))
+		self.info('Path for error log is {} and will be created if any ERROR messages occur'
+				  .format(self.pth_error_log))
+		self.debug(('Stream output is going to stdout which will only be displayed if DEBUG MODE is True and currently '
+				   'it is {}'.format(self.debug_mode)))
+
+		# Ensure initial log messages are created and saved to log file
+		self.handler_progress_log.flush()
+		return None
 
 	def close_logging(self):
 		"""Function closes logging but first removes the debug_handler so that the output is not flushed on
@@ -127,8 +169,6 @@ class Logger:
 		for handler in reversed(self.file_handlers):
 			handler.close()
 			del handler
-
-
 
 	def get_file_handlers(self, pth, min_level=logging.INFO, buffer=False, flush_level=logging.INFO, buffer_cap=10,
 						  formatter=logging.Formatter()):
@@ -173,20 +213,21 @@ class Logger:
 	def info(self, msg):
 		""" Handler for info messages """
 		# Only print output to powerfactory if it has been passed to logger
-		if self.app:
+		if self.app and self.pf_executed:
 			self.app.PrintPlain(msg)
 		self.logger.info(msg)
 
 	def warning(self, msg):
 		""" Handler for warning messages """
-		if self.app:
+		self.warning_count += 1
+		if self.app and self.pf_executed:
 			self.app.PrintWarn(msg)
 		self.logger.warning(msg)
 
 	def error(self, msg):
 		""" Handler for warning messages """
 		self.error_count += 1
-		if self.app:
+		if self.app and self.pf_executed:
 			self.app.PrintError(msg)
 		self.logger.error(msg)
 
@@ -194,8 +235,9 @@ class Logger:
 		""" Critical error has occured """
 		# Get calling function to include in log message
 		caller = sys._getframe().f_back.f_code.co_name
+		self.critical_count += 1
 
-		if self.app:
+		if self.app and self.pf_executed:
 			try:
 				# Try statement since possible that an error has occured and it might not run
 				self.app.PrintError(msg)
@@ -209,21 +251,39 @@ class Logger:
 		self.handler_progress_log.flush()
 		self.handler_error_log.flush()
 
+	def logging_final_report_and_closure(self):
+		"""
+			Function reports number of error messages raised and closes down logging
+		:return None:
+		"""
+		if sum([self.warning_count, self.error_count, self.critical_count]) > 1:
+			self.logger.info(('Log file closing, there were the following number of important messages: \n'
+							  '\t - {} Warning Messages that may be of concern\n'
+							  '\t - {} Error Messages that may have stopped the results being produced\n'
+							  '\t - {} Critical Messages')
+							 .format(self.warning_count, self.error_count, self.critical_count))
+		else:
+			self.logger.info('Log file closing, there were 0 important messages')
+		self.logger.debug('Logging stopped')
+		logging.shutdown()
+
 	def __del__(self):
 		"""
 			To correctly handle deleting and therefore shutting down of logging module
 		:return None:
 		"""
-		self.logger.debug('Logging stopped')
-		logging.shutdown()
+		self.logging_final_report_and_closure()
+		# #self.logger.debug('Logging stopped')
+		# #logging.shutdown()
 
 	def __exit__(self):
 		"""
 			To correctly handle deleting and therefore shutting down of logging module
 		:return None:
 		"""
-		self.logger.debug('Logging stopped')
-		logging.shutdown()
+		self.logging_final_report_and_closure()
+		# #self.logger.debug('Logging stopped')
+		# #logging.shutdown()
 
 #  ----- UNIT TESTS -----
 class TestLoggerSetup(unittest.TestCase):

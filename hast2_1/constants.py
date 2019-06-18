@@ -21,7 +21,8 @@ __phone__ = '+44 7899 984158'
 __status__ = 'Constants'
 
 nom_freq = 50.0
-logger_name = 'HAST'
+# #logger_name = 'HAST'
+logger_name = None
 
 # When parallel processing will ensure this number of cpus are kept free
 cpu_keep_free = 1

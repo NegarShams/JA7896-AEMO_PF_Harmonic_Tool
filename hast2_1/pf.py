@@ -88,7 +88,7 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	"""
 		Adds the filter detailed to the PF model
 	:param _app: handle to power factory application
-	:param excel_writing.SubstationFilter filter_ref:  Handle to SubstationFilter class form HAST import
+	:param excel_writing.FilterDetails filter_ref:  Handle to FilterDetails class form HAST import
 	:param float q:  MVAR value for filter
 	:param float freq:  Frequency value for filter
 	:param str filter_name:  Name of filter being added which includes associated contingency

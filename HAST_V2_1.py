@@ -1372,7 +1372,7 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 def check_filters(list_of_filters):			# Checks and creates list of terminals to add the Filters to
 	"""
 			Checks the status of each contingency
-		:param list list_of_filters: List of filters to be checked where each filter is of type excel_writing.SubstationFilter
+		:param list list_of_filters: List of filters to be checked where each filter is of type excel_writing.FilterDetails
 		:return: List of filters to actually be studied 
 		"""
 	filters_ok = True
@@ -1549,7 +1549,6 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	# TODO: Complete processing to convert everything to use class for processing
 	cls_hast_inputs = hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict, uid_time=start1)
 
-
 	study_settings = analysis_dict[constants.HASTInputs.study_settings]
 	if len(study_settings) != 20:
 		print2('Error, Check input Study Settings there should be 20 Items in the list there are only: {} {}'
@@ -1605,12 +1604,12 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 								 debug=DEBUG_MODE)
 
 	# Disable graphic updating
-	if not DEBUG_MODE:
-		logger.info('Graphic updating and load flow results will not be shown')
+	if not DEBUG_MODE and logger.pf_executed:
+		logger.info('Graphic updating and detailed load flow results will not be shown until script completes')
 		app.SetGraphicUpdate(0)
 		app.EchoOff()
 	else:
-		logger.info('Running in debug mode and so output / screen updating is not disabled')
+		logger.info('Running in debug mode and so all details and progress updates are output')
 
 	shutil.copy(src=import_workbook, dst=os.path.join(Temp_Results_Export, 'HAST Inputs_{}.xlsx'.format(start1)))
 
@@ -1635,20 +1634,22 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	global Excel_Export_Z12
 	Excel_Export_Z12 = study_settings[18]										# Export Mutual Impedances to excel
 
-	print1(title, bf=1, af=0)
+
+	c = constants.PowerFactory
+	logger.info(title)
 	for keys,values in analysis_dict.items():									# Prints all the inputs to progress log
-		print1(keys, bf=1, af=0)
-		print1(values, bf=1, af=0)
+		logger.info(keys)
+		logger.info(values)
 	global List_of_Studycases
-	List_of_Studycases = analysis_dict["Base_Scenarios"]						# Uses the list of Studycases
+	List_of_Studycases = analysis_dict[c.sht_Scenarios]						# Uses the list of Studycases
 	if len(List_of_Studycases) <1:												# Check there are the right number of inputs
 		logger.error('Error - Check excel input Base_Scenarios there should be at least 1 Item in the list')
 	global List_of_Contingencies
-	List_of_Contingencies = analysis_dict["Contingencies"]						# Uses the list of Contingencies
+	List_of_Contingencies = analysis_dict[c.sht_Contingencies]						# Uses the list of Contingencies
 	if len(List_of_Contingencies) <1:											# Check there are the right number of inputs
 		logger.error('Error - Check excel input Contingencies there should be at least 1 Item in the list')
 	global List_of_Filters
-	List_of_Filters = analysis_dict[constants.PowerFactory.sht_Filters]  # Imports Settings for the filters
+	List_of_Filters = cls_hast_inputs.list_of_filters
 	if len(List_of_Filters) == 0:
 		logger.info('No harmonic filters listed for studies')
 	global List_of_Points
@@ -1658,17 +1659,17 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	if len(List_of_Points) <1:													# Check there are the right number of inputs
 		logger.error('Error - Check excel input Terminals there should be at least 1 Item in the list')
 	global Load_Flow_Setting
-	Load_Flow_Setting = analysis_dict["Loadflow_Settings"]						# Imports Settings for LDF calculation
+	Load_Flow_Setting = analysis_dict[c.sht_LF]						# Imports Settings for LDF calculation
 	if len(Load_Flow_Setting) != 55:											# Check there are the right number of inputs
 		print2('Error - Check excel input Loadflow_Settings there should be 55 Items in the list there are only: {} {}'
 			   .format(len(Load_Flow_Setting), Load_Flow_Setting))
 	global Fsweep_Settings
-	Fsweep_Settings = analysis_dict["Frequency_Sweep"]							# Imports Settings for Frequency Sweep calculation
+	Fsweep_Settings = analysis_dict[c.sht_Freq]							# Imports Settings for Frequency Sweep calculation
 	if len(Fsweep_Settings) != 16:												# Check there are the right number of inputs
 		print2('Error - Check excel input Frequency_Sweep there should be 16 Items in the list there are only: {} {}'
 			   .format(len(Fsweep_Settings), Fsweep_Settings))
 	global Harmonic_Loadflow_Settings
-	Harmonic_Loadflow_Settings = analysis_dict["Harmonic_Loadflow"]				# Imports Settings for Harmonic LDF calculation
+	Harmonic_Loadflow_Settings = analysis_dict[c.sht_HLF]				# Imports Settings for Harmonic LDF calculation
 	if len(Harmonic_Loadflow_Settings) != 15:									# Check there are the right number of inputs
 		logger.error(('Error - Check excel input Harmonic_Loadflow Settings there should be 17 Items in the list '
 					 'there are only: {} {}')
