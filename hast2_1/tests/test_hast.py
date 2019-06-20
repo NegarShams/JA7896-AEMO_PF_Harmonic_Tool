@@ -87,6 +87,19 @@ class TestHast(unittest.TestCase):
 									   uid='stage2_v220')
 		self.assertTrue(os.path.isfile(results_file))
 
+	def test_stage_all_processing_v220(self):
+		"""
+			Produces set of results for all stages in single HAST run
+			This is a combination of stage0, stage1 and stage2 HAST
+			input files
+			v220 - This now takes into consideration the nominal voltage of the node being investigated
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage_all.xlsx')
+		results_file = TestModule.main(import_workbook=hast_inputs_file,
+									   results_export_folder=self.results_export_folder_v220,
+									   uid='stage_all_v220')
+		self.assertTrue(os.path.isfile(results_file))
+
 	def test_results1_v2_0_processing(self):
 		"""
 			Produces a new set of HAST results based on update to include nominal voltage in v2.2.0
@@ -144,7 +157,6 @@ class TestHast(unittest.TestCase):
 						  import_workbook=hast_inputs_file,
 						  results_export_folder=self.results_export_folder,
 						  uid='non_convergent')
-
 
 	def test_one_convergent_base_case(self):
 		"""
@@ -240,3 +252,12 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		cls_hast = TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict)
 		# Confirm that length is only 1
 		self.assertTrue(len(cls_hast.sc_names) == 1)
+
+	def test_new_hast_import(self):
+		"""
+			Test confirms that if a HAST inputs file is used which contains duplicated terminals names
+			then a critical error will be raised
+		:return:
+		"""
+		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage0.xlsx')
+		TestModule.hast2.excel_writing.HASTInputs(filename=hast_inputs_file)

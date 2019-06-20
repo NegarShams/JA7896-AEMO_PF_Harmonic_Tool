@@ -25,6 +25,7 @@ import hast2_1.constants as constants
 import shutil
 import logging
 import pywintypes
+import pandas as pd
 
 
 
@@ -360,6 +361,10 @@ class Excel:
 		:param bool hrm_sim:  Boolean to determine whether harmonic load flow has been carried out
 		:return:
 		"""
+
+		print('Do not believe this function is used anymore')
+		raise SyntaxError('TEST')
+
 		# Constant declarations
 		c = self.excel_constants
 		t1 = time.clock()
@@ -1027,7 +1032,7 @@ class HASTInputs:
 		Class that the HAST Spreadsheet is fed into for processing
 		TODO: At the moment only study settings are processed
 	"""
-	def __init__(self, hast_inputs, uid_time=time.strftime('%y_%m_%d_%H_%M_%S'), filename=''):
+	def __init__(self, hast_inputs=None, uid_time=time.strftime('%y_%m_%d_%H_%M_%S'), filename=''):
 		"""
 			Initialises the settings based on the HAST Study Settings spreadsheet
 		:param dict hast_inputs:  Dictionary of input data returned from excel_writing.Excel.import_excel_harmonic_inputs
@@ -1037,6 +1042,12 @@ class HASTInputs:
 		c = constants.PowerFactory
 		# General constants
 		self.filename=filename
+
+		self.uid = uid_time
+
+		#NEW - Import hast workbook (IN PROGRESS)
+		# TODO: Not fully implemented yet, requires further development and testing
+		# self.import_hast_workbook()
 
 		# Attribute definitions (study settings)
 		self.pth_results_folder = str()
@@ -1078,7 +1089,6 @@ class HASTInputs:
 		self.list_of_filters = list()
 
 		# Process study settings
-		self.uid = uid_time
 		self.study_settings(hast_inputs[c.sht_Study])
 
 		# Process List of Terminals
@@ -1089,13 +1099,42 @@ class HASTInputs:
 		self.sc_names = self.get_study_cases(hast_inputs[c.sht_Scenarios])
 		self.cont_names = self.get_contingencies(hast_inputs[c.sht_Contingencies])
 
-	def study_settings(self, list_study_settings):
+	def import_hast_workbook(self):
+		"""
+			Function to import the HAST workbook and process all the settings into this class
+			# TODO: Partially developed, not fully operational yet and required further development
+		:return:
+		"""
+		c = constants.PowerFactory
+		# Loop through each of the sheets that need importing
+		for sht_name, (index_col, last_col, header_row,
+					   rows_to_skip, number_of_rows) in constants.analysis_sheets2.items():
+			df = pd.read_excel(self.filename,
+							   sheet_name=sht_name,
+							   index_col=index_col,
+							   usecols=last_col,
+							   header=header_row,
+							   skiprows=rows_to_skip,
+							   nrows=number_of_rows)
+			if sht_name == c.sht_Study:
+				self.study_settings(df_settings=df)
+			elif sht_name == c.sht_Scenarios:
+				pass
+				# TODO: Got To Here
+
+	def study_settings(self, list_study_settings=None, df_settings=None):
 		"""
 			Populate study settings
 		:param list list_study_settings:
+		:param pd.DataFrame df_settings:  Dataframe of study settings for processing
 		:return None:
 		"""
-		l = list_study_settings
+		# Since this is settings, convert dataframe to list and extract based on position
+		if df_settings is not None:
+			l = df_settings[1].tolist()
+		else:
+			l = list_study_settings
+
 		# Folder to store logs (progress/error) and the excel results if empty will use current working directory
 		if not l[0]:
 			self.pth_results_folder = os.getcwd() + "\\"
