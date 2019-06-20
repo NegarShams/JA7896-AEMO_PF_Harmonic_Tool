@@ -769,16 +769,16 @@ def create_study_case_results_files(cls_sc, cls_prj):
 
 	logger.info('Checking all terminals and producing mutual impedance data')
 	# Checks to see if all the terminals are in the project and skips any that aren't
-	if cls_prj.terminals_index is None:
-		cls_prj.terminals_index, _ = check_terminals(List_of_Points, prj_name=cls_prj.name, sc_name=cls_sc.name)
-		# Gets the network elements folder
-		list_network_element_folders = get_object(Net_Elm)
-		logger.info('Network elements folder = {}'.format(list_network_element_folders))
+	# #if cls_prj.terminals_index is None:
+	cls_prj.terminals_index, _ = check_terminals(List_of_Points, prj_name=cls_prj.name, sc_name=cls_sc.name)
+	# Gets the network elements folder
+	list_network_element_folders = get_object(Net_Elm)
+	logger.info('Network elements folder = {}'.format(list_network_element_folders))
 
-		if len(list_network_element_folders) < 1:
-			logger.error('Could not find Network Element folder, Note: this is case sensitive : {}'.format(Net_Elm))
-		else:
-			cls_prj.folder_network_elements = list_network_element_folders[0]
+	if len(list_network_element_folders) < 1:
+		logger.error('Could not find Network Element folder, Note: this is case sensitive : {}'.format(Net_Elm))
+	else:
+		cls_prj.folder_network_elements = list_network_element_folders[0]
 
 	# Add mutual_impedance links to the study folders
 	if len(cls_prj.terminals_index) > 1 and cls_prj.include_mutual:
@@ -1262,7 +1262,7 @@ def check_terminals(list_of_points, prj_name, sc_name): 		# This checks and crea
 						  ' and Study Case: {}.\n'
 						  'Therefore not possible to obtain results for User named terminal: {}')
 						 .format(terminal.substation, prj_name, sc_name, terminal.name))
-			terminals_ok = 1
+			terminals_error = 1
 			# Continue with next terminal
 			continue
 
@@ -1277,7 +1277,7 @@ def check_terminals(list_of_points, prj_name, sc_name): 		# This checks and crea
 						  'Project: {} and Study Case: {}\n'
 						  'Therefore not possible to obtain results for HAST User Terminal Name: {}')
 						 .format(terminal.terminal, terminal.substation, prj_name, sc_name, terminal.terminal))
-			terminals_ok = 1
+			terminals_error = 1
 			continue
 
 		# If multiple terminals with the same name exist then alert User.  This should not be possible in the current
@@ -1683,8 +1683,6 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 		logger.close_logging()
 		del logger
 		raise RuntimeError('No projects successfully initialised for harmonic studies to be run')
-
-
 
 	# Confirms that studies should be run and that there are some projects that have actually been successfully produced
 	# If all base load flows are non-convergent then there are no studies to run.
