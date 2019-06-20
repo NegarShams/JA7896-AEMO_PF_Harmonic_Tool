@@ -1515,6 +1515,7 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	# --------------------------------------------------------------------------------------------------------------------
 	# TODO:  Need to add in capability here to capture script fail and release so that powerfactory license is released
 	global app
+	app = None
 
 	# TODO: Write unittest to check exception raised if powerfactory not loaded
 	if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):

@@ -253,6 +253,8 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		# Confirm that length is only 1
 		self.assertTrue(len(cls_hast.sc_names) == 1)
 
+	# TODO: Test not yet implemented
+	@unittest.skip('Not Yet Implemented')
 	def test_new_hast_import(self):
 		"""
 			Test confirms that if a HAST inputs file is used which contains duplicated terminals names
