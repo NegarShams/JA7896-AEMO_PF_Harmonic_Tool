@@ -603,6 +603,7 @@ class TestProcessStages(unittest.TestCase):
 		cls.search_pth_0 = os.path.join(cls.TESTS_DIR, 'stage0_v220')
 		cls.search_pth_1 = os.path.join(cls.TESTS_DIR, 'stage1_v220')
 		cls.search_pth_2 = os.path.join(cls.TESTS_DIR, 'stage2_v220')
+		cls.search_pth_all = os.path.join(cls.TESTS_DIR, 'stage_all_v220')
 
 	def test_stages_all_combine(self):
 		"""
@@ -619,6 +620,26 @@ class TestProcessStages(unittest.TestCase):
 			search_pths=[self.search_pth_0,
 						 self.search_pth_1,
 						 self.search_pth_2]
+		)
+
+		TestModule.extract_results(pth_file=target_file, df=df, vars_to_export=vars_to_export)
+		# Confirm newly created file exists
+		self.assertTrue(os.path.isfile(target_file))
+
+	def test_stages_combine(self):
+		"""
+			Tests combining of multiple study cases which have been produced as part of a single run
+		:return:
+		"""
+		# File to export to
+		target_file = os.path.join(self.TESTS_DIR,
+								   'Results_stages_all_v220(single_run).xlsx')
+		# Check if file already exists and delete
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		df, vars_to_export = TestModule.combine_multiple_hast_runs(
+			search_pths=[self.search_pth_all]
 		)
 
 		TestModule.extract_results(pth_file=target_file, df=df, vars_to_export=vars_to_export)

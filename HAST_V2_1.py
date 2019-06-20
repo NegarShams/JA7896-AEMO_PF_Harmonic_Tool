@@ -298,21 +298,11 @@ def create_variation(folder, pfclass, name):
 	:param str name: Name for variation
 	:return powerfactory.Variation: Handle for newly created variation
 	"""
-	# Check if variation exists first
-	# #variation = folder.GetContents('{}.{}'.format(name, pfclass))
-
-	# #if len(variation) == 0:
-		# #Variation doesn't exist so create a new one
 	variation = create_object(folder, pfclass, name)
 
 	# Change color of variation
 	variation.icolor = 1
 	logger.debug('Variation {} created'.format(variation))
-	# #else:
-	# #	# Returns list object so need to get first item
-	# #	variation = variation[0]
-
-	# #app.PrintPlain(variation)
 	return variation
 
 
@@ -333,13 +323,15 @@ def activate_variation(variation): 		# Activate Scenario
 
 def create_stage(location, pfclass, name):
 	"""
-		Creates a new stage in powerfactory
+		Creates a new expansion stage in powerfactory
 	:param powerfactory.Location location: Handle to powerfacory location
 	:param str pfclass: String describing the powerfactory stage to be created
 	:param ztr name: Name of new stage to be created
 	:return powerfactory.Stage stage: Handle to newly created powerfactory stage
 	"""
-	stage = location.CreateObject(pfclass, name)
+	stage = create_object(location=location,
+						  pfclass=pfclass,
+						  name=name)
 	stage.loc_name = name
 	activate_stage(stage)
 	return stage
@@ -355,25 +347,30 @@ def activate_stage(stage):
 	if sce == 0:
 		logger.debug('Activated Variation Stage Successfully: {}'.format(stage))
 	elif sce != 0:
-		print2('Error Unsuccessfully Activated Variation Stage: {}........................'.format(stage))
-		print2('Unsuccessfully Activated Variation Stage Error Code: {}'.format(sce))
+		logger.error('Unable to activate variation expansion stage: {} and PowerFactory returned error code: {}'
+					 .format(stage,sce))
 	return None
 
 
-def load_flow(load_flow_settings, studycase_name=''):		# Inputs load flow settings and executes load flow
+def load_flow(load_flow_settings, sc, studycase_name=''):		# Inputs load flow settings and executes load flow
 	"""
 		Run load flow in powerfactory
 	:param list load_flow_settings: List of settings for powerfactory when running loadflow
-	:param str studycase_name:  Name of study case being run to include in error message reporting
-	:return int error_code: Error code provided by powerfactory determining its success 
+	:param sc:  Studycase handle
+	:param str studycase_name:  Name of study case being run to include in error message reporting	
+	:return (int error_code, ldf): Error code provided by powerfactory determining its success, 
+									handle to powerfactory load flow command 
 	"""
 	# TODO: Setting should only need setting once rather than every time load_flow is run so could be defined in
 	# TODO: + constants
 	t1 = time.clock()
 	## Loadflow settings
 	## -------------------------------------------------------------------------------------
+	# Create new object for the load flow on the base case so that existing settings are not overwritten
+	ldf = create_object(location=sc,
+						pfclass=constants.PowerFactory.ldf_command,
+						name=constants.PowerFactory.default_ldf_name)
 	# Get handle for load flow command from study case
-	ldf = app.GetFromStudyCase(constants.PowerFactory.ldf_command)
 	# Basic
 	ldf.iopt_net = load_flow_settings[0]          		# Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
 	ldf.iopt_at = load_flow_settings[1]            		# Automatic Tap Adjustment
@@ -459,8 +456,7 @@ def load_flow(load_flow_settings, studycase_name=''):		# Inputs load flow settin
 	elif error_code == 2:
 		logger.error('Load Flow failed for {} due to divergence of outer loops, time taken: {:.2f} seconds'
 					 .format(studycase_name, t2))
-	return error_code
-
+	return error_code, ldf
 
 def harm_load_flow(results, harmonic_loadflow_settings):		# Inputs load flow settings and executes load flow
 	"""
@@ -616,7 +612,6 @@ def create_mutual_impedance_list(location, terminal_list, list_of_mutual = [], l
 	"""
 	logger.info('Creating: Mutual Impedance List of Terminals')
 	terminal_list1 = list(terminal_list)
-	# #logger.info(terminal_list1)
 
 	# Produce a dictionary of the terminals so can lookup which ones require mutual impedance data
 	_dict_terminal_mutual = {term[3]:term[4] for term in terminal_list1}
@@ -630,7 +625,6 @@ def create_mutual_impedance_list(location, terminal_list, list_of_mutual = [], l
 			pf_terminal_2 = _x[3]
 			# Adjusted so that mutual data will only be collected from this node to the remote node if the remote node
 			# is set to True in the input data (column 4)
-			# #if x[3] != y[3] and y[4]:
 			if pf_terminal_2 != pf_terminal_1 and \
 					(_dict_terminal_mutual[pf_terminal_2] or
 					 _dict_terminal_mutual[pf_terminal_1]):
@@ -730,8 +724,13 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 	:param str name: Name to be given to new object 
 	:return powerfactory.Object _new_object: Handle to object returns 
 	"""
-	# _new_object used instead of new_object to avoid shadowing
-	_new_object = location.CreateObject(pfclass, name)
+	# Checks if object already exists before creating a new one and return handle to object if already
+	# exists.  Returns list of all objects that match the name provided
+	existing_object = location.GetContents('{}.{}'.format(name,pfclass))
+	if existing_object:
+		_new_object = existing_object[0]
+	else:
+		_new_object = location.CreateObject(pfclass, name)
 	return _new_object
 
 
@@ -798,7 +797,6 @@ def create_study_case_results_files(cls_sc, cls_prj):
 			logger.debug('New mutual impedance folder = {}'.format(cls_prj.mutual_impedance_folder))
 			# Move newly created folder to ElmNet
 			net_elm = get_object(Net_Elm)[0]
-			# #failed = net_elm.Move(cls_prj.mutual_impedance_folder)
 			failed = cls_prj.folder_network_elements.Move(cls_prj.mutual_impedance_folder)
 			if failed == 0:
 				logger.debug('Moving mutual impedance folder {} from {} to {} was a success'
@@ -820,8 +818,9 @@ def create_study_case_results_files(cls_sc, cls_prj):
 			list_of_mutual=cls_prj.list_of_mutual,
 			list_of_mutual_names=cls_prj.list_of_mutual_names
 		)
-		print(cls_prj.list_of_mutual)
-		logger.info('List of mutual impedance elements = {}'.format(cls_prj.list_of_mutual))
+		msg1 = 'The following mutual impedance elements were created and will be monitored:'
+		msg2 = '\n'.join(['\t - Name: {} \n\t\t PowerFactory Element: {}'.format(x[1], x[2]) for x in cls_prj.list_of_mutual])
+		logger.info('{}\n{}'.format(msg1,msg2))
 	else:
 		# Can't Export mutual impedances if you give it only one bus
 		cls_prj.include_mutual = False
@@ -841,13 +840,9 @@ def create_study_case_results_files(cls_sc, cls_prj):
 			for mut in cls_prj.list_of_mutual:								# Adds the mutual impedance data to Results File
 				add_vars_res(cls_sc.fs_res, mut[2], constants.HASTInputs.mutual_variables)
 		cls_sc.fs_res.SetAsDefault()
-
-		# Create command for frequency sweep and add to Task Automation
-		# Needs to be found in each copied study case
-		# #_ = cls_sc.create_freq_sweep(results_file=cls_sc.fs_res, settings=Fsweep_Settings)
 	else:
-	# Frequency sweep not carried out so no need to add to task automation
-		logger.info('No frequency sweep included for study case {}'.format(cls_sc.name))
+		# Frequency sweep not carried out so no need to add to task automation
+		logger.debug('No frequency sweep included for study case {}'.format(cls_sc.name))
 
 	if HRM_Sim:
 		# During task automation each process only has access to single study case and therefore results
@@ -862,7 +857,7 @@ def create_study_case_results_files(cls_sc, cls_prj):
 		cls_sc.hldf_results.SetAsDefault()
 
 	else:
-		logger.info('No Harmonic load flow added for study case {}'.format(cls_sc.name))
+		logger.debug('No Harmonic load flow added for study case {}'.format(cls_sc.name))
 
 	logger.info('Creating of commands for studies in project {} completed in {:0.2f} seconds'
 				.format(cls_prj.name, time.clock() - _t1_prj_start))
@@ -904,6 +899,16 @@ def add_all_filters(new_filter_list, cont_name, sc, op, sc_target_folder,
 	"""
 		Function to create new copy of study case for each filter
 	:param new_filter_list:
+	:param str cont_name:
+	:param sc:  Handle to the study case in PowerFactory that will be copied
+	:param op:  Handle the operational scenario in PowerFactory that will be copied for the new filter
+	:param sc_target_folder:  Target folder in PowerFactory to contain the new study cases with the filters
+	:param op_target_folder:  Target folder in PowerFactory to contain the new operational scenario
+	:param variations_folder:  Folder that contains the variations
+	:param list_params: Parameters from HAST inputs for the study case (i.e. name, project, etc.)
+	:param cont_short_name:  Short name for the contingency under consideration
+	:param pf.PFProject cls_prj: Handle to the custom PowerFactory project class that will house the study case
+	:param bool create_studies: Whether to create the frequency scan and harmonic load flow studies for the filter case
 	:return:
 	"""
 	for filter_item in new_filter_list:
@@ -948,31 +953,25 @@ def add_all_filters(new_filter_list, cont_name, sc, op, sc_target_folder,
 			# Save updated scenario which now includes filter
 			save_active_scenario()
 
+			# Create new class reference with all the details for this contingency and
+			# filter combination and then add to
+			# list to be returned
+			_study_cls = pf.PFStudyCase(full_name=filter_full_name,
+										list_parameters=list_params,
+										cont_name=cont_short_name,
+										filter_name=filter_name,
+										sc=filter_study_case,
+										op=filter_op,
+										prj=cls_prj,
+										task_auto=cls_prj.task_auto,
+										uid=start1,
+										results_pth=Temp_Results_Export)
+			_study_cls.create_load_flow(load_flow_settings=Load_Flow_Setting)
+
 			# Determine if load flow successful and if not then don't include _study_cls in results
-			lf_error = load_flow(load_flow_settings=Load_Flow_Setting, studycase_name=filter_full_name)
+			if _study_cls.run_load_flow():
 
-			# Deactivate new study case and reactivate old study case
-			filter_study_case.Deactivate()
-
-			# REMOVED - No need to reactivate study case
-			# #study_case.Activate()
-
-			# Only add to study case list and project list if load_flow successful, will still
-			# remain in folder of study cases but will be skipped in freq_scan and harmonic lf
-			if lf_error == 0:
-				# Create new class reference with all the details for this contingency and
-				# filter combination and then add to
-				# list to be returned
-				_study_cls = pf.PFStudyCase(full_name=filter_full_name,
-											list_parameters=list_params,
-											cont_name=cont_short_name,
-											filter_name=filter_name,
-											sc=filter_study_case,
-											op=filter_op,
-											prj=cls_prj,
-											task_auto=cls_prj.task_auto,
-											uid=start1,
-											results_pth=Temp_Results_Export)
+				# Create the frequency sweep and harmonic load flow studies
 				if create_studies:
 					_study_cls.create_studies(logger=logger,
 											  fs=FS_Sim, hldf=HRM_Sim,
@@ -1003,8 +1002,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	time_sc_check = time.clock()
 	logger.info(('Checking all Projects, Study Cases and Scenarios Solve for Load Flow, it will also check N-1 and ' 
 				 ' create the operational scenarios if Pre_Case_Check is True\n'))
-	# #_count_studycase used instead of count_studycase to avoid shadowing
-	# #_count_studycase = 0
 	new_list =[]
 
 	# Empty list which will be populated with the new classes
@@ -1013,10 +1010,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 	# TODO: Handling non-unique studycases
 	for sc_list_parameters in list_to_check:
 		logger.info('----####---- \t Studies for {} \t ----####----'.format(sc_list_parameters[0]))
-		# #sc_list_parameters = list_to_check[_count_studycase]
-		# ERROR: Previously was not actually looking at the list passed to function
 		# TODO: Efficiency - This is activating a new project even if it is the same
-
 		# TODO:  Create frequency / HLF command and results at this point and then copy / paste
 		project_name = sc_list_parameters[1]
 		_prj = activate_project(project_name)  # Activate Project
@@ -1026,13 +1020,17 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 			if _study_error == 0:
 				scenario, scen_err = activate_scenario(sc_list_parameters[3])										# Activate Scenario
 				if scen_err == 0:
-					# #sc_name=sc_list_parameters
 					logger.info('Load flow being run for HAST study case {}'.format(sc_list_parameters))
-					ldf_err = load_flow(load_flow_settings=Load_Flow_Setting,
-										studycase_name=sc_list_parameters)																			# Perform Load Flow
+					ldf_err, ldf_command = load_flow(load_flow_settings=Load_Flow_Setting,
+													 sc=study_case,
+													 studycase_name=sc_list_parameters)																			# Perform Load Flow
 					logger.debug('Load flow study completed with error code {}'.format(ldf_err))
 					# Not possible to skip unsolved load flows since gets stuck in a loop
 					if ldf_err == 0:
+						# If no error then deletes the load flow command that was created to avoid leaving mess in
+						# studycase
+						delete_object(ldf_command)
+
 						new_list.append(sc_list_parameters)
 						logger.debug('Studycase Scenario Solving added to analysis list {}'
 									 .format(sc_list_parameters))
@@ -1049,18 +1047,6 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 						operation_case_folder = app.GetProjectFolder("scen")
 						_op_sc_results_folder, _folder_exists2 = create_folder(operation_case_folder,
 																			   Operation_Scenario_Folder)
-
-						# Create a variations folder for this project so that new mutual impedances created
-						# during running can be deleted easily.
-						# Create new variation within variations_folder
-						variations_folder = app.GetProjectFolder("scheme")
-						_variations_folder, _folder_exists3 = create_folder(variations_folder,
-																			Variation_Name)
-						variation = create_variation(_variations_folder, constants.PowerFactory.pf_scheme, Variation_Name)
-						activate_variation(variation)
-
-						# Create and activate recording stage within variation
-						_ = create_stage(variation, constants.PowerFactory.pf_stage, Variation_Name)
 
 						# Check if folder already exists
 						task_auto_name = 'Task_Automation_{}'.format(start1)
@@ -1087,44 +1073,61 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							sc=study_case,
 							op_target_folder = _op_sc_results_folder,
 							op=scenario)
+
+						# Create a variations folder for this project so that new mutual impedances created
+						# during running can be deleted easily.
+						# Create new variation within variations_folder
+						variations_folder = app.GetProjectFolder("scheme")
+						_variations_folder, _folder_exists3 = create_folder(variations_folder,
+																			Variation_Name)
+						variation = create_variation(_variations_folder, constants.PowerFactory.pf_scheme,
+													 Variation_Name)
+						activate_variation(variation)
+
+						# Create and activate recording stage within variation
+						_ = create_stage(variation, constants.PowerFactory.pf_stage, Variation_Name)
+
 						# Check base case converges, otherwise skip all contingencies
-						if not load_flow(load_flow_settings=Load_Flow_Setting, studycase_name=base_case_name):
-							logger.debug('Load flow for base study case {} successful'.format(base_case_name))
-							cls_base_sc = hast2_1.pf.PFStudyCase(full_name=base_case_name,
-																 list_parameters=sc_list_parameters,
-																 cont_name=constants.HASTInputs.base_case,
-																 sc=sc_base,
-																 op=op_base,
-																 prj=_prj,
-																 task_auto=task_automation,
-																 uid=start1,
-																 base_case=True,
-																 results_pth=Temp_Results_Export)
+						cls_base_sc = hast2_1.pf.PFStudyCase(full_name=base_case_name,
+															 list_parameters=sc_list_parameters,
+															 cont_name=constants.HASTInputs.base_case,
+															 sc=sc_base,
+															 op=op_base,
+															 prj=_prj,
+															 task_auto=task_automation,
+															 uid=start1,
+															 base_case=True,
+															 results_pth=Temp_Results_Export)
 
-							# Add study case to dictionary of projects
-							if project_name not in prj_dict.keys():
-								# Create a new project and add these objects so that they will be deleted once
-								# the study has been completed
-								# Variations all stored in a folder so that they can be deleted as a group.
-								objects_to_delete = [study_case_results_folder,
-													 _op_sc_results_folder,
-													 _variations_folder]
-								prj_dict[project_name] = hast2_1.pf.PFProject(name=project_name,
-																			  prj=_prj,
-																			  task_auto=task_automation,
-																			  folders=objects_to_delete,
-																			  include_mutual=Excel_Export_Z12)
-							prj_dict[project_name].sc_cases.append(cls_base_sc)
-							prj_dict[project_name].sc_base = sc_base
-
-						else:
+						# Add load flow command to study case
+						cls_base_sc.create_load_flow(load_flow_settings=Load_Flow_Setting)
+						# Run load flow and determine if successful fo base case that has been copied as an extra check
+						if not cls_base_sc.run_load_flow():
 							logger.error(('Load flow not successful for base study case {} and therefore no '
-										 'contingencies for this case will be studied')
+										  'contingencies for this case will be studied')
 										 .format(base_case_name))
-							# #Iterate study case to check
-							# #_count_studycase += 1
+							# Remove reference to base case
+							del cls_base_sc
+							# -- POTENTIAL LOOP EXIT COMMAND --
 							continue
 
+						# Add study case to dictionary of projects
+						if project_name not in prj_dict.keys():
+							# Create a new project and add these objects so that they will be deleted once
+							# the study has been completed
+							# Variations all stored in a folder so that they can be deleted as a group.
+							objects_to_delete = [study_case_results_folder,
+												 _op_sc_results_folder,
+												 _variations_folder]
+							prj_dict[project_name] = hast2_1.pf.PFProject(name=project_name,
+																		  prj=_prj,
+																		  task_auto=task_automation,
+																		  folders=objects_to_delete,
+																		  include_mutual=Excel_Export_Z12)
+						prj_dict[project_name].sc_cases.append(cls_base_sc)
+						prj_dict[project_name].sc_base = sc_base
+
+						# Studies running successfully so continue
 						create_study_case_results_files(cls_sc=cls_base_sc, cls_prj=prj_dict[project_name])
 
 						# Add filters for base case
@@ -1142,7 +1145,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							create_studies=True)
 
 						while cont_count < len(new_contingency_list):
-							logger.debug('Carrying out Contingency Pre Stage Check: {}'
+							logger.debug('Carrying out Contingency Check: {}'
 										 .format(new_contingency_list[cont_count][0]))
 							# sc_base and op_base now reflect base case so no need to check
 							if new_contingency_list[cont_count][0] == "Base_Case":
@@ -1165,29 +1168,25 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 							save_active_scenario()
 
-							# Determine if load flow successful and if not then don't include _study_cls in results
-							lf_error = load_flow(load_flow_settings=Load_Flow_Setting,
-												 studycase_name=cont_name)
-
-							# Deactivate new study case and reactivate old study case
-							cont_study_case.Deactivate()
-
+							# Create new class reference with all the details for this contingency and then add to
+							# list to be returned
+							_study_cls = hast2_1.pf.PFStudyCase(full_name=cont_name,
+																list_parameters=sc_list_parameters,
+																cont_name=new_contingency_list[cont_count][0],
+																sc=cont_study_case,
+																op=cont_scenario,
+																prj=_prj,
+																task_auto=task_automation,
+																uid=start1,
+																base_case=False,
+																results_pth=Temp_Results_Export)
+							# Create load flow case and check if error
+							_study_cls.create_load_flow(load_flow_settings=Load_Flow_Setting)
 
 							# Only add load flow to study case list and project list if load_flow successful, will still
 							# remain in folder of study cases but will be skipped in freq_scan and harmonic lf
-							if lf_error == 0:
-								# Create new class reference with all the details for this contingency and then add to
-								# list to be returned
-								_study_cls = hast2_1.pf.PFStudyCase(full_name=cont_name,
-																	list_parameters=sc_list_parameters,
-																	cont_name=new_contingency_list[cont_count][0],
-																	sc=cont_study_case,
-																	op=cont_scenario,
-																	prj=_prj,
-																	task_auto=task_automation,
-																	uid=start1,
-																	base_case=False,
-																	results_pth=Temp_Results_Export)
+							if _study_cls.run_load_flow():
+
 								_study_cls.create_studies(logger=logger,
 														  fs=FS_Sim, hldf=HRM_Sim,
 														  fs_settings=Fsweep_Settings,
@@ -1234,10 +1233,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 		else:
 			logger.error('Problem Activating Project: {} {}'
 						 .format(sc_list_parameters[0], sc_list_parameters[1]))
-		# #_count_studycase += 1
-	logger.info('Finished Checking Study Cases in {:.2f}'.format(time.clock() - time_sc_check))
-	print1("___________________________________________________________________________________________________",
-		   bf=2,af=2)
+	msg1 = '-- Finished Checking Study Cases in {:.2f}'.format(time.clock() - time_sc_check)
+	msg2 = '\t'+'_'*100+'\t'
+	logger.info('{}\n{}'.format(msg1,msg2))
 	return prj_dict
 
 def check_terminals(list_of_points, prj_name, sc_name): 		# This checks and creates the list of terminals to add to the Results file
@@ -1254,7 +1252,6 @@ def check_terminals(list_of_points, prj_name, sc_name): 		# This checks and crea
 	terminals_error = 0
 	# terminals_index contains list of the terminal handles to be used in the study
 	terminals_index = list()
-	# #tm_count = 0
 	for terminal in list_of_points:
 		# Get handle for the substation that contains the data
 		pf_sub = app.GetCalcRelevantObjects(terminal.substation)
@@ -1364,9 +1361,9 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 			contingencies_ok = 1
 		elif not skip_contingency:
 			new_contingency_list.append(list_of_couplers)
-	logger.info("Contingencies Used for Analysis:")
-	for item in new_contingency_list:
-		logger.info('\t - {}'.format(item))
+	msg1 = 'Contingencies Used for Analysis:'
+	msg2 = '\n'.join(['\t - Name: {}'.format(x[0]) for x in new_contingency_list])
+	logger.info('{}\n{}'.format(msg1, msg2))
 	return new_contingency_list, contingencies_ok
 
 def check_filters(list_of_filters):			# Checks and creates list of terminals to add the Filters to
@@ -1653,7 +1650,6 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	if len(List_of_Filters) == 0:
 		logger.info('No harmonic filters listed for studies')
 	global List_of_Points
-	# #List_of_Points = analysis_dict["Terminals"]									# Uses the list of Terminals
 	# Uses the class with list of terminals to allow referencing by name rather than position
 	List_of_Points = cls_hast_inputs.list_of_terms
 	if len(List_of_Points) <1:													# Check there are the right number of inputs

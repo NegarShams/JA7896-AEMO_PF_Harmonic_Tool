@@ -21,7 +21,6 @@ __phone__ = '+44 7899 984158'
 __status__ = 'Constants'
 
 nom_freq = 50.0
-# #logger_name = 'HAST'
 logger_name = None
 
 # When parallel processing will ensure this number of cpus are kept free
@@ -80,6 +79,7 @@ class PowerFactory:
 	default_results_name = 'HAST_Res'
 	default_fs_extension = '_FS'
 	default_hldf_extension = '_HLDF'
+	default_ldf_name = 'HAST_LDF'
 
 	pf_r1 = 'm:R'
 	pf_x1 = 'm:X'

@@ -31,9 +31,13 @@ __version__ = '2.1.2'
 __email__ = 'david.mills@PSCconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Beta'
+# Get name of current script for use in log messages
+__name__ = os.path.basename(__file__)
 
-logger = logging.getLogger()
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
+					level=logging.INFO,
+					datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger(constants.logger_name)
 
 # Populate the following to avoid a GUI import
 list_of_folders_to_import = []
@@ -265,7 +269,6 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 
 	df_mutual = pd.DataFrame().reindex_like(_df)
 	df_mutual = df_mutual.drop(_df.columns, axis=1)
-	# #df_mutual.index = _df.index
 	new_var_names1 = []
 	new_var_names2 = []
 	new_ref_terminals1 = []
@@ -319,7 +322,6 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	# Obtain nominal voltage for each terminal
 	idx = pd.IndexSlice
 	# Add in row to contain the nominal voltage
-	# #df_nom_voltage = pd.DataFrame(index=[c.idx_nom_voltage], columns=_df.columns)
 	_df.loc[c.idx_nom_voltage, :] = ''
 
 	for term, df in _df.groupby(axis=1, level=c.lbl_Reference_Terminal):
@@ -371,9 +373,6 @@ def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping, startco
 		list_col_nums = list(df.columns.get_locs(list(map(list, zip(*v.columns.to_list())))))
 		col_nums[k] =[x+startcol for x in list_col_nums]
 
-	# # May need to add back in the tuple
-	# Create a tuple with name of chart followed by value (tuple used to ensure order matches)
-	# grouping = [('_'.join(k),v) if type(k) is not str else (k,v) for k,v in zip(keys, values)]
 	return col_nums
 
 def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
@@ -401,59 +400,65 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 
 	# Export to excel with a new sheet for each node
 	i=0
-	with pd.ExcelWriter(pth_file, engine='xlsxwriter') as writer:
-		for node_name, _df in list_dfs:
-			logger.info(' - \t {}/{} Exporting node {}'.format(i+1, num_nodes, node_name))
-			i += 1
-			col = c.start_col
-			for var in vars_to_export:
-				# Will only include index and header labels if True
-				# include_index = col <= c.start_col
-				include_index = True
+	try:
+		with pd.ExcelWriter(pth_file, engine='xlsxwriter') as writer:
+			for node_name, _df in list_dfs:
+				logger.info(' - \t {}/{} Exporting node {}'.format(i+1, num_nodes, node_name))
+				i += 1
+				col = c.start_col
+				for var in vars_to_export:
+					# Will only include index and header labels if True
+					# include_index = col <= c.start_col
+					include_index = True
 
-				df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
-				if not df_to_export.empty:
-					# Results are sorted in study case then contingency then filter order
-					df_to_export.to_excel(writer, merge_cells=True,
-										  sheet_name=node_name,
-										  startrow=start_row, startcol=col,
-										  header=include_index, index_label=False)
+					df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
+					if not df_to_export.empty:
+						# Results are sorted in study case then contingency then filter order
+						df_to_export.to_excel(writer, merge_cells=True,
+											  sheet_name=node_name,
+											  startrow=start_row, startcol=col,
+											  header=include_index, index_label=False)
 
-					# Add graphs if data is self-impedance
-					if var == constants.PowerFactory.pf_z1 and plot_graphs:
-						logger.info(' \t - \t Adding graph for node {}'.format(node_name))
+						# Add graphs if data is self-impedance
+						if var == constants.PowerFactory.pf_z1 and plot_graphs:
+							logger.info(' \t - \t Adding graph for node {}'.format(node_name))
 
-						num_rows = df_to_export.shape[0]
-						# Get number of columns to include in each graph grouping
-						dict_graph_grouping = graph_grouping(df=df_to_export, startcol=col+1)
-						names = df_to_export.columns.names
-						row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
+							num_rows = df_to_export.shape[0]
+							# Get number of columns to include in each graph grouping
+							dict_graph_grouping = graph_grouping(df=df_to_export, startcol=col+1)
+							names = df_to_export.columns.names
+							row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
 
 
-						add_graph(writer, sheet_name=node_name,
-								  row_cont=row_cont,
-								  row_start=start_row + len(names) + 1,
-								  col_freq=col,
-								  num_rows=num_rows,
-								  graph_groups=dict_graph_grouping,
-								  chrt_row_num=0)
+							add_graph(writer, sheet_name=node_name,
+									  row_cont=row_cont,
+									  row_start=start_row + len(names) + 1,
+									  col_freq=col,
+									  num_rows=num_rows,
+									  graph_groups=dict_graph_grouping,
+									  chrt_row_num=0)
 
-						# Get grouping of graphs to compare study cases
-						dict_graph_grouping = graph_grouping(df=df_to_export,
-															 group_by=constants.ResultsExtract.chart_grouping_base_case,
-															 startcol=col+1)
+							# Get grouping of graphs to compare study cases
+							dict_graph_grouping = graph_grouping(df=df_to_export,
+																 group_by=constants.ResultsExtract.chart_grouping_base_case,
+																 startcol=col+1)
 
-						add_graph(writer, sheet_name=node_name,
-								  row_cont=row_cont,
-								  row_start=start_row + len(names) + 1,
-								  col_freq=col,
-								  num_rows=num_rows,
-								  graph_groups=dict_graph_grouping,
-								  chrt_row_num=1)
+							add_graph(writer, sheet_name=node_name,
+									  row_cont=row_cont,
+									  row_start=start_row + len(names) + 1,
+									  col_freq=col,
+									  num_rows=num_rows,
+									  graph_groups=dict_graph_grouping,
+									  chrt_row_num=1)
 
-					col = col + df_to_export.shape[1] + c.col_spacing
-				else:
-					logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
+						col = col + df_to_export.shape[1] + c.col_spacing
+					else:
+						logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
+	except PermissionError:
+		logger.critical(('Unable to write to excel workbook {} since it is either already open or you do not have '
+						 'the appropriate permissions to save here.  Please check and then rerun {}')
+						.format(pth_file, __name__))
+		raise PermissionError('Unable to write to workbook')
 
 	return None
 
@@ -757,6 +762,9 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 if __name__ == '__main__':
 	# Start logger
 	time_stamps = [time.time()]
+	log_format = '%(asctime)s - %(levelname)s - %(message)s'
+	logging.basicConfig(format=log_format, level=logging.INFO)
+	logger = logging.getLogger(constants.logger_name)
 
 	# Load GUI to select files
 	# TODO: Add option in GUI whether to include graphs in plots

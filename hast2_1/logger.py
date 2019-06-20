@@ -273,8 +273,6 @@ class Logger:
 		:return None:
 		"""
 		self.logging_final_report_and_closure()
-		# #self.logger.debug('Logging stopped')
-		# #logging.shutdown()
 
 	def __exit__(self):
 		"""
@@ -282,8 +280,6 @@ class Logger:
 		:return None:
 		"""
 		self.logging_final_report_and_closure()
-		# #self.logger.debug('Logging stopped')
-		# #logging.shutdown()
 
 #  ----- UNIT TESTS -----
 class TestLoggerSetup(unittest.TestCase):

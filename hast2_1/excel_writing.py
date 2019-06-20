@@ -258,7 +258,6 @@ class Excel:
 					aces = [cell_start_alph + str(no) for no in cell_range_num]  #
 
 				# Initialise row counter and loop through each row of input data
-				# #count_row = 0
 				for count_row in range(len(aces)):
 					ws.Range(aces[count_row]).End(c.xlToRight).Select()
 					col_end = self.xl.Selection.Address  # Returns address of last cells
@@ -294,10 +293,7 @@ class Excel:
 					elif current_worksheet == constants.PowerFactory.sht_Filters:
 						row_value = FilterDetails(row_data=row_value)
 
-						# #row_value = add_filters(row_data=row_value)
-
 					row_input.append(row_value)
-					# #count_row = count_row + 1
 
 			# More efficiently checking which worksheet looking at
 			elif current_worksheet in constants.PowerFactory.HAST_Input_Settings_Sheets:
@@ -727,7 +723,6 @@ class Excel:
 					# the columns by the number of results.
 					for res_type in res_to_include:
 						for x in fs_results:
-							# #if x[1] == "c:Z_12":
 							if x[constants.ResultsExtract.loc_pf_variable_mutual] == res_type:
 								ws.Range(ws.Cells(startrow - 1, newcol),
 										 ws.Cells(endrow, newcol)).Value = list(zip(*[x]))
@@ -1182,9 +1177,7 @@ class HASTInputs:
 		"""
 		# Get handle for logger
 		logger = logging.getLogger(constants.logger_name)
-		# #self.list_of_terms = list_of_terminals
 		self.list_of_terms = [TerminalDetails(k[0], k[1], k[2], k[3]) for k in list_of_terminals]
-		# #self.dict_of_terms = {(k[1], k[2]): k[0] for k in list_of_terminals}
 		self.dict_of_terms = {(k.substation, k.terminal): k.name for k in self.list_of_terms}
 
 		# Confirm that none of the terminal names are greater than the maximum allowed character length

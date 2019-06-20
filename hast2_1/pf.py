@@ -15,6 +15,8 @@ import math
 import hast2_1.constants as constants
 import multiprocessing
 import unittest
+import time
+import logging
 
 # Meta Data
 __author__ = 'David Mills'
@@ -31,9 +33,15 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 	:param str name: Name to be given to new object 
 	:return powerfactory.Object _new_object: Handle to object returns 
 	"""
-	# _new_object used instead of new_object to avoid shadowing
-	_new_object = location.CreateObject(pfclass, name)
-	return _new_object
+	# Check if already exists before creating a new object
+	existing_object = location.GetContents('{}.{}'.format(name, pfclass))
+	if existing_object:
+		_new_object = existing_object[0]
+		already_existed = True
+	else:
+		_new_object = location.CreateObject(pfclass, name)
+		already_existed = False
+	return _new_object, already_existed
 
 def retrieve_results(elmres, res_type, write_as_df=False):			# Reads results into python lists from results file
 	"""
@@ -104,17 +112,17 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 
 	hdl_substation = _app.GetCalcRelevantObjects(filter_ref.sub)
 
-	hdl_filter = create_object(location=hdl_substation[0],
-						   pfclass=constants.PowerFactory.pf_filter,
-						   name=filter_name)
+	hdl_filter, _ = create_object(location=hdl_substation[0],
+								  pfclass=constants.PowerFactory.pf_filter,
+								  name=filter_name)
 
 
 	c = constants.PowerFactory
 	# Add cubicle for filter
 	hdl_terminal = hdl_substation[0].GetContents(filter_ref.term)
-	hdl_cubicle = create_object(location=hdl_terminal[0],
-							   pfclass=c.pf_cubicle,
-							   name=filter_name)
+	hdl_cubicle, _ = create_object(location=hdl_terminal[0],
+								   pfclass=c.pf_cubicle,
+								   name=filter_name)
 
 	# Set attributes for new filter
 	hdl_filter.SetAttribute(c.pf_shn_term, hdl_cubicle)
@@ -254,7 +262,6 @@ class PFStudyCase:
 		self.name = full_name
 		self.base_name = list_parameters[0]
 		self.prj_name = list_parameters[1]
-		# #self.sc_name = list_parameters[2]
 		self.sc_name = remove_string_endings(astring=list_parameters[2], trailing='.IntCase')
 		self.op_name = remove_string_endings(astring=list_parameters[3], trailing='.IntScenario')
 		self.cont_name = cont_name
@@ -270,6 +277,7 @@ class PFStudyCase:
 		self.task_auto = task_auto
 
 		# Attributes set during study completion
+		self.ldf = None
 		self.frq = None
 		self.hldf = None
 		self.frq_export_com = None
@@ -287,6 +295,100 @@ class PFStudyCase:
 		self.fs_result_exports = []
 		self.hldf_result_exports = []
 
+	def create_load_flow(self, load_flow_settings):
+		"""
+			Create a load flow command in the study case so that the same settings will be run with the
+			frequency scan and HAST file so that there are no issues with non-convergence.
+		:param list load_flow_settings:  Load flow settings provided as an input to the HAST file
+		:return None:
+		"""
+		ldf, already_existed = create_object(location=self.sc,
+											 pfclass=constants.PowerFactory.ldf_command,
+											 name='HAST_{}'.format(self.uid))
+
+		# Since uid is used in name of HAST load flow only need to update settings if a new
+		# load flow command is created
+		if not already_existed:
+			# Basic
+			ldf.iopt_net = load_flow_settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
+			ldf.iopt_at = load_flow_settings[1]  # Automatic Tap Adjustment
+			ldf.iopt_ashnt = load_flow_settings[2]  # Automatic Shunt Adjustment
+			ldf.iopt_lim = load_flow_settings[3]  # Consider Reactive Power Limits
+			ldf.iopt_ashnt = load_flow_settings[4]  # Consider Reactive Power Limits Scaling Factor
+			ldf.iopt_tem = load_flow_settings[
+				5]  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
+			ldf.iopt_pq = load_flow_settings[6]  # Consider Voltage Dependency of Loads
+			ldf.iopt_fls = load_flow_settings[7]  # Feeder Load Scaling
+			ldf.iopt_sim = load_flow_settings[8]  # Consider Coincidence of Low-Voltage Loads
+			ldf.scPnight = load_flow_settings[9]  # Scaling Factor for Night Storage Heaters
+
+			# Active Power Control
+			ldf.iopt_apdist = load_flow_settings[
+				10]  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
+			# 2 Acording to Primary Control, 3 Acording to Inertias)
+			ldf.iopt_plim = load_flow_settings[11]  # Consider Active Power Limits
+			ldf.iPbalancing = load_flow_settings[
+				12]  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
+			# ldf.rembar = load_flow_settings[13] # Reference Busbar
+			ldf.phiini = load_flow_settings[14]  # Angle
+
+			# Advanced Options
+			ldf.i_power = load_flow_settings[15]  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
+			ldf.iopt_notopo = load_flow_settings[16]  # No Topology Rebuild
+			ldf.iopt_noinit = load_flow_settings[17]  # No initialisation
+			ldf.utr_init = load_flow_settings[18]  # Consideration of transformer winding ratio
+			ldf.maxPhaseShift = load_flow_settings[19]  # Max Transformer Phase Shift
+			ldf.itapopt = load_flow_settings[20]  # Tap Adjustment ( 0 Direct, 1 Step)
+			ldf.krelax = load_flow_settings[21]  # Min COntroller Relaxation Factor
+
+			ldf.iopt_stamode = load_flow_settings[22]  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
+			ldf.iopt_igntow = load_flow_settings[
+				23]  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
+			ldf.initOPF = load_flow_settings[24]  # Use this load flow for initialisation of OPF
+			ldf.zoneScale = load_flow_settings[25]  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
+
+			# Iteration Control
+			ldf.itrlx = load_flow_settings[26]  # Max No Iterations for Newton-Raphson Iteration
+			ldf.ictrlx = load_flow_settings[27]  # Max No Iterations for Outer Loop
+			ldf.nsteps = load_flow_settings[28]  # Max No Iterations for Number of steps
+
+			ldf.errlf = load_flow_settings[29]  # Max Acceptable Load Flow Error for Nodes
+			ldf.erreq = load_flow_settings[30]  # Max Acceptable Load Flow Error for Model Equations
+			ldf.iStepAdapt = load_flow_settings[31]  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
+			ldf.relax = load_flow_settings[32]  # If Fixed Relaxation factor
+			ldf.iopt_lev = load_flow_settings[33]  # Automatic Model Adaptation for Convergence
+
+			# Outputs
+			ldf.iShowOutLoopMsg = load_flow_settings[34]  # Show 'outer Loop' Messages
+			ldf.iopt_show = load_flow_settings[35]  # Show Convergence Progress Report
+			ldf.num_conv = load_flow_settings[36]  # Number of reported buses/models per iteration
+			ldf.iopt_check = load_flow_settings[37]  # Show verification report
+			ldf.loadmax = load_flow_settings[38]  # Max Loading of Edge Element
+			ldf.vlmin = load_flow_settings[39]  # Lower Limit of Allowed Voltage
+			ldf.vlmax = load_flow_settings[40]  # Upper Limit of Allowed Voltage
+			# ldf.outcmd =  load_flow_settings[41]          		# Output
+			ldf.iopt_chctr = load_flow_settings[42]  # Check Control Conditions
+			# ldf.chkcmd = load_flow_settings[43]            	# Command
+
+			# Load Generation Scaling
+			ldf.scLoadFac = load_flow_settings[44]  # Load Scaling Factor
+			ldf.scGenFac = load_flow_settings[45]  # Generation Scaling Factor
+			ldf.scMotFac = load_flow_settings[46]  # Motor Scaling Factor
+
+			# Low Voltage Analysis
+			ldf.Sfix = load_flow_settings[47]  # Fixed Load kVA
+			ldf.cosfix = load_flow_settings[48]  # Power Factor of Fixed Load
+			ldf.Svar = load_flow_settings[49]  # Max Power Per Customer kVA
+			ldf.cosvar = load_flow_settings[50]  # Power Factor of Variable Part
+			ldf.ginf = load_flow_settings[51]  # Coincidence Factor
+			ldf.i_volt = load_flow_settings[52]  # Voltage Drop Analysis (0 Stochastic, 1 Maximum Current)
+
+			# Advanced Simulation Options
+			ldf.iopt_prot = load_flow_settings[53]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
+			ldf.ign_comp = load_flow_settings[54]  # Ignore Composite Elements
+
+		self.ldf = ldf
+
 	def create_freq_sweep(self, results_file, settings):
 		"""
 			Create a frequency sweep command in the study_case and return this as a reference
@@ -296,30 +398,34 @@ class PFStudyCase:
 		"""
 		self.fs_results = results_file
 		# Create a new frequency sweep command object and store it in the study case
-		frq = create_object(self.sc, 'ComFsweep', 'FSweep_{}'.format(self.uid))
+		frq, already_existed = create_object(self.sc, constants.PowerFactory.frq_sweep_command,
+											 'FSweep_{}'.format(self.uid))
 
-		## Frequency Sweep Settings
-		## -------------------------------------------------------------------------------------
-		# Basic
-		# TODO: Check whether all settings from input file are actually used
-		frq.iopt_net = settings[2]  # Network Representation (0=Balanced 1=Unbalanced)
-		frq.fstart = settings[3]  # Impedance Calculation Start frequency
-		frq.fstop = settings[4]  # Stop Frequency
-		frq.fstep = settings[5]  # Step Size
-		frq.i_adapt = settings[6]  # Automatic Step Size Adaption
-		frq.frnom = settings[7]  # Nominal Frequency
-		frq.fshow = settings[8]  # Output Frequency
-		frq.ifshow = settings[9]  # Harmonic Order
-		frq.p_resvar = results_file  # Results Variable
-		# TODO: Load flow settings for frequency sweep are currently not configured
-		# frq.cbutldf = fsweep_settings[11]                 # Load flow
+		# Since uid is used in frequency command name only need to update settings if new object created
+		if not already_existed:
+			## Frequency Sweep Settings
+			## -------------------------------------------------------------------------------------
+			# Basic
+			# TODO: Check whether all settings from input file are actually used
+			frq.iopt_net = settings[2]  # Network Representation (0=Balanced 1=Unbalanced)
+			frq.fstart = settings[3]  # Impedance Calculation Start frequency
+			frq.fstop = settings[4]  # Stop Frequency
+			frq.fstep = settings[5]  # Step Size
+			frq.i_adapt = settings[6]  # Automatic Step Size Adaption
+			frq.frnom = settings[7]  # Nominal Frequency
+			frq.fshow = settings[8]  # Output Frequency
+			frq.ifshow = settings[9]  # Harmonic Order
+			frq.p_resvar = results_file  # Results Variable
 
-		# Advanced
-		frq.errmax = settings[12]  # Setting for Step Size Adaption    Maximum Prediction Error
-		frq.errinc = settings[13]  # Minimum Prediction Error
-		frq.ninc = settings[14]  # Step Size Increase Delay
-		frq.ioutall = settings[15]  # Calculate R, X at output frequency for all nodes
 
+			# Advanced
+			frq.errmax = settings[12]  # Setting for Step Size Adaption    Maximum Prediction Error
+			frq.errinc = settings[13]  # Minimum Prediction Error
+			frq.ninc = settings[14]  # Step Size Increase Delay
+			frq.ioutall = settings[15]  # Calculate R, X at output frequency for all nodes
+
+		# Frequency sweep will use the load flow command created for this study case
+		frq.cbutldf = self.ldf
 		self.frq = frq
 		return self.frq
 
@@ -332,33 +438,36 @@ class PFStudyCase:
 		"""
 		self.hldf_results = results_file
 		# Create a new harmonic load flow object and store it in the study case
-		hldf = create_object(self.sc, 'ComHldf', 'HLDF_{}'.format(self.uid))
+		hldf, already_existed = create_object(self.sc, 'ComHldf', 'HLDF_{}'.format(self.uid))
 
-		## Loadflow settings
-		## -------------------------------------------------------------------------------------
-		# Basic
-		hldf.iopt_net = settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
-		hldf.iopt_allfrq = settings[1]  # Calculate Harmonic Load Flow 0 - Single Frequency 1 - All Frequencies
-		hldf.iopt_flicker = settings[2]  # Calculate Flicker
-		hldf.iopt_SkV = settings[3]  # Calculate Sk at Fundamental Frequency
-		hldf.frnom = settings[4]  # Nominal Frequency
-		hldf.fshow = settings[5]  # Output Frequency
-		hldf.ifshow = settings[6]  # Harmonic Order
-		hldf.p_resvar = results_file  # Results Variable
-		# TODO: No settings are currently provided for the load flow parameters
-		# hldf.cbutldf =  harmonic_loadflow_settings[8]               	# Load flow
+		# Since uid in command name only need to update settings if a new object is created
+		if not already_existed:
+			## Loadflow settings
+			## -------------------------------------------------------------------------------------
+			# Basic
+			hldf.iopt_net = settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
+			hldf.iopt_allfrq = settings[1]  # Calculate Harmonic Load Flow 0 - Single Frequency 1 - All Frequencies
+			hldf.iopt_flicker = settings[2]  # Calculate Flicker
+			hldf.iopt_SkV = settings[3]  # Calculate Sk at Fundamental Frequency
+			hldf.frnom = settings[4]  # Nominal Frequency
+			hldf.fshow = settings[5]  # Output Frequency
+			hldf.ifshow = settings[6]  # Harmonic Order
+			hldf.p_resvar = results_file  # Results Variable
 
-		# IEC 61000-3-6
-		hldf.iopt_harmsrc = settings[9]  # Treatment of Harmonic Sources
+			# IEC 61000-3-6
+			hldf.iopt_harmsrc = settings[9]  # Treatment of Harmonic Sources
 
-		# Advanced Options
-		hldf.iopt_thd = settings[10]  # Calculate HD and THD 0 Based on Fundamental Frequency values 1 Based on rated voltage/current
-		hldf.maxHrmOrder = settings[11]  # Max Harmonic order for calculation of THD and THF
-		hldf.iopt_HF = settings[12]  # Calculate Harmonic Factor (HF)
-		hldf.ioutall = settings[13]  # Calculate R, X at output frequency for all nodes
-		hldf.expQ = settings[14]  # Calculation of Factor-K (BS 7821) for Transformers
+			# Advanced Options
+			hldf.iopt_thd = settings[10]  # Calculate HD and THD 0 Based on Fundamental Frequency values 1 Based on rated voltage/current
+			hldf.maxHrmOrder = settings[11]  # Max Harmonic order for calculation of THD and THF
+			hldf.iopt_HF = settings[12]  # Calculate Harmonic Factor (HF)
+			hldf.ioutall = settings[13]  # Calculate R, X at output frequency for all nodes
+			hldf.expQ = settings[14]  # Calculation of Factor-K (BS 7821) for Transformers
 
+		# Load flow command to use
+		hldf.cbutldf =  self.ldf
 		self.hldf = hldf
+
 		return self.hldf
 
 	def process_fs_results(self, logger=None):
@@ -391,17 +500,6 @@ class PFStudyCase:
 						self.filter_name,
 						self.name,
 						res[0]]
-
-			# #Insert contingency / filter name (if exists)
-			# #if self.filter_name is not None:
-			# #	# If filter name exists then filter name is used
-			# #	res.insert(1, self.filter_name)
-			# #else:
-			# #	# If not then contingency name is used
-			# #	res.insert(1, self.cont_name)  # Contingency name
-
-			# # Using base_name as description of study_case
-			# #res.insert(1, self.base_name)  # Study case description
 
 		logger.debug('Frequency scan results for study <{}> extracted from PowerFactory'
 					 .format(self.name))
@@ -438,22 +536,7 @@ class PFStudyCase:
 							 'The returned results <res12> are {}').format(self.hldf_results, res12))
 				thd = 'NA'
 
-			# #thd1 = re.split(r'[\\.]', res12[1])
-			# #logger.info('thd1[11] = {}.ElmSubstat'.format(thd1[11]))
-			# #thd2 = app.GetCalcRelevantObjects(thd1[11] + ".ElmSubstat")
-			# #thdz = False
-			# #if thd2[0] is not None:
-			# #	thd3 = thd2[0].GetContents()
-			# #	for thd4 in thd3:
-			# #		if (thd1[13] + ".ElmTerm") in str(thd4):
-			# #			logger.info('thd4 = {}'.format(thd4))
-			# #			str_thd = thd4.GetAttribute('m:THD')
-			# #			thdz = True
-			# #elif thd2[0] is not None or thdz == False:
-			# #	str_thd = "NA"
-			# #res12.insert(2, str_thd)														# Insert THD
 			res12.insert(2, thd)															# Insert THD
-			# #res12.insert(2, New_Contingency_List[count][0])							# Op scenario
 			res12.insert(2, self.cont_name)												# Op scenario
 			res12.insert(2, self.sc_name)												# Study case description
 			res12.pop(5)
@@ -528,7 +611,7 @@ class PFStudyCase:
 		res_export_path = os.path.join(self.res_pth, '{}.csv'.format(name))
 
 		# Create com_res file to deal with extracting the results
-		h_comres = create_object(location=self.sc, pfclass=c.pf_comres, name=name)
+		h_comres, _ = create_object(location=self.sc, pfclass=c.pf_comres, name=name)
 
 		# Set relevant result
 		h_comres.SetAttribute(c.result, result)
@@ -555,6 +638,30 @@ class PFStudyCase:
 		h_comres.SetAttribute(c.variable, 1)
 
 		return h_comres, res_export_path
+
+	def run_load_flow(self):
+		""" Function to run the embedded load flow command
+		:return bool success: Returns True / False on whether load flow was a success
+		"""
+		logger = logging.getLogger(constants.logger_name)
+		t1 = time.time()
+		error_code = self.ldf.Execute()
+		t2 = time.time() - t1
+		if error_code == 0:
+			logger.info('\t - Load Flow calculation {} successful for {}, time taken: {:.2f} seconds'
+						.format(self.ldf, self.name, t2))
+			success = True
+		elif error_code == 1:
+			logger.error(('Load Flow calculation {} for {} failed due to divergence of inner loops, '
+						  'time taken: {:.2f} seconds')
+						 .format(self.ldf, self.name, t2))
+			success = False
+		elif error_code == 2:
+			logger.error(('Load Flow calculation {} failed for {} due to divergence of outer loops, '
+						  'time taken: {:.2f} seconds')
+						 .format(self.ldf, self.name, t2))
+			success = False
+		return success
 
 
 class PFProject:
@@ -610,9 +717,7 @@ class PFProject:
 		"""
 		fs_res = []
 		for sc_cls in self.sc_cases:
-			# #sc_cls.sc.Activate()
 			fs_res.extend(sc_cls.process_fs_results(logger=logger))
-			# #sc_cls.sc.Deactivate()
 		return fs_res
 
 	def process_hrlf_results(self, logger):
@@ -621,9 +726,7 @@ class PFProject:
 		"""
 		hrlf_res = []
 		for sc_cls in self.sc_cases:
-			# #sc_cls.sc.Activate()
 			hrlf_res.extend(sc_cls.process_hrlf_results(logger))
-			# #sc_cls.sc.Deactivate()
 		return hrlf_res
 
 	def ensure_active_study_case(self, app):
