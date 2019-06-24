@@ -33,7 +33,7 @@ __email__ = 'david.mills@PSCconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Beta'
 # Get name of current script for use in log messages
-__name__ = os.path.basename(__file__)
+__script__ = os.path.basename(__file__)
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
 					level=logging.INFO,
@@ -459,7 +459,7 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 	except PermissionError:
 		logger.critical(('Unable to write to excel workbook {} since it is either already open or you do not have '
 						 'the appropriate permissions to save here.  Please check and then rerun {}')
-						.format(pth_file, __name__))
+						.format(pth_file, __script__))
 		raise PermissionError('Unable to write to workbook')
 
 	return None
@@ -816,7 +816,6 @@ def load_extract_dataframe(targ_file, df=None, load=False):
 		print(msg)
 		raise ValueError(msg)
 	return df
-
 
 # Only runs if main script is run
 if __name__ == '__main__':
