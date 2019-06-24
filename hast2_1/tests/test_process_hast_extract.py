@@ -6,6 +6,7 @@ import collections
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 SEARCH_PTH = os.path.join(TESTS_DIR, 'results1')
+TARGET_EXTRACT = os.path.join(SEARCH_PTH,'extract.pkl')
 HAST_INPUTS = os.path.join(SEARCH_PTH, 'HAST Inputs_test.xlsx')
 HAST_Results1 = os.path.join(SEARCH_PTH, 'FS_SC1_Base_Case.csv')
 
@@ -162,6 +163,14 @@ class TestHASTImportFunctions(unittest.TestCase):
 		self.assertEqual(combined_df.columns.names[6],constants.ResultsExtract.lbl_FullName)
 		# Check a random value
 		self.assertAlmostEqual(combined_df.iloc[10,15],29.087961, places=4)
+		# Extracts this dataframe to a compressed file so can be used for other tests
+
+		if os.path.isfile(TARGET_EXTRACT):
+			os.remove(TARGET_EXTRACT)
+		_new_df = TestModule.load_extract_dataframe(targ_file=TARGET_EXTRACT,
+													df=combined_df)
+		# Confirms that the DataFrames are equal for the same element
+		self.assertEqual(combined_df.iloc[0,0], _new_df.iloc[0,0])
 
 	def test_combine_r12_files(self):
 		"""
@@ -461,6 +470,37 @@ class TestFunctionsWithoutHASTinputs(unittest.TestCase):
 		cont_name, filter_name = TestModule.split_contingency_filter_values(list_of_terms=file_splits,
 																			starting_point=3)
 		self.assertNotEqual(cont_name, test_cont_name)
+
+	def test_load_extract_dataframe_error(self):
+		"""
+			Tests that the DataFrame function returns an error if it is incorrectly run
+		:return:
+		"""
+		target_file = os.path.join(SEARCH_PTH, 'test1.pkl')
+		self.assertRaises(ValueError, TestModule.load_extract_dataframe, target_file)
+
+	def test_load_extract_dataframe(self):
+		"""
+			Tests that the DataFrame function returns an error if it is incorrectly run
+		:return:
+		"""
+		if os.path.isfile(TARGET_EXTRACT):
+			df = TestModule.load_extract_dataframe(targ_file=TARGET_EXTRACT, load=True)
+
+			self.assertTrue(type(df) is pd.DataFrame)
+		else:
+			self.fail('Unable to run test since file to be loaded does not exist: {}'
+				  .format(TARGET_EXTRACT))
+
+	def test_calc_rx_boundaries(self):
+		"""
+			Test case to test the extraction of the R and X coordinates for a ConvexHull from the data provided
+		:return:
+		"""
+
+
+		combined_df = TestModule.load_extract_dataframe(targ_file=TARGET_EXTRACT, load=True)
+		TestModule.calc_rx_boundaries(df=combined_df)
 
 @unittest.skipIf(not FULL_TEST, 'Slower tests have been skipped')
 class TestImportingMultipleResults(unittest.TestCase):

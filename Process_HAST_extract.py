@@ -24,6 +24,7 @@ import hast2_1.constants as constants
 import time
 import collections
 import math
+import pickle
 
 # Meta Data
 __author__ = 'David Mills'
@@ -43,8 +44,9 @@ logger = logging.getLogger(constants.logger_name)
 list_of_folders_to_import = []
 target_file = None
 
-# Whether to include graphs when exporting
+# Whether to include graphs when exporting and whether to include CONVEX HULL
 PLOT_GRAPHS = True
+INCLUDE_CONVEX_HULL = False
 
 # For Backwards compatibility
 INCLUDE_NOM_VOLTAGE = True
@@ -631,7 +633,11 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	:param list search_pths:  List of folders which contain the results files to be combined / extracted
 	 							each folder must contain raw .csv results exports + a HAST inputs
 	:param bool drop_duplicates:  (Optional=True) - If set to False then duplicated columns will be included in the output
-	:return pd.DataFrame df, list vars_to_export:  Combined results into single dataframe, list of variables for export
+	:return pd.DataFrame df, list vars_to_export, bool export_graphs, bool export_convex_hull:
+				Combined results into single dataframe,
+				list of variables for export
+				Whether any of the hast files required graphs to be exported
+				Whether any of the hast files required convex hull to be produced
 	"""
 	t0 = time.time()
 	logger.info('Importing all hast results files in list folders: \n' +
@@ -640,6 +646,10 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	c = constants.ResultsExtract
 	all_dfs = []
 	vars_to_export = []
+
+	# Constant used to determine whether graphs should be included or not
+	export_graphs = PLOT_GRAPHS
+	export_convex_hull = INCLUDE_CONVEX_HULL
 
 	# Loop through each folder, import the hast inputs sheet and results files
 	for folder in search_pths:
@@ -654,6 +664,11 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 
 		# Include list of variables for export
 		vars_to_export.extend(_hast_inputs.vars_to_export())
+
+		# Determines whether graphs should be plotted or not, if any of the HAST inputs requires graphs
+		# or the constant above PLOT_GRAPHS then they will be included
+		export_graphs = any((_hast_inputs.export_to_excel, export_graphs))
+		export_convex_hull = any((export_convex_hull, _hast_inputs.include_convex_hull))
 
 	t1 = time.time()
 	logger.info('All results imported in {:.2f} seconds'.format(t1-t0))
@@ -756,7 +771,52 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	df.sort_index(axis=1, level=[c.lbl_Reference_Terminal, c.lbl_Terminal, c.lbl_StudyCase], inplace=True)
 
 	logger.info('Imported results combined and duplicates removed in {:.2f}'.format(time.time()-t1))
-	return df, vars_to_export
+	return df, vars_to_export, export_graphs, export_convex_hull
+
+def calc_rx_boundaries(df, sc=None):
+	"""
+		Script to extract from the Dataframe the necessary R and X data and to calculate the convex hull for each
+		harmonic order.
+	:param pd.DataFrame df:  Dataframe for combined data from all results from which R and X data will be extracted
+	:param list sc:  (sc=None) - Optional name for study case if want to restrict results
+	:return pd.DataFrame df_boundaries:  Returns the boundary coordinates for the RX data specific to this ConvexHull
+	"""
+
+	# Extract R and X data from dataframe
+	idx = pd.IndexSlice
+	if sc is not None:
+		# If a list of study cases to include has been provided then include that in the search
+		idx_search = idx[:,:,:,sc,:,:,:,[constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1]]
+	else:
+		idx_search = idx[:,:,:,:,:,:,:,[constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1]]
+	df_rx = df.loc[:,idx_search]
+
+	# Loop through each node and then group into harmonic orders
+	# TODO: Not fully implemented, now need to develop code to calculate ConvexHull
+
+def load_extract_dataframe(targ_file, df=None, load=False):
+	"""
+		Function to load or extract a dataframe to a target path
+		as a pickled file.  Used for faster importing when carrying out
+		unittesting.
+	:param str targ_file:  Full result file name (including extension) where df is saved
+	:param pd.DataFrame df: DataFrame to be extracted
+	:param bool load:  If set to True then loads rather than saves
+	:return pd.DataFrame df:  Returns either newly imported dataframe or previously exported
+	"""
+	if load:
+		with open(targ_file, 'rb') as input_file:
+			df = pickle.load(input_file)
+	elif df is not None:
+		with open(targ_file, 'wb') as output_file:
+			pickle.dump(df, output_file)
+	else:
+		msg = ('Set to save file (load = {} but yet no DataFrame as been provided (df = {}'
+			.format(load, df))
+		print(msg)
+		raise ValueError(msg)
+	return df
+
 
 # Only runs if main script is run
 if __name__ == '__main__':
@@ -791,12 +851,16 @@ if __name__ == '__main__':
 	time_stamps.append(time.time())
 	logger.info('User file selection took {:.2f} seconds'.format(time_stamps[-1]-time_stamps[0]))
 
-	combined_df, vars_in_hast = combine_multiple_hast_runs(search_pths=list_of_folders_to_import)
+	# Group the multiple sets of results together and obtain the inputs necessary for the next stage
+	combined_df, vars_in_hast, export_graphs, export_convex_hull = combine_multiple_hast_runs(
+		search_pths=list_of_folders_to_import
+	)
 
 	time_stamps.append(time.time())
 	logger.info('Processing HAST inputs took {:.2f} seconds'.format(time_stamps[-1] - time_stamps[-2]))
 
-	extract_results(pth_file=target_file, df=combined_df, vars_to_export=vars_in_hast, plot_graphs=PLOT_GRAPHS)
+	extract_results(pth_file=target_file, df=combined_df, vars_to_export=vars_in_hast,
+					plot_graphs=export_graphs)
 	time_stamps.append(time.time())
 	logger.info('Extracting results took'.format(time_stamps[-1] - time_stamps[-2]))
 
