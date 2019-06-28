@@ -678,7 +678,7 @@ class TestProcessStages(unittest.TestCase):
 		if os.path.isfile(target_file):
 			os.remove(target_file)
 
-		df, vars_to_export = TestModule.combine_multiple_hast_runs(
+		df, vars_to_export, export_graphs, export_convex_hull = TestModule.combine_multiple_hast_runs(
 			search_pths=[self.search_pth_all]
 		)
 
