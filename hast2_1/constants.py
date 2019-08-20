@@ -70,6 +70,7 @@ class PowerFactory:
 	pf_scheme = 'IntScheme'
 	pf_stage = 'IntSstage'
 	pf_results = 'ElmRes'
+	pf_network_elements = 'ElmNet'
 
 	# General Types
 	pf_folder_type = 'IntFolder'

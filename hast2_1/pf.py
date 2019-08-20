@@ -295,11 +295,13 @@ class PFStudyCase:
 		self.fs_result_exports = []
 		self.hldf_result_exports = []
 
-	def create_load_flow(self, load_flow_settings):
+	def create_load_flow(self, load_flow_settings, net_elements_folder):
 		"""
 			Create a load flow command in the study case so that the same settings will be run with the
 			frequency scan and HAST file so that there are no issues with non-convergence.
 		:param list load_flow_settings:  Load flow settings provided as an input to the HAST file
+		:param PowerFactory Folder net_elements_folder:  Handle to folder in powerfactory which contains all network
+														elements
 		:return None:
 		"""
 		ldf, already_existed = create_object(location=self.sc,
@@ -312,7 +314,7 @@ class PFStudyCase:
 			# Basic
 			ldf.iopt_net = load_flow_settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
 			ldf.iopt_at = load_flow_settings[1]  # Automatic Tap Adjustment
-			ldf.iopt_ashnt = load_flow_settings[2]  # Automatic Shunt Adjustment
+			ldf.iopt_asht = load_flow_settings[2]  # Automatic Shunt Adjustment
 			ldf.iopt_lim = load_flow_settings[3]  # Consider Reactive Power Limits
 			ldf.iopt_ashnt = load_flow_settings[4]  # Consider Reactive Power Limits Scaling Factor
 			ldf.iopt_tem = load_flow_settings[
@@ -327,9 +329,15 @@ class PFStudyCase:
 				10]  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
 			# 2 Acording to Primary Control, 3 Acording to Inertias)
 			ldf.iopt_plim = load_flow_settings[11]  # Consider Active Power Limits
-			ldf.iPbalancing = load_flow_settings[
-				12]  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
-			# ldf.rembar = load_flow_settings[13] # Reference Busbar
+			ldf.iPbalancing = load_flow_settings[12]  # (0 Ref Machine, 1 Load, Static Gen,
+			# 											Dist slack by loads, Dist slack by Sync,
+
+			# Get DataObject handle for reference busbar
+			net_folder_name, substation, terminal = load_flow_settings[13].split('\\')
+			pf_sub = net_elements_folder.GetContents('{}.{}'.format(substation, constants.PowerFactory.pf_substation))
+			pf_term = pf_sub[0].GetContents('{}.{}'.format(terminal, constants.PowerFactory.pf_terminal))[0]
+
+			ldf.rembar = pf_term
 			ldf.phiini = load_flow_settings[14]  # Angle
 
 			# Advanced Options

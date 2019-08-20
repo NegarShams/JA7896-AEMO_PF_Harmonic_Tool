@@ -52,10 +52,22 @@ something happens
 - Added functionality to repeat studies for different filter arrangements and will now also run in unattended mode
 """
 
+pf_version = '2018'
+
 DIG_PATH_2016 = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
 DIG_PATH_2018 = r'C:\Program Files\DIgSILENT\PowerFactory 2018 SP7'
 DIG_PYTHON_PATH_2016 = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.5'
 DIG_PYTHON_PATH_2018 = r'C:\Program Files\DIgSILENT\PowerFactory 2018 SP7\Python\3.5'
+
+if pf_version == '2016':
+	DIG_PATH = DIG_PATH_2016
+	DIG_PYTHON_PATH = DIG_PYTHON_PATH_2016
+elif pf_version == '2018':
+	DIG_PATH = DIG_PATH_2018
+	DIG_PYTHON_PATH = DIG_PYTHON_PATH_2018
+else:
+	print('ERROR python version not found')
+	raise SyntaxError('ERROR')
 
 # IMPORT SOME PYTHON MODULES
 # --------------------------------------------------------------------------------------------------------------------
@@ -392,7 +404,15 @@ def load_flow(load_flow_settings, sc, studycase_name=''):		# Inputs load flow se
 															# 2 Acording to Primary Control, 3 Acording to Inertias)
 	ldf.iopt_plim = load_flow_settings[11]            	# Consider Active Power Limits
 	ldf.iPbalancing = load_flow_settings[12]          	# (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
-	# ldf.rembar = load_flow_settings[13] # Reference Busbar
+
+	# Get DataObject handle for reference busbar
+	print1(load_flow_settings[13])
+	# #ref_busbar = get_object(load_flow_settings[13])
+	net_folder_name, substation, terminal = load_flow_settings[13].split('\\')
+	pf_sub = app.GetCalcRelevantObjects('{}.{}'.format(substation, constants.PowerFactory.pf_substation))
+	pf_term = pf_sub[0].GetContents('{}.{}'.format(terminal, constants.PowerFactory.pf_terminal))[0]
+
+	ldf.rembar = pf_term
 	ldf.phiini = load_flow_settings[14]         		# Angle
 
 	# Advanced Options
@@ -461,6 +481,7 @@ def load_flow(load_flow_settings, sc, studycase_name=''):		# Inputs load flow se
 		logger.error('Load Flow failed for {} due to divergence of outer loops, time taken: {:.2f} seconds'
 					 .format(studycase_name, t2))
 	return error_code, ldf
+
 
 def harm_load_flow(results, harmonic_loadflow_settings):		# Inputs load flow settings and executes load flow
 	"""
@@ -957,6 +978,9 @@ def add_all_filters(new_filter_list, cont_name, sc, op, sc_target_folder,
 			# Save updated scenario which now includes filter
 			save_active_scenario()
 
+			# Network Elements
+			net_element_folder = get_object(Net_Elm)[0]
+
 			# Create new class reference with all the details for this contingency and
 			# filter combination and then add to
 			# list to be returned
@@ -970,7 +994,8 @@ def add_all_filters(new_filter_list, cont_name, sc, op, sc_target_folder,
 										task_auto=cls_prj.task_auto,
 										uid=start1,
 										results_pth=Temp_Results_Export)
-			_study_cls.create_load_flow(load_flow_settings=Load_Flow_Setting)
+			_study_cls.create_load_flow(load_flow_settings=Load_Flow_Setting,
+										net_elements_folder=net_element_folder)
 
 			# Determine if load flow successful and if not then don't include _study_cls in results
 			if _study_cls.run_load_flow():
@@ -1091,6 +1116,9 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 						# Create and activate recording stage within variation
 						_ = create_stage(variation, constants.PowerFactory.pf_stage, Variation_Name)
 
+						# Get folder which contains all network elements
+						net_element_folder = get_object(Net_Elm)[0]
+
 						# Check base case converges, otherwise skip all contingencies
 						cls_base_sc = hast2_1.pf.PFStudyCase(full_name=base_case_name,
 															 list_parameters=sc_list_parameters,
@@ -1104,7 +1132,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 															 results_pth=Temp_Results_Export)
 
 						# Add load flow command to study case
-						cls_base_sc.create_load_flow(load_flow_settings=Load_Flow_Setting)
+						cls_base_sc.create_load_flow(load_flow_settings=Load_Flow_Setting,
+													 net_elements_folder=net_element_folder)
 						# Run load flow and determine if successful fo base case that has been copied as an extra check
 						if not cls_base_sc.run_load_flow():
 							logger.error(('Load flow not successful for base study case {} and therefore no '
@@ -1185,7 +1214,8 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 																base_case=False,
 																results_pth=Temp_Results_Export)
 							# Create load flow case and check if error
-							_study_cls.create_load_flow(load_flow_settings=Load_Flow_Setting)
+							_study_cls.create_load_flow(load_flow_settings=Load_Flow_Setting,
+														net_elements_folder=net_element_folder)
 
 							# Only add load flow to study case list and project list if load_flow successful, will still
 							# remain in folder of study cases but will be skipped in freq_scan and harmonic lf
@@ -1493,12 +1523,12 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 		constants.HASTInputs.fs_term_variables.append(constants.PowerFactory.pf_nom_voltage)
 
 
-	sys.path.append(DIG_PATH_2016)
-	sys.path.append(DIG_PATH_2018)
-	sys.path.append(DIG_PYTHON_PATH_2016)
-	sys.path.append(DIG_PYTHON_PATH_2018)
+	sys.path.append(DIG_PATH)
+	# #sys.path.append(DIG_PATH_2018)
+	sys.path.append(DIG_PYTHON_PATH)
+	# #sys.path.append(DIG_PYTHON_PATH_2018)
 
-	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH_2016 + ':' + DIG_PATH_2018
+	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
 	title = ('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n' +
 		'NAME:           Harmonics Automated Simulation Tool (HAST)\n' +
 		'VERSION:        {}\n' +
@@ -1759,14 +1789,15 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 
 	# Plot results to excel
 	if export_to_excel:
-		combined_df, vars_in_hast = Process_HAST_extract.combine_multiple_hast_runs(
+		combined_df, vars_in_hast, export_graphs, _ = Process_HAST_extract.combine_multiple_hast_runs(
 			search_pths=[Temp_Results_Export],
 			drop_duplicates=False
 		)
 		Process_HAST_extract.extract_results(
 			pth_file=excel_results + constants.ResultsExtract.extension,
 			df=combined_df,
-			vars_to_export=vars_in_hast)
+			vars_to_export=vars_in_hast,
+			plot_graphs=export_graphs)
 
 	logger.info('Total Time: {:.2f}'.format(time.clock() - start))
 
