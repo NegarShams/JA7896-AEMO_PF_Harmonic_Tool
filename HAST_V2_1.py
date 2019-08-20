@@ -52,8 +52,10 @@ something happens
 - Added functionality to repeat studies for different filter arrangements and will now also run in unattended mode
 """
 
-DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
-DIG_PYTHON_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.5'
+DIG_PATH_2016 = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5'
+DIG_PATH_2018 = r'C:\Program Files\DIgSILENT\PowerFactory 2018 SP7'
+DIG_PYTHON_PATH_2016 = r'C:\Program Files\DIgSILENT\PowerFactory 2016 SP5\Python\3.5'
+DIG_PYTHON_PATH_2018 = r'C:\Program Files\DIgSILENT\PowerFactory 2018 SP7\Python\3.5'
 
 # IMPORT SOME PYTHON MODULES
 # --------------------------------------------------------------------------------------------------------------------
@@ -373,8 +375,10 @@ def load_flow(load_flow_settings, sc, studycase_name=''):		# Inputs load flow se
 	# Get handle for load flow command from study case
 	# Basic
 	ldf.iopt_net = load_flow_settings[0]          		# Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
+	# TODO: Need to implement a setting for the phase shifting transformers (PST)
+	ldf.iPST_at = 1
 	ldf.iopt_at = load_flow_settings[1]            		# Automatic Tap Adjustment
-	ldf.iopt_ashnt = load_flow_settings[2]        		# Automatic Shunt Adjustment
+	ldf.iopt_asht = load_flow_settings[2]        		# Automatic Shunt Adjustment
 	ldf.iopt_lim = load_flow_settings[3]             	# Consider Reactive Power Limits
 	ldf.iopt_ashnt = load_flow_settings[4]             	# Consider Reactive Power Limits Scaling Factor
 	ldf.iopt_tem = load_flow_settings[5]               	# Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
@@ -1489,10 +1493,12 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 		constants.HASTInputs.fs_term_variables.append(constants.PowerFactory.pf_nom_voltage)
 
 
-	sys.path.append(DIG_PATH)
-	sys.path.append(DIG_PYTHON_PATH)
+	sys.path.append(DIG_PATH_2016)
+	sys.path.append(DIG_PATH_2018)
+	sys.path.append(DIG_PYTHON_PATH_2016)
+	sys.path.append(DIG_PYTHON_PATH_2018)
 
-	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH
+	os.environ['PATH'] = os.environ['PATH'] + ';' + DIG_PATH_2016 + ':' + DIG_PATH_2018
 	title = ('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n' +
 		'NAME:           Harmonics Automated Simulation Tool (HAST)\n' +
 		'VERSION:        {}\n' +
