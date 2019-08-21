@@ -334,6 +334,12 @@ class PFStudyCase:
 
 			# Get DataObject handle for reference busbar
 			net_folder_name, substation, terminal = load_flow_settings[13].split('\\')
+			# Confirm that substation and terminal types exist in name
+			if not substation.endswith(constants.PowerFactory.pf_substation):
+				substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
+			if not terminal.endswith(constants.PowerFactory.pf_terminal):
+				terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
+			
 			pf_sub = net_elements_folder.GetContents('{}.{}'.format(substation, constants.PowerFactory.pf_substation))
 			pf_term = pf_sub[0].GetContents('{}.{}'.format(terminal, constants.PowerFactory.pf_terminal))[0]
 

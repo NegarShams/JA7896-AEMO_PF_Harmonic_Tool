@@ -409,8 +409,14 @@ def load_flow(load_flow_settings, sc, studycase_name=''):		# Inputs load flow se
 	print1(load_flow_settings[13])
 	# #ref_busbar = get_object(load_flow_settings[13])
 	net_folder_name, substation, terminal = load_flow_settings[13].split('\\')
-	pf_sub = app.GetCalcRelevantObjects('{}.{}'.format(substation, constants.PowerFactory.pf_substation))
-	pf_term = pf_sub[0].GetContents('{}.{}'.format(terminal, constants.PowerFactory.pf_terminal))[0]
+	# Confirm that substation and terminal types exist in name
+	if not substation.endswith(constants.PowerFactory.pf_substation):
+		substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
+	if not terminal.endswith(constants.PowerFactory.pf_terminal):
+		terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
+	# Get handle for substation and terminal
+	pf_sub = app.GetCalcRelevantObjects(substation)
+	pf_term = pf_sub[0].GetContents(terminal)[0]
 
 	ldf.rembar = pf_term
 	ldf.phiini = load_flow_settings[14]         		# Angle
