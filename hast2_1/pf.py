@@ -339,9 +339,9 @@ class PFStudyCase:
 				substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
 			if not terminal.endswith(constants.PowerFactory.pf_terminal):
 				terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
-			
-			pf_sub = net_elements_folder.GetContents('{}.{}'.format(substation, constants.PowerFactory.pf_substation))
-			pf_term = pf_sub[0].GetContents('{}.{}'.format(terminal, constants.PowerFactory.pf_terminal))[0]
+
+			pf_sub = net_elements_folder.GetContents(substation)
+			pf_term = pf_sub[0].GetContents(terminal)[0]
 
 			ldf.rembar = pf_term
 			ldf.phiini = load_flow_settings[14]  # Angle
