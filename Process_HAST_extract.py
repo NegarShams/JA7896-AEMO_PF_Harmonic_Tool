@@ -526,7 +526,10 @@ def add_graph(writer, sheet_name, row_cont, row_start, col_freq, num_rows,
 
 	for chart_name, cols in plots.items():
 		chrt = wkbk.add_chart(c.chart_type)
-		chrt.set_title({'name':chart_name})
+		# Adjusted to include the name of the sheet in the chart title and fixing the font_size
+		# #chrt.set_title({'name':chart_name})
+		chrt.set_title({'name':'{} - {}'.format(sheet_name, chart_name),
+						'name_font':{'size':c.font_size_chart_title}})
 		charts.append(chrt)
 		color_i = 0
 

@@ -347,6 +347,12 @@ def create_stage(location, pfclass, name):
 						  pfclass=pfclass,
 						  name=name)
 	stage.loc_name = name
+
+	# Get active stage time and add 1 second to ensure new stage becomes recording stage
+	current_stage = app.GetRecordingStage()
+	if current_stage is not None:
+		stage.tAcTime = current_stage.tAcTime + 1
+
 	activate_stage(stage)
 	return stage
 

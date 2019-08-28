@@ -200,6 +200,9 @@ class ResultsExtract:
 					  'dash_type': 'dash'}
 				  }
 
+	# Font size for chart title
+	font_size_chart_title = 14
+
 	def __init__(self):
 		"""
 			Initial class
