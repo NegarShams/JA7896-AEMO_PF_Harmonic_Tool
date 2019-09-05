@@ -342,7 +342,7 @@ class PFStudyCase:
 			# 											Dist slack by loads, Dist slack by Sync,
 
 			# Get DataObject handle for reference busbar
-			net_folder_name, substation, terminal = load_flow_settings[14].split('\\')
+			net_folder_name, substation, terminal = load_flow_settings[14-offset].split('\\')
 			# Confirm that substation and terminal types exist in name
 			if not substation.endswith(constants.PowerFactory.pf_substation):
 				substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)

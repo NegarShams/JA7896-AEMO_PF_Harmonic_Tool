@@ -103,16 +103,30 @@ def add_lf_settings(row_data):
 	:return list combined_entry:
 	"""
 	z = row_data
-	combined_entry = [
-		int(z[0]), int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]),
-		int(z[8]),
-		float(z[9]), int(z[10]), int(z[11]), int(z[12]), z[13], z[14], int(z[15]), int(z[16]),
-		int(z[17]),
-		int(z[18]), float(z[19]), int(z[20]), float(z[21]), int(z[22]), int(z[23]), int(z[24]),
-		int(z[25]),
-		int(z[26]), int(z[27]), int(z[28]), z[29], z[30], int(z[31]), z[32], int(z[33]), int(z[34]),
-		int(z[35]), int(z[36]), int(z[37]), z[38], z[39], z[40], z[41], int(z[42]), z[43], z[44], z[45],
-		z[46], z[47], z[48], z[49], z[50], z[51], int(z[52]), int(z[53]), int(z[54])]
+	# TODO: There is a more efficient way to do this
+	if len(row_data) == 56:
+		combined_entry = [
+			int(z[0]), int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]), int(z[8]),
+			int(z[9]),
+			float(z[10]), int(z[11]), int(z[12]), int(z[13]), z[14], z[15], int(z[16]), int(z[17]),
+			int(z[18]),
+			int(z[19]), float(z[20]), int(z[21]), float(z[22]), int(z[23]), int(z[24]), int(z[25]),
+			int(z[26]),
+			int(z[27]), int(z[28]), int(z[29]), z[30], z[31], int(z[32]), z[33], int(z[34]), int(z[35]),
+			int(z[36]), int(z[37]), int(z[38]), z[39], z[40], z[41], z[42], int(z[43]), z[44], z[45], z[46],
+			z[47], z[48], z[49], z[50], z[51], z[52], int(z[53]), int(z[54]), int(z[55])]
+	else:
+		# For backwards compatibility with the previous version
+		combined_entry = [
+			int(z[0]), int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]),
+			int(z[8]),
+			float(z[9]), int(z[10]), int(z[11]), int(z[12]), z[13], z[14], int(z[15]), int(z[16]),
+			int(z[17]),
+			int(z[18]), float(z[19]), int(z[20]), float(z[21]), int(z[22]), int(z[23]), int(z[24]),
+			int(z[25]),
+			int(z[26]), int(z[27]), int(z[28]), z[29], z[30], int(z[31]), z[32], int(z[33]), int(z[34]),
+			int(z[35]), int(z[36]), int(z[37]), z[38], z[39], z[40], z[41], int(z[42]), z[43], z[44], z[45],
+			z[46], z[47], z[48], z[49], z[50], z[51], int(z[52]), int(z[53]), int(z[54])]
 	return combined_entry
 
 def add_freq_settings(row_data):
