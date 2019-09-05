@@ -276,6 +276,9 @@ class HASTInputs:
 	# Default value on whether mutual impedance data should be included or not
 	default_include_mutual = True
 
+	# Default value for automatic tap changing of PST
+	def_automatic_pst_tap = 1
+
 # TODO: Partially implemented for excel_writing.HASTInputs to process HAST file
 # TODO: Once completed will replace analysis_sheets = () below
 analysis_sheets2 = dict()
