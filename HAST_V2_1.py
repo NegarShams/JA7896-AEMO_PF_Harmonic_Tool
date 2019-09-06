@@ -1714,14 +1714,14 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 		logger.error('Error - Check excel input Terminals there should be at least 1 Item in the list')
 	global Load_Flow_Setting
 	Load_Flow_Setting = analysis_dict[c.sht_LF]						# Imports Settings for LDF calculation
-	if len(Load_Flow_Setting) != 55:											# Check there are the right number of inputs
-		print2('Error - Check excel input Loadflow_Settings there should be 55 Items in the list there are only: {} {}'
-			   .format(len(Load_Flow_Setting), Load_Flow_Setting))
+	if len(Load_Flow_Setting) != 55 and len(Load_Flow_Setting) != 56:											# Check there are the right number of inputs
+		logger.error('Error - Check excel input Loadflow_Settings there should be 55 (old format) or 56 items in the list there are only: {} {}'
+					 .format(len(Load_Flow_Setting), Load_Flow_Setting))
 	global Fsweep_Settings
 	Fsweep_Settings = analysis_dict[c.sht_Freq]							# Imports Settings for Frequency Sweep calculation
 	if len(Fsweep_Settings) != 16:												# Check there are the right number of inputs
-		print2('Error - Check excel input Frequency_Sweep there should be 16 Items in the list there are only: {} {}'
-			   .format(len(Fsweep_Settings), Fsweep_Settings))
+		logger.error('Error - Check excel input Frequency_Sweep there should be 16 Items in the list there are only: {} {}'
+					 .format(len(Fsweep_Settings), Fsweep_Settings))
 	global Harmonic_Loadflow_Settings
 	Harmonic_Loadflow_Settings = analysis_dict[c.sht_HLF]				# Imports Settings for Harmonic LDF calculation
 	if len(Harmonic_Loadflow_Settings) != 15:									# Check there are the right number of inputs
