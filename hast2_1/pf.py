@@ -124,6 +124,9 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 								   pfclass=c.pf_cubicle,
 								   name=filter_name)
 
+	# Set input mode to design mode (DES)
+	hdl_filter.SetAttribute(c.pf_shn_inputmode, c.pf_shn_selectedinput)
+
 	# Set attributes for new filter
 	hdl_filter.SetAttribute(c.pf_shn_term, hdl_cubicle)
 	hdl_filter.SetAttribute(c.pf_shn_voltage, filter_ref.nom_voltage)
@@ -134,7 +137,8 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	hdl_filter.SetAttribute(c.pf_shn_tuning, freq / constants.nom_freq)
 	# For some reason need to set q factor
 	hdl_filter.SetAttribute(c.pf_shn_qfactor, filter_ref.quality_factor)
-	hdl_filter.SetAttribute(c.pf_shn_qfactor_nom, filter_ref.quality_factor * (constants.nom_freq / freq))
+	# #hdl_filter.SetAttribute(c.pf_shn_qfactor_nom, filter_ref.quality_factor * (constants.nom_freq / freq))
+	hdl_filter.SetAttribute(c.pf_shn_qfactor_nom, filter_ref.quality_factor)
 
 	hdl_filter.SetAttribute(c.pf_shn_rp, filter_ref.resistance_parallel)
 	logger.debug('Filter {} added to substation {} with Q = {} MVAR and resonant frequency = {} Hz'
@@ -142,6 +146,8 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 
 	# TODO:  Rather that writing messages to confirm this could instead validate using
 	logger.info('Filter {} added to model'.format(hdl_filter))
+	logger.debug('Filter input mode set to: {} and should be {}'.format(hdl_filter.GetAttribute(c.pf_shn_inputmode),
+																		c.pf_shn_selectedinput))
 	logger.debug('Connected cubicle = {} = {}'.format(hdl_cubicle, hdl_filter.GetAttribute(c.pf_shn_term)))
 	logger.debug('Nominal voltage = {}kV = {}kV'.format(filter_ref.nom_voltage, hdl_filter.GetAttribute(c.pf_shn_voltage)))
 	logger.debug('Shunt type = {} = {}'.format(filter_ref.type, hdl_filter.GetAttribute(c.pf_shn_type)))

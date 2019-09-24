@@ -61,6 +61,8 @@ class PowerFactory:
 	pf_shn_voltage = 'ushnm'
 	pf_shn_type = 'shtype'
 	pf_shn_q = 'qtotn'
+	pf_shn_inputmode = 'mode_inp'
+	pf_shn_selectedinput = 'DES'
 	pf_shn_freq = 'fres'
 	pf_shn_tuning = 'nres'
 	pf_shn_qfactor = 'greaf0'
