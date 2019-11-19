@@ -246,6 +246,7 @@ def check_if_object_exists(location, name):  	# Check if the object exists
 	new_object = location.GetContents(name)
 	return new_object[0]
 
+
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
 	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid,
@@ -256,7 +257,7 @@ class PFStudyCase:
 		:param list list_parameters:  List of parameters from the Base_Scenarios inputs sheet
 		:param str cont_name:  Name of contingency being considered
 		:param str filter_name: (optional=None) Name of filter that has been included if applicable
-		:param object sc:  Handle to newly created study case
+		:param powerfactory.DataObject sc:  Handle to newly created study case
 		:param object op:  Handle to newly created operational scenario
 		:param object prj:  Handle to project in which this study case is contained
 		:param object task_auto:  Handle to the Task Automation object created for this project studies
@@ -275,6 +276,9 @@ class PFStudyCase:
 		self.filter_name = filter_name
 		self.base_case = base_case
 		self.res_pth = results_pth
+
+		# Get logger
+		self.logger = logging.getLogger(constants.logger_name)
 
 		# Handle for study cases that will require activating
 		self.sc = sc
@@ -301,119 +305,139 @@ class PFStudyCase:
 		self.fs_result_exports = []
 		self.hldf_result_exports = []
 
-	def create_load_flow(self, load_flow_settings, net_elements_folder):
+	def create_load_flow(self, hast_inputs, app):
 		"""
 			Create a load flow command in the study case so that the same settings will be run with the
 			frequency scan and HAST file so that there are no issues with non-convergence.
-		:param list load_flow_settings:  Load flow settings provided as an input to the HAST file
-		:param PowerFactory Folder net_elements_folder:  Handle to folder in powerfactory which contains all network
-														elements
+		:param hast2_1.excel_writing.HASTInputs hast_inputs:
+		:param powerfactory.GetApplication app:  Handle to powerfactory application
 		:return None:
 		"""
-		ldf, already_existed = create_object(location=self.sc,
-											 pfclass=constants.PowerFactory.ldf_command,
-											 name='HAST_{}'.format(self.uid))
+		# See if HAST load flow command already existed and if not create a new one
+		ldf, hast_existed = create_object(
+			location=self.sc,
+			pfclass=constants.PowerFactory.ldf_command,
+			name='HAST_{}'.format(self.uid))
 
 		# Since uid is used in name of HAST load flow only need to update settings if a new
 		# load flow command is created
-		if not already_existed:
-			# Basic
-			ldf.iopt_net = load_flow_settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
-			ldf.iopt_at = load_flow_settings[1]  # Automatic Tap Adjustment
-			ldf.iopt_asht = load_flow_settings[2]  # Automatic Shunt Adjustment
+		if not hast_existed:
+			# Either copy existing settings or create new settings
+			if hast_inputs.pf_loadflow_command:
+				ldf_existing = check_if_object_exists(self.sc, hast_inputs.pf_loadflow_command)
+				# Since the routine to check if one existed would have returned one need to delete it first and then
+				# copy reference load flow with new name
+				error = ldf.Delete()
+				if error != 0:
+					self.logger.critical('Unable to delete the recently created load flow command <{}>'.format(ldf))
 
-			# Added in Automatic Tapping of PSTs but for backwards compatibility will ensure can work when less than 1
-			if len(load_flow_settings) == 56:
-				# Setting for PST exists
-				offset = 0
-				ldf.iPST_at = load_flow_settings[3]  # Automatic Tap Adjustment of Phase Shifters
+				# Create new load flow command based on pre-defined load flow command
+				ldf = self.sc.AddCopy(ldf_existing, 'HAST_{}'.format(self.uid))
+
+				self.logger.debug('Load flow for study case, <{}> based on settings in <{}>'.format(self.sc, ldf_existing))
 			else:
-				# Setting for PST does not exist
-				offset = 1
-				ldf.iPST_at = constants.HASTInputs.def_automatic_pst_tap  # Automatic Tap Adjustment of Phase Shifters
+				# Create new object for the load flow on the base case so that existing settings are not overwritten
+				lf_settings = hast_inputs.lf
+				# Get handle for load flow command from study case
+				# Basic
+				ldf.iopt_net = lf_settings.iopt_net  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
 
-			ldf.iopt_lim = load_flow_settings[4-offset]  # Consider Reactive Power Limits
-			ldf.iopt_ashnt = load_flow_settings[5-offset]  # Consider Reactive Power Limits Scaling Factor
-			ldf.iopt_tem = load_flow_settings[6-offset]  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
-			ldf.iopt_pq = load_flow_settings[7-offset]  # Consider Voltage Dependency of Loads
-			ldf.iopt_fls = load_flow_settings[8-offset]  # Feeder Load Scaling
-			ldf.iopt_sim = load_flow_settings[9-offset]  # Consider Coincidence of Low-Voltage Loads
-			ldf.scPnight = load_flow_settings[10-offset]  # Scaling Factor for Night Storage Heaters
+				# Added in Automatic Tapping of PSTs but for backwards compatibility will ensure can work when less than 1
+				ldf.iPST_at = lf_settings.iPST_at  # Automatic Tap Adjustment of Phase Shifters
+				ldf.iopt_plim = lf_settings.iopt_plim  # Consider Active Power Limits
 
-			# Active Power Control
-			ldf.iopt_apdist = load_flow_settings[11-offset]  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
-			# 2 Acording to Primary Control, 3 Acording to Inertias)
-			ldf.iopt_plim = load_flow_settings[12-offset]  # Consider Active Power Limits
-			ldf.iPbalancing = load_flow_settings[13-offset]  # (0 Ref Machine, 1 Load, Static Gen,
-			# 											Dist slack by loads, Dist slack by Sync,
+				# Voltage and Reactive Power Regulation
+				ldf.iopt_at = lf_settings.iopt_at  # Automatic Tap Adjustment
+				ldf.iopt_asht = lf_settings.iopt_asht  # Automatic Shunt Adjustment
+				ldf.iopt_lim = lf_settings.iopt_lim  # Consider Reactive Power Limits
+				ldf.iopt_limScale = lf_settings.iopt_limScale  # Consider Reactive Power Limits Scaling Factor
 
-			# Get DataObject handle for reference busbar
-			net_folder_name, substation, terminal = load_flow_settings[14-offset].split('\\')
-			# Confirm that substation and terminal types exist in name
-			if not substation.endswith(constants.PowerFactory.pf_substation):
-				substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
-			if not terminal.endswith(constants.PowerFactory.pf_terminal):
-				terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
+				# Temperature Dependency
+				ldf.iopt_tem = lf_settings.iopt_tem  # Temperature Dependency: Line Cable Resistances
+				# 													(0 ...at 20C, 1 at Maximum Operational Temperature)
 
-			pf_sub = net_elements_folder.GetContents(substation)
-			pf_term = pf_sub[0].GetContents(terminal)[0]
+				# Load Options
+				ldf.iopt_pq = lf_settings.iopt_pq  # Consider Voltage Dependency of Loads
+				ldf.iopt_fls = lf_settings.iopt_fls  # Feeder Load Scaling
 
-			ldf.rembar = pf_term
-			ldf.phiini = load_flow_settings[15-offset]  # Angle
+				ldf.iopt_sim = lf_settings.iopt_sim  # Consider Coincidence of Low-Voltage Loads
+				ldf.scPnight = lf_settings.scPnight  # Scaling Factor for Night Storage Heaters
 
-			# Advanced Options
-			ldf.i_power = load_flow_settings[16-offset]  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
-			ldf.iopt_notopo = load_flow_settings[17-offset]  # No Topology Rebuild
-			ldf.iopt_noinit = load_flow_settings[18-offset]  # No initialisation
-			ldf.utr_init = load_flow_settings[19-offset]  # Consideration of transformer winding ratio
-			ldf.maxPhaseShift = load_flow_settings[20-offset]  # Max Transformer Phase Shift
-			ldf.itapopt = load_flow_settings[21-offset]  # Tap Adjustment ( 0 Direct, 1 Step)
-			ldf.krelax = load_flow_settings[22-offset]  # Min COntroller Relaxation Factor
+				# Active Power Control
+				ldf.iopt_apdist = lf_settings.iopt_apdist  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
+				# 2 According to Primary Control, 3 According to Inertias)
 
-			ldf.iopt_stamode = load_flow_settings[23-offset]  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
-			ldf.iopt_igntow = load_flow_settings[24-offset]  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
-			ldf.initOPF = load_flow_settings[25-offset]  # Use this load flow for initialisation of OPF
-			ldf.zoneScale = load_flow_settings[26-offset]  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
+				ldf.iPbalancing = lf_settings.iPbalancing  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
 
-			# Iteration Control
-			ldf.itrlx = load_flow_settings[27-offset]  # Max No Iterations for Newton-Raphson Iteration
-			ldf.ictrlx = load_flow_settings[28-offset]  # Max No Iterations for Outer Loop
-			ldf.nsteps = load_flow_settings[29-offset]  # Max No Iterations for Number of steps
+				# Find busbar in system
+				lf_settings.find_reference_terminal(app=app)
+				ldf.rembar = lf_settings.rembar  # Reference machine
 
-			ldf.errlf = load_flow_settings[30-offset]  # Max Acceptable Load Flow Error for Nodes
-			ldf.erreq = load_flow_settings[31-offset]  # Max Acceptable Load Flow Error for Model Equations
-			ldf.iStepAdapt = load_flow_settings[32-offset]  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
-			ldf.relax = load_flow_settings[33-offset]  # If Fixed Relaxation factor
-			ldf.iopt_lev = load_flow_settings[34-offset]  # Automatic Model Adaptation for Convergence
+				ldf.phiini = lf_settings.phiini  # Angle
 
-			# Outputs
-			ldf.iShowOutLoopMsg = load_flow_settings[35-offset]  # Show 'outer Loop' Messages
-			ldf.iopt_show = load_flow_settings[36-offset]  # Show Convergence Progress Report
-			ldf.num_conv = load_flow_settings[37-offset]  # Number of reported buses/models per iteration
-			ldf.iopt_check = load_flow_settings[38-offset]  # Show verification report
-			ldf.loadmax = load_flow_settings[39-offset]  # Max Loading of Edge Element
-			ldf.vlmin = load_flow_settings[40-offset]  # Lower Limit of Allowed Voltage
-			ldf.vlmax = load_flow_settings[41-offset]  # Upper Limit of Allowed Voltage
-			# ldf.outcmd =  load_flow_settings[42-offset]          		# Output
-			ldf.iopt_chctr = load_flow_settings[43-offset]  # Check Control Conditions
-			# ldf.chkcmd = load_flow_settings[44-offset]            	# Command
+				# Advanced Options
+				ldf.i_power = lf_settings.i_power  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
+				ldf.iopt_notopo = lf_settings.iopt_notopo  # No Topology Rebuild
+				ldf.iopt_noinit = lf_settings.iopt_noinit  # No initialisation
+				ldf.utr_init = lf_settings.utr_init  # Consideration of transformer winding ratio
+				ldf.maxPhaseShift = lf_settings.maxPhaseShift  # Max Transformer Phase Shift
+				ldf.itapopt = lf_settings.itapopt  # Tap Adjustment ( 0 Direct, 1 Step)
+				ldf.krelax = lf_settings.krelax  # Min Controller Relaxation Factor
 
-			# Load Generation Scaling
-			ldf.scLoadFac = load_flow_settings[45-offset]  # Load Scaling Factor
-			ldf.scGenFac = load_flow_settings[46-offset]  # Generation Scaling Factor
-			ldf.scMotFac = load_flow_settings[47-offset]  # Motor Scaling Factor
+				ldf.iopt_stamode = lf_settings.iopt_stamode  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
+				ldf.iopt_igntow = lf_settings.iopt_igntow  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
+				ldf.initOPF = lf_settings.initOPF  # Use this load flow for initialisation of OPF
+				ldf.zoneScale = lf_settings.zoneScale  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
 
-			# Low Voltage Analysis
-			ldf.Sfix = load_flow_settings[48-offset]  # Fixed Load kVA
-			ldf.cosfix = load_flow_settings[49-offset]  # Power Factor of Fixed Load
-			ldf.Svar = load_flow_settings[50-offset]  # Max Power Per Customer kVA
-			ldf.cosvar = load_flow_settings[51-offset]  # Power Factor of Variable Part
-			ldf.ginf = load_flow_settings[52-offset]  # Coincidence Factor
-			ldf.i_volt = load_flow_settings[53-offset]  # Voltage Drop Analysis (0 Stochastic, 1 Maximum Current)
+				# Iteration Control
+				ldf.itrlx = lf_settings.itrlx  # Max No Iterations for Newton-Raphson Iteration
+				ldf.ictrlx = lf_settings.ictrlx  # Max No Iterations for Outer Loop
+				ldf.nsteps = lf_settings.nsteps  # Max No Iterations for Number of steps
 
-			# Advanced Simulation Options
-			ldf.iopt_prot = load_flow_settings[54-offset]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
-			ldf.ign_comp = load_flow_settings[55-offset]  # Ignore Composite Elements
+				ldf.errlf = lf_settings.errlf  # Max Acceptable Load Flow Error for Nodes
+				ldf.erreq = lf_settings.erreq  # Max Acceptable Load Flow Error for Model Equations
+				ldf.iStepAdapt = lf_settings.iStepAdapt  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
+				ldf.relax = lf_settings.relax  # If Fixed Relaxation factor
+				ldf.iopt_lev = lf_settings.iopt_lev  # Automatic Model Adaptation for Convergence
+
+				# Outputs
+				ldf.iShowOutLoopMsg = lf_settings.iShowOutLoopMsg  # Show 'outer Loop' Messages
+				ldf.iopt_show = lf_settings.iopt_show  # Show Convergence Progress Report
+				ldf.num_conv = lf_settings.num_conv  # Number of reported buses/models per iteration
+				ldf.iopt_check = lf_settings.iopt_check  # Show verification report
+				ldf.loadmax = lf_settings.loadmax  # Max Loading of Edge Element
+				ldf.vlmin = lf_settings.vlmin  # Lower Limit of Allowed Voltage
+				ldf.vlmax = lf_settings.vlmax  # Upper Limit of Allowed Voltage
+				# ldf.outcmd =  load_flow_settings[42-offset]          		# Output
+				ldf.iopt_chctr = lf_settings.iopt_chctr  # Check Control Conditions
+				# ldf.chkcmd = load_flow_settings[44-offset]            	# Command
+
+				# Load Generation Scaling
+				ldf.scLoadFac = lf_settings.scLoadFac  # Load Scaling Factor
+				ldf.scGenFac = lf_settings.scGenFac  # Generation Scaling Factor
+				ldf.scMotFac = lf_settings.scMotFac  # Motor Scaling Factor
+
+				# Low Voltage Analysis
+				ldf.Sfix = lf_settings.Sfix  # Fixed Load kVA
+				ldf.cosfix = lf_settings.cosfix  # Power Factor of Fixed Load
+				ldf.Svar = lf_settings.Svar  # Max Power Per Customer kVA
+				ldf.cosvar = lf_settings.cosvar  # Power Factor of Variable Part
+				ldf.ginf = lf_settings.ginf  # Coincidence Factor
+				ldf.i_volt = lf_settings.i_volt  # Voltage Drop Analysis (0 Stochastic Evaluation,
+				#														 						1 Maximum Current Estimation)
+
+				# Advanced Simulation Options
+				ldf.iopt_prot = lf_settings.iopt_prot  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
+				ldf.ign_comp = lf_settings.ign_comp  # Ignore Composite Elements
+
+				self.logger.debug(
+					(
+						'Load flow settings for study case <{}> based on settings in HAST inputs spreadsheet and '
+						'detailed in load flow command <{}>'
+					).format(self.sc, ldf)
+				)
+		else:
+			pass
 
 		self.ldf = ldf
 

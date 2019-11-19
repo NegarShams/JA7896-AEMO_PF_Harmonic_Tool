@@ -103,30 +103,16 @@ def add_lf_settings(row_data):
 	:return list combined_entry:
 	"""
 	z = row_data
-	# TODO: There is a more efficient way to do this
-	if len(row_data) == 56:
-		combined_entry = [
-			int(z[0]), int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]), int(z[8]),
-			int(z[9]),
-			float(z[10]), int(z[11]), int(z[12]), int(z[13]), z[14], z[15], int(z[16]), int(z[17]),
-			int(z[18]),
-			int(z[19]), float(z[20]), int(z[21]), float(z[22]), int(z[23]), int(z[24]), int(z[25]),
-			int(z[26]),
-			int(z[27]), int(z[28]), int(z[29]), z[30], z[31], int(z[32]), z[33], int(z[34]), int(z[35]),
-			int(z[36]), int(z[37]), int(z[38]), z[39], z[40], z[41], z[42], int(z[43]), z[44], z[45], z[46],
-			z[47], z[48], z[49], z[50], z[51], z[52], int(z[53]), int(z[54]), int(z[55])]
-	else:
-		# For backwards compatibility with the previous version
-		combined_entry = [
-			int(z[0]), int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]),
-			int(z[8]),
-			float(z[9]), int(z[10]), int(z[11]), int(z[12]), z[13], z[14], int(z[15]), int(z[16]),
-			int(z[17]),
-			int(z[18]), float(z[19]), int(z[20]), float(z[21]), int(z[22]), int(z[23]), int(z[24]),
-			int(z[25]),
-			int(z[26]), int(z[27]), int(z[28]), z[29], z[30], int(z[31]), z[32], int(z[33]), int(z[34]),
-			int(z[35]), int(z[36]), int(z[37]), z[38], z[39], z[40], z[41], int(z[42]), z[43], z[44], z[45],
-			z[46], z[47], z[48], z[49], z[50], z[51], int(z[52]), int(z[53]), int(z[54])]
+	# No longer backwards compatible since the input settings for selecting a defined load flow file have been added
+	combined_entry = [
+		z[0],
+		int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]), int(z[8]), int(z[9]), int(z[10]),
+		float(z[11]), int(z[12]), int(z[13]), int(z[14]), z[15], z[16], int(z[17]), int(z[18]), int(z[19]),	int(z[20]),
+		float(z[21]), int(z[22]), float(z[23]), int(z[24]), int(z[25]), int(z[26]), int(z[27]),	int(z[28]), int(z[29]),
+		int(z[30]), z[31], z[32], int(z[33]), z[34], int(z[35]), int(z[36]),
+		int(z[37]), int(z[38]), int(z[39]), z[40], z[41], z[42], z[43], int(z[44]), z[45], z[46], z[47],
+		z[48], z[49], z[50], z[51], z[52], z[53], int(z[54]), int(z[55]), int(z[56])]
+
 	return combined_entry
 
 def add_freq_settings(row_data):
@@ -1097,8 +1083,17 @@ class HASTInputs:
 		# Attribute definitions (filters)
 		self.list_of_filters = list()
 
+		# Load Flow Settings
+		# Will contain full string to load flow command to be used
+		self.pf_loadflow_command = str()
+		# Will contain reference to LFSettings which contains all settings
+		self.lf = LFSettings()
+
 		# Process study settings
 		self.study_settings(hast_inputs[c.sht_Study])
+
+		# Process load flow settings
+		self.load_flow_settings(hast_inputs[c.sht_LF])
 
 		# Process List of Terminals
 		self.process_terminals(hast_inputs[c.sht_Terminals])
@@ -1181,6 +1176,24 @@ class HASTInputs:
 
 		return None
 
+	def load_flow_settings(self, list_lf_settings):
+		"""
+			Populate load flow settings
+		:param list list_lf_settings:
+		:return None:
+		"""
+		# TODO: Develop to process the load flow settings and determine whether to use a settings file or an input
+
+		# If there is no value provided then assume
+		if not list_lf_settings[0]:
+			self.lf.populate_data(load_flow_settings=list_lf_settings[1:])
+			self.pf_loadflow_command = None
+		else:
+			# Settings file for existing load flow settings in PowerFactory
+			self.pf_loadflow_command = '{}.{}'.format(list_lf_settings[0], constants.PowerFactory.ldf_command)
+			self.lf = None
+		return None
+
 	def process_terminals(self, list_of_terminals):
 		"""
 			Processes the terminals from the HAST input into a dictionary so can lookup the name to use based on
@@ -1207,12 +1220,15 @@ class HASTInputs:
 							 'characters.').format(self.filename, constants.HASTInputs.max_terminal_name_length))
 
 		# Check all terminal names are unique
-		if len(terminal_names) != len(set(terminal_names)):
+		# Get duplicated terminals and report to user then exit
+		duplicates = [x for n, x in enumerate(terminal_names) if x in terminal_names[:n]]
+		if duplicates:
 			msg = ('The user defined Terminal names given in the HAST Inputs workbook {} are not unique for '
 				  'each entry.  Please check rename some of the terminals').format(self.filename)
+			# Get duplicated entries
 			logger.critical(msg)
-			logger.critical('The names that have been provided are as follows:')
-			for name in terminal_names:
+			logger.critical('The following terminal names have been duplicated:')
+			for name in duplicates:
 				logger.critical('\t - User Defined Terminal Name: {}'.format(name))
 			raise ValueError(msg)
 
@@ -1233,12 +1249,14 @@ class HASTInputs:
 		# Check no filter names are duplicated
 		filter_names = [k.name for k in self.list_of_filters]
 		# Check all filter names are unique
-		if len(filter_names) != len(set(filter_names)):
+		# Duplicated filter names
+		duplicates = [x for n,x in enumerate(filter_names) if x not in filter_names[:n]]
+		if duplicates:
 			msg = ('The user defined Filter names given in the HAST Inputs workbook {} are not unique for '
 				  'each entry.  Please check rename some of the terminals').format(self.filename)
 			logger.critical(msg)
-			logger.critical('The names that have been provided are as follows:')
-			for name in filter_names:
+			logger.critical('The following names are duplicated:')
+			for name in duplicates:
 				logger.critical('\t - User Defined Filter Name: {}'.format(name))
 			raise ValueError(msg)
 		return None
@@ -1291,12 +1309,14 @@ class HASTInputs:
 				self.sc_details[new_sc.name] = new_sc
 
 			# Get list of study_case names and confirm they are all unique
-			if len(sc_names) != len(set(sc_names)):
+			# Get duplicated study case names
+			duplicates = [x for n,x in enumerate(sc_names) if x in sc_names[:n]]
+			if duplicates:
 				msg = ('The user defined Study Case names given in the HAST Inputs workbook {} are not unique for '
 					   'each entry.  Please check rename some of the user defined names').format(self.filename)
 				logger.critical(msg)
-				logger.critical('The names that have been provided are as follows:')
-				for name in sc_names:
+				logger.critical('The following SC names have been duplicated:')
+				for name in duplicates:
 					logger.critical('\t - Study Case Name: {}'.format(name))
 				raise ValueError(msg)
 
@@ -1323,12 +1343,14 @@ class HASTInputs:
 				self.cont_details[new_cont.name] = new_cont
 
 			# Get list of contingency names and confirm they are all unique
-			if len(cont_names) != len(set(cont_names)):
+			# Get duplciated contingency names
+			duplicates = [x for n,x in enumerate(cont_names) if x in cont_names[:n]]
+			if duplicates:
 				msg = ('The user defined Contingency names given in the HAST Inputs workbook {} are not unique for '
 					   'each entry.  Please check and rename some of the user defined names').format(self.filename)
 				logger.critical(msg)
-				logger.critical('The names that have been provided are as follows:')
-				for name in cont_names:
+				logger.critical('The following names that have been provided are duplicated:')
+				for name in duplicates:
 					logger.critical('\t - Contingency Name: {}'.format(name))
 				raise ValueError(msg)
 
@@ -1430,6 +1452,217 @@ class FilterDetails:
 		# Produce lists of each Q step for each frequency so multiple filters can be tested
 		self.f_q_values = list(itertools.product(self.f_range, self.q_range))
 
+class LFSettings:
+	def __init__(self):
+		"""
+			Initialise variables
+		"""
+		# Target busbar reference found during runtime
+		self.rembar = str()
+
+		# Basic
+		self.iopt_net = int()  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
+		self.iopt_at = int()  # Automatic Tap Adjustment
+		self.iopt_asht = int()  # Automatic Shunt Adjustment
+
+		# Added in Automatic Tapping of PSTs but for backwards compatibility will ensure can work when less than 1
+		self.iPST_at = int()  # Automatic Tap Adjustment of Phase Shifters
+
+		self.iopt_lim = int()  # Consider Reactive Power Limits
+		self.iopt_limScale = int()  # Consider Reactive Power Limits Scaling Factor
+		self.iopt_tem = int()  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
+		self.iopt_pq = int()  # Consider Voltage Dependency of Loads
+		self.iopt_fls = int()  # Feeder Load Scaling
+		self.iopt_sim = int()  # Consider Coincidence of Low-Voltage Loads
+		self.scPnight = int()  # Scaling Factor for Night Storage Heaters
+
+		# Active Power Control
+		self.iopt_apdist = int()  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
+		# 2 Acording to Primary Control, 3 Acording to Inertias)
+		self.iopt_plim = int()  # Consider Active Power Limits
+		self.iPbalancing = int()  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
+
+		# Get DataObject handle for reference busbar
+		self.substation = str()
+		self.terminal = str()
+
+		self.phiini = int() # Angle
+
+		# Advanced Options
+		self.i_power = int()  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
+		self.iopt_notopo = int()  # No Topology Rebuild
+		self.iopt_noinit = int()  # No initialisation
+		self.utr_init = int()  # Consideration of transformer winding ratio
+		self.maxPhaseShift = int()  # Max Transformer Phase Shift
+		self.itapopt = int()  # Tap Adjustment ( 0 Direct, 1 Step)
+		self.krelax = int()  # Min COntroller Relaxation Factor
+
+		self.iopt_stamode = int()  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
+		self.iopt_igntow = int()  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
+		self.initOPF = int()  # Use this load flow for initialisation of OPF
+		self.zoneScale = int()  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
+
+		# Iteration Control
+		self.itrlx = int()  # Max No Iterations for Newton-Raphson Iteration
+		self.ictrlx = int()  # Max No Iterations for Outer Loop
+		self.nsteps = int()  # Max No Iterations for Number of steps
+
+		self.errlf = int()  # Max Acceptable Load Flow Error for Nodes
+		self.erreq = int()  # Max Acceptable Load Flow Error for Model Equations
+		self.iStepAdapt = int()  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
+		self.relax = int()  # If Fixed Relaxation factor
+		self.iopt_lev = int()  # Automatic Model Adaptation for Convergence
+
+		# Outputs
+		self.iShowOutLoopMsg = int()  # Show 'outer Loop' Messages
+		self.iopt_show = int()  # Show Convergence Progress Report
+		self.num_conv = int()  # Number of reported buses/models per iteration
+		self.iopt_check = int()  # Show verification report
+		self.loadmax = int()  # Max Loading of Edge Element
+		self.vlmin = int()  # Lower Limit of Allowed Voltage
+		self.vlmax = int()  # Upper Limit of Allowed Voltage
+		self.iopt_chctr = int()  # Check Control Conditions
+
+		# Load Generation Scaling
+		self.scLoadFac = int()  # Load Scaling Factor
+		self.scGenFac = int()  # Generation Scaling Factor
+		self.scMotFac = int()  # Motor Scaling Factor
+
+		# Low Voltage Analysis
+		self.Sfix = int()  # Fixed Load kVA
+		self.cosfix = int()  # Power Factor of Fixed Load
+		self.Svar = int()  # Max Power Per Customer kVA
+		self.cosvar = int()  # Power Factor of Variable Part
+		self.ginf = int()  # Coincidence Factor
+		self.i_volt = int()  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
+
+		# Advanced Simulation Options
+		self.iopt_prot = int()  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
+		self.ign_comp = int()  # Ignore Composite Elements
+
+	def populate_data(self, load_flow_settings):
+		"""
+			List of settings for the load flow from HAST if using a manual settings file
+		:param list load_flow_settings:
+		"""
+		# Loadflow settings
+		# -------------------------------------------------------------------------------------
+		# Create new object for the load flow on the base case so that existing settings are not overwritten
+
+		# Get handle for load flow command from study case
+		# Basic
+		self.iopt_net = load_flow_settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
+		self.iopt_at = load_flow_settings[1]  # Automatic Tap Adjustment
+		self.iopt_asht = load_flow_settings[2]  # Automatic Shunt Adjustment
+
+		# Added in Automatic Tapping of PSTs but for backwards compatibility will ensure can work when less than 1
+		if len(load_flow_settings) == 56:
+			# Setting for PST exists
+			offset = 0
+			self.iPST_at = load_flow_settings[3]  # Automatic Tap Adjustment of Phase Shifters
+		else:
+			# Setting for PST does not exist
+			offset = 1
+			self.iPST_at = constants.HASTInputs.def_automatic_pst_tap  # Automatic Tap Adjustment of Phase Shifters
+
+		self.iopt_lim = load_flow_settings[4 - offset]  # Consider Reactive Power Limits
+		self.iopt_limScale = load_flow_settings[5 - offset]  # Consider Reactive Power Limits Scaling Factor
+		self.iopt_tem = load_flow_settings[
+			6 - offset]  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
+		self.iopt_pq = load_flow_settings[7 - offset]  # Consider Voltage Dependency of Loads
+		self.iopt_fls = load_flow_settings[8 - offset]  # Feeder Load Scaling
+		self.iopt_sim = load_flow_settings[9 - offset]  # Consider Coincidence of Low-Voltage Loads
+		self.scPnight = load_flow_settings[10 - offset]  # Scaling Factor for Night Storage Heaters
+
+		# Active Power Control
+		self.iopt_apdist = load_flow_settings[
+			11 - offset]  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
+		# 2 Acording to Primary Control, 3 Acording to Inertias)
+		self.iopt_plim = load_flow_settings[12 - offset]  # Consider Active Power Limits
+		self.iPbalancing = load_flow_settings[
+			13 - offset]  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
+
+		# Get DataObject handle for reference busbar
+		net_folder_name, substation, terminal = load_flow_settings[14 - offset].split('\\')
+		# Confirm that substation and terminal types exist in name
+		if not substation.endswith(constants.PowerFactory.pf_substation):
+			self.substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
+		if not terminal.endswith(constants.PowerFactory.pf_terminal):
+			self.terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
+
+
+		self.phiini = load_flow_settings[15 - offset]  # Angle
+
+		# Advanced Options
+		self.i_power = load_flow_settings[16 - offset]  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
+		self.iopt_notopo = load_flow_settings[17 - offset]  # No Topology Rebuild
+		self.iopt_noinit = load_flow_settings[18 - offset]  # No initialisation
+		self.utr_init = load_flow_settings[19 - offset]  # Consideration of transformer winding ratio
+		self.maxPhaseShift = load_flow_settings[20 - offset]  # Max Transformer Phase Shift
+		self.itapopt = load_flow_settings[21 - offset]  # Tap Adjustment ( 0 Direct, 1 Step)
+		self.krelax = load_flow_settings[22 - offset]  # Min COntroller Relaxation Factor
+
+		self.iopt_stamode = load_flow_settings[23 - offset]  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
+		self.iopt_igntow = load_flow_settings[
+			24 - offset]  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
+		self.initOPF = load_flow_settings[25 - offset]  # Use this load flow for initialisation of OPF
+		self.zoneScale = load_flow_settings[
+			26 - offset]  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
+
+		# Iteration Control
+		self.itrlx = load_flow_settings[27 - offset]  # Max No Iterations for Newton-Raphson Iteration
+		self.ictrlx = load_flow_settings[28 - offset]  # Max No Iterations for Outer Loop
+		self.nsteps = load_flow_settings[29 - offset]  # Max No Iterations for Number of steps
+
+		self.errlf = load_flow_settings[30 - offset]  # Max Acceptable Load Flow Error for Nodes
+		self.erreq = load_flow_settings[31 - offset]  # Max Acceptable Load Flow Error for Model Equations
+		self.iStepAdapt = load_flow_settings[32 - offset]  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
+		self.relax = load_flow_settings[33 - offset]  # If Fixed Relaxation factor
+		self.iopt_lev = load_flow_settings[34 - offset]  # Automatic Model Adaptation for Convergence
+
+		# Outputs
+		self.iShowOutLoopMsg = load_flow_settings[35 - offset]  # Show 'outer Loop' Messages
+		self.iopt_show = load_flow_settings[36 - offset]  # Show Convergence Progress Report
+		self.num_conv = load_flow_settings[37 - offset]  # Number of reported buses/models per iteration
+		self.iopt_check = load_flow_settings[38 - offset]  # Show verification report
+		self.loadmax = load_flow_settings[39 - offset]  # Max Loading of Edge Element
+		self.vlmin = load_flow_settings[40 - offset]  # Lower Limit of Allowed Voltage
+		self.vlmax = load_flow_settings[41 - offset]  # Upper Limit of Allowed Voltage
+		# ldf.outcmd =  load_flow_settings[42-offset]          		# Output
+		self.iopt_chctr = load_flow_settings[43 - offset]  # Check Control Conditions
+		# ldf.chkcmd = load_flow_settings[44-offset]            	# Command
+
+		# Load Generation Scaling
+		self.scLoadFac = load_flow_settings[45 - offset]  # Load Scaling Factor
+		self.scGenFac = load_flow_settings[46 - offset]  # Generation Scaling Factor
+		self.scMotFac = load_flow_settings[47 - offset]  # Motor Scaling Factor
+
+		# Low Voltage Analysis
+		self.Sfix = load_flow_settings[48 - offset]  # Fixed Load kVA
+		self.cosfix = load_flow_settings[49 - offset]  # Power Factor of Fixed Load
+		self.Svar = load_flow_settings[50 - offset]  # Max Power Per Customer kVA
+		self.cosvar = load_flow_settings[51 - offset]  # Power Factor of Variable Part
+		self.ginf = load_flow_settings[52 - offset]  # Coincidence Factor
+		self.i_volt = load_flow_settings[
+			53 - offset]  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
+
+		# Advanced Simulation Options
+		self.iopt_prot = load_flow_settings[
+			54 - offset]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
+		self.ign_comp = load_flow_settings[55 - offset]  # Ignore Composite Elements
+
+
+	def find_reference_terminal(self, app):
+		"""
+			Find and populate reference terminal for machine
+		:param powerfacotry.app app:
+		:return None:
+		"""
+		pf_sub = app.GetCalcRelevantObjects(self.substation)
+		pf_term = pf_sub[0].GetContents(self.terminal)[0]
+		self.rembar = pf_term
+
+		return None
 
 #  ----- UNIT TESTS -----
 class TestExcelSetup(unittest.TestCase):

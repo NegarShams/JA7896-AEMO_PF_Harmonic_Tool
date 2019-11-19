@@ -293,7 +293,7 @@ analysis_sheets = (
 	(PowerFactory.sht_Scenarios, "A5"),
 	(PowerFactory.sht_Contingencies, "A5"),
 	(PowerFactory.sht_Terminals, "A5"),
-	(PowerFactory.sht_LF, "D5"),
+	(PowerFactory.sht_LF, "D4"),
 	(PowerFactory.sht_Freq, "D5"),
 	(PowerFactory.sht_HLF, "D5"),
 	(PowerFactory.sht_Filters, "A5"))
