@@ -1,26 +1,60 @@
 <component name="ProjectDictionaryState">
   <dictionary name="david">
     <words>
+      <w>apdist</w>
+      <w>asht</w>
+      <w>chctr</w>
       <w>chkcmd</w>
       <w>chrt</w>
+      <w>conv</w>
+      <w>cosfix</w>
+      <w>cosvar</w>
       <w>endcol</w>
       <w>endrow</w>
+      <w>erreq</w>
+      <w>errlf</w>
       <w>filelocation</w>
+      <w>ginf</w>
       <w>hldf</w>
       <w>hrmb</w>
+      <w>ictrlx</w>
+      <w>igntow</w>
+      <w>iopt</w>
+      <w>itapopt</w>
+      <w>itrlx</w>
+      <w>krelax</w>
       <w>loadflow</w>
+      <w>loadmax</w>
+      <w>mutelm</w>
+      <w>netelm</w>
       <w>newcol</w>
+      <w>noinit</w>
       <w>noofgraphrows</w>
       <w>noofgraphrowsrange</w>
+      <w>notopo</w>
+      <w>nsteps</w>
+      <w>opscen</w>
       <w>outcmd</w>
       <w>outserv</w>
+      <w>pbalancing</w>
       <w>pfclass</w>
+      <w>phiini</w>
+      <w>plim</w>
+      <w>pnight</w>
       <w>powerfactory</w>
+      <w>prot</w>
+      <w>pspf</w>
       <w>rembar</w>
+      <w>resfolder</w>
       <w>scen</w>
+      <w>sfix</w>
+      <w>stamode</w>
       <w>startcol</w>
       <w>startrow</w>
+      <w>svar</w>
       <w>textfile</w>
+      <w>vlmax</w>
+      <w>vlmin</w>
       <w>workbookname</w>
     </words>
   </dictionary>

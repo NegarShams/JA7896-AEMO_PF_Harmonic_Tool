@@ -144,7 +144,6 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	logger.debug('Filter {} added to substation {} with Q = {} MVAR and resonant frequency = {} Hz'
 				 .format(filter_name, hdl_cubicle, q, freq))
 
-	# TODO:  Rather that writing messages to confirm this could instead validate using
 	logger.info('Filter {} added to model'.format(hdl_filter))
 	logger.debug('Filter input mode set to: {} and should be {}'.format(hdl_filter.GetAttribute(c.pf_shn_inputmode),
 																		c.pf_shn_selectedinput))

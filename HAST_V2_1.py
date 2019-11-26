@@ -1599,9 +1599,10 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 
 	# Create excel instance to deal with retrieving import data from excel
 	# TODO: Make use of class in <hast2.excel_writing> for complete processing of inputs
-	with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
-		# Reads in the Settings from the spreadsheet
-		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=import_workbook)
+	# #with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
+	# #	# Reads in the Settings from the spreadsheet
+	excel_cls = hast2.excel_writing.Excel(print_info=print1, print_error=print2)
+	analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=import_workbook)
 	# TODO: Complete processing to convert everything to use class for processing
 	cls_hast_inputs = hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict, uid_time=start1)
 

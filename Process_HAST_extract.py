@@ -674,8 +674,9 @@ def get_hast_values(search_pth):
 		hast_inputs_workbook = list_of_input_files[0]
 
 	# Import HAST workbook using excel_writing import
-	with hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
-		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=hast_inputs_workbook)
+	# #with hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
+	excel_cls = hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error)
+	analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=hast_inputs_workbook)
 
 	# Process the imported workbook into
 	processed_inputs = hast2.excel_writing.HASTInputs(analysis_dict)

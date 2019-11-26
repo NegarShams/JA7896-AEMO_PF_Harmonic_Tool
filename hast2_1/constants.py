@@ -281,13 +281,6 @@ class HASTInputs:
 	# Default value for automatic tap changing of PST
 	def_automatic_pst_tap = 1
 
-# TODO: Partially implemented for excel_writing.HASTInputs to process HAST file
-# TODO: Once completed will replace analysis_sheets = () below
-analysis_sheets2 = dict()
-# Form = (index_col=None, last_col=None, header_row=None, rows_to_skip=[], number_of_rows=None)
-analysis_sheets2[PowerFactory.sht_Study] = (0, 1, None, [0,1,2,3], 20)
-analysis_sheets2[PowerFactory.sht_Scenarios] = (None, 3, 3, [0,1,2], 20)
-
 # In format:  (sheet_name, header row, data columns, rows to skip) - all numbers 0 indexed
 analysis_sheets = (
 	(PowerFactory.sht_Study, None, 'B', 4),
