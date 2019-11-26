@@ -324,16 +324,69 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	# Obtain nominal voltage for each terminal
 	idx = pd.IndexSlice
 	# Add in row to contain the nominal voltage
-	_df.loc[c.idx_nom_voltage, :] = ''
+	_df.loc[c.idx_nom_voltage] = str()
 
+	dict_nom_voltage = dict()
+
+	# Find the nominal voltage for each terminal (if exists)
 	for term, df in _df.groupby(axis=1, level=c.lbl_Reference_Terminal):
 		idx_filter = idx[:,:,:,:,:,:,'e:uknom']
 		try:
 			# Obtain nominal voltage and then set row values appropriately to include in results
 			nom_voltage = df.loc[:,idx_filter].iloc[0,0]
-			_df.loc[c.idx_nom_voltage, idx[term,:,:,:,:,:,:]] = nom_voltage
+			dict_nom_voltage[term] = nom_voltage
+			# #_df.loc[c.idx_nom_voltage, idx[term,:,:,:,:,:,:]] = nom_voltage
+			# #df.loc[c.idx_nom_voltage, :] = nom_voltage
 		except KeyError:
 			pass
+
+	# Check for any duplicated multi-index entries (typically contingencies) and rename
+	to_keep = 'first'
+	if any(_df.columns.duplicated(keep=to_keep)):
+		logger.debug('Processing duplicated results in the HAST results file: {}'.format(pth_file))
+		# Get duplicated and non-duplicated into separate DataFrames
+		duplicated_entries = _df.loc[:, _df.columns.duplicated(keep=to_keep)]
+		non_duplicated_entries = _df.loc[:, ~_df.columns.duplicated(keep=to_keep)]
+
+		# Rename duplicated_entries and report to user (contingency is the entry that is renamed)
+		# Only allows for a single duplicated entry
+		if any(duplicated_entries.columns.duplicated()):
+			logger.critical(
+				(
+					'Unexpected error when trying to deal with duplicate columns for processing of the HAST results '
+					'file: {}'
+				).format(pth_file)
+			)
+			raise IOError('Multiple duplicated entries')
+
+		# Produce new column labels for each contingency
+		terminals = set(duplicated_entries.columns.get_level_values(level=c.lbl_Reference_Terminal))
+		msg = (
+			(
+				'During processing of the HAST results file: {} some duplicated entries have been for the '
+				'following terminals: \n'
+			).format(pth_file)
+		)
+		msg += '\n'.join(['\t - Terminal:  {}'.format(x) for x in terminals])
+		msg += '\n To resolve this the following changes have been made to the duplicated entries:\n'
+		for label in (c.lbl_Contingency, c.lbl_FullName):
+			# Get all the old and new labels and combine together into a lookup dictionary
+			old_labels = set(duplicated_entries.columns.get_level_values(level=label))
+			new_labels = ['{}({})'.format(x, 1) for x in old_labels]
+			replacement = dict(zip(old_labels, new_labels))
+			# Replace the duplicated entries with the new ones
+			duplicated_entries.rename(columns=replacement, level=label, inplace=True)
+			msg += '\n'.join(
+				['\t - For {} value {} has been replaced with {}'.format(label, k, v) for k,v in replacement.items()]
+			) +'\n'
+		logger.warning(msg)
+
+		# Combine the two DataFrames back into a single DataFrame
+		_df = pd.concat([duplicated_entries, non_duplicated_entries], axis=1)
+
+	# Update the DataFrame to include the nominal voltage for every terminal
+	for term, nom_voltage in dict_nom_voltage.items():
+		_df.loc[c.idx_nom_voltage, idx[term,:,:,:,:,:,:]] = nom_voltage
 
 	# Add the new nominal voltage into the index data
 	_df = _df.T.set_index(c.idx_nom_voltage, append=True).T
@@ -622,7 +675,6 @@ def get_hast_values(search_pth):
 
 	# Import HAST workbook using excel_writing import
 	with hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
-		# TODO:  Performance improvement possible by speeding up processing of HAST inputs workbook
 		analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=hast_inputs_workbook)
 
 	# Process the imported workbook into

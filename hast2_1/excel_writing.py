@@ -103,7 +103,17 @@ def add_lf_settings(row_data):
 	:return list combined_entry:
 	"""
 	z = row_data
-	# No longer backwards compatible since the input settings for selecting a defined load flow file have been added
+
+	# Input data adjusted for backwards compatibility prior to inclusion of automatic tap adjustment of phase shifters
+	# in PowerFactory 2018
+	if len(row_data) == 56:
+		row_data.insert(4, constants.HASTInputs.def_automatic_pst_tap)
+
+	# Convert a nan value to an empty string for backwards compatibility if no Load Flow Command has been provided
+	# as an input
+	if z[0] is np.nan:
+		z[0] = str()
+
 	combined_entry = [
 		z[0],
 		int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]), int(z[8]), int(z[9]), int(z[10]),
@@ -136,6 +146,25 @@ def add_hlf_settings(row_data):
 	combined_entry = [int(z[0]), int(z[1]), int(z[2]), int(z[3]), z[4], z[5], z[6], z[7],
 					  z[8], int(z[9]), int(z[10]), int(z[11]), int(z[12]), int(z[13]), int(z[14])]
 	return combined_entry
+
+def add_study_settings(row_data):
+	"""
+		Function to read in the study settings and save to list
+		# TODO: Convert this to a class / process data formats whilst in DataFrame
+	:param list row_data:
+	:return list combined_entry:
+	"""
+	z = row_data
+	# No longer backwards compatible since the input settings for selecting a defined load flow file have been added
+	combined_entry = [
+		z[0], z[1], z[2], z[3], z[4], z[5], z[6], z[7],
+		bool(z[8]), bool(z[9]), bool(z[10]), bool(z[11]), bool(z[12]), bool(z[13]), bool(z[14]), bool(z[15]),
+		bool(z[16]), bool(z[17]), bool(z[18]), bool(z[19])
+	]
+
+	return combined_entry
+
+
 
 class Excel:
 	""" Class to deal with the writing and reading from excel and therefore allowing unittesting of the
@@ -207,42 +236,54 @@ class Excel:
 		# Initialise empty dictionary
 		analysis_dict = dict()
 
-		wb = self.xl.Workbooks.Open(workbookname)  # Open workbook
-		c = self.excel_constants
+		# #wb = self.xl.Workbooks.Open(workbookname)  # Open workbook
+		# #c = self.excel_constants
 		# print(c.xlDown)
-		self.xl.Visible = False  # Make excel Visible
-		self.xl.DisplayAlerts = False  # Don't Display Alerts
+		# #self.xl.Visible = False  # Make excel Visible
+		# #self.xl.DisplayAlerts = False  # Don't Display Alerts
 
 		# Loop through each worksheet defined in <analysis_sheets>
 		for x in self.analysis_sheets:
 			# Select and activate each worksheet
-			try:
-				# Tru statement to capture when worksheet doesn't exist
-				ws = wb.Sheets(x[0])  # Set Active Sheet
-			except pywintypes.com_error as error:
-				if error.excepinfo[5] == -2147352565:
-					logger.debug(('Old HAST inputs workbook used which is missing the worksheet {}. '
-								 'Therefore importing of this worksheet is skipped')
-								 .format(x[0]))
-					continue
-				else:
-					logger.critical('Unknown error when trying to load worksheet {} from workbook {}'
-									.format(x[0], workbookname))
-					raise error
+			# #try:
+			# #	# Try statement to capture when worksheet doesn't exist
+			# #	ws = wb.Sheets(x[0])  # Set Active Sheet
+			# #except pywintypes.com_error as error:
+			# #	if error.excepinfo[5] == -2147352565:
+			# #		logger.debug(('Old HAST inputs workbook used which is missing the worksheet {}. '
+			# #					 'Therefore importing of this worksheet is skipped')
+			# #					 .format(x[0]))
+			# #		continue
+			# #	else:
+			# #		logger.critical('Unknown error when trying to load worksheet {} from workbook {}'
+			# #						.format(x[0], workbookname))
+			# #		raise error
+
+			# Import worksheet using pandas
+			# #try:
+			# Import data for this specific worksheet
+			# TODO: Need to add something to capture when sheet name is missing
+			current_worksheet = x[0]
+			df = pd.read_excel(
+				workbookname, sheet_name=x[0], header=x[1], usecols=x[2], skiprows=x[3]
+			)
+			# #except:
+			# #	pass
 
 			# Don't think sheet needs to be activated
-			ws.Activate()  # Activate Sheet
-			cell_start = x[1]  # Starting Cell
+			# #ws.Activate()  # Activate Sheet
+			# #cell_start = x[1]  # Starting Cell
 
-			ws.Range(cell_start).End(c.xlDown).Select()  # Equivalent to shift end down
-			row_end = self.xl.Selection.Address
+			# #ws.Range(cell_start).End(c.xlDown).Select()  # Equivalent to shift end down
+			# #row_end = self.xl.Selection.Address
 			row_input = []
-			current_worksheet = x[0]
+			# #current_worksheet = x[0]
 
 			# Code only to be executed for these sheets
 			if current_worksheet in constants.PowerFactory.HAST_Input_Scenario_Sheets:
 				# if x[0] == "Contingencies" or x[0] == "Base_Scenarios" or x[0] == "Terminals":	# For these sheets
 				# Find the starting and ending cells
+				"""
 				cell_start_alph = re.sub('[^a-zA-Z]', '', cell_start)  # Gets the starting cell alpha C5 = C
 				cell_start_num = int(re.sub('[^\d.]', '', cell_start))  # Gets the starting cell number C5 = 5
 				cell_end = int(re.sub('[^\d.]', '', row_end))  # Gets the ending cell alpha E5 = E
@@ -278,6 +319,14 @@ class Excel:
 						continue
 
 					# Routine only for 'Contingencies' worksheet
+					"""
+				# Loop through each row of DataFrame and convert series to list
+				for index, data_series in df.iterrows():
+					# Convert the Series to a list and return the required data
+					# drop nan values from series
+					# TODO: Should include data checking on import to improve processing speed
+					data_to_process = data_series.dropna()
+					row_value = data_to_process.tolist()
 					if current_worksheet == constants.PowerFactory.sht_Contingencies:
 						row_value = add_contingency(row_data=row_value)
 
@@ -297,9 +346,12 @@ class Excel:
 
 			# More efficiently checking which worksheet looking at
 			elif current_worksheet in constants.PowerFactory.HAST_Input_Settings_Sheets:
-				row_value = ws.Range(cell_start + ":" + row_end).Value
+				# For these worksheets input settings are in a series and can be converted to a list directly
+				row_input = df.iloc[:,0].tolist()
+				"""
 				for item in row_value:
 					row_input.append(item[0])
+				"""
 				if current_worksheet == constants.PowerFactory.sht_LF:
 					# Process inputs for Loadflow_Settings
 					row_input = add_lf_settings(row_data=row_input)
@@ -312,10 +364,14 @@ class Excel:
 					# Process inputs for Harmonic_Loadflow
 					row_input = add_hlf_settings(row_data=row_input)
 
+				elif current_worksheet ==  constants.PowerFactory.sht_Study:
+					# Process inputs for Study Settings
+					row_input = add_study_settings(row_data=row_input)
+
 			# Combine imported results in a dictionary relevant to the worksheet that has been imported
 			analysis_dict[current_worksheet] = row_input  # Imports range of values into a list of lists
 
-		wb.Close()  # Close Workbook
+		# #wb.Close()  # Close Workbook
 		return analysis_dict
 
 	def create_workbook(self, workbookname, excel_visible):  # Create Workbook
@@ -1555,35 +1611,25 @@ class LFSettings:
 		self.iopt_at = load_flow_settings[1]  # Automatic Tap Adjustment
 		self.iopt_asht = load_flow_settings[2]  # Automatic Shunt Adjustment
 
-		# Added in Automatic Tapping of PSTs but for backwards compatibility will ensure can work when less than 1
-		if len(load_flow_settings) == 56:
-			# Setting for PST exists
-			offset = 0
-			self.iPST_at = load_flow_settings[3]  # Automatic Tap Adjustment of Phase Shifters
-		else:
-			# Setting for PST does not exist
-			offset = 1
-			self.iPST_at = constants.HASTInputs.def_automatic_pst_tap  # Automatic Tap Adjustment of Phase Shifters
+		# Added in Automatic Tapping of PSTs with default values
+		self.iPST_at = load_flow_settings[3]  # Automatic Tap Adjustment of Phase Shifters
 
-		self.iopt_lim = load_flow_settings[4 - offset]  # Consider Reactive Power Limits
-		self.iopt_limScale = load_flow_settings[5 - offset]  # Consider Reactive Power Limits Scaling Factor
-		self.iopt_tem = load_flow_settings[
-			6 - offset]  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
-		self.iopt_pq = load_flow_settings[7 - offset]  # Consider Voltage Dependency of Loads
-		self.iopt_fls = load_flow_settings[8 - offset]  # Feeder Load Scaling
-		self.iopt_sim = load_flow_settings[9 - offset]  # Consider Coincidence of Low-Voltage Loads
-		self.scPnight = load_flow_settings[10 - offset]  # Scaling Factor for Night Storage Heaters
+		self.iopt_lim = load_flow_settings[4]  # Consider Reactive Power Limits
+		self.iopt_limScale = load_flow_settings[5]  # Consider Reactive Power Limits Scaling Factor
+		self.iopt_tem = load_flow_settings[6]  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
+		self.iopt_pq = load_flow_settings[7]  # Consider Voltage Dependency of Loads
+		self.iopt_fls = load_flow_settings[8]  # Feeder Load Scaling
+		self.iopt_sim = load_flow_settings[9]  # Consider Coincidence of Low-Voltage Loads
+		self.scPnight = load_flow_settings[10]  # Scaling Factor for Night Storage Heaters
 
 		# Active Power Control
-		self.iopt_apdist = load_flow_settings[
-			11 - offset]  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
+		self.iopt_apdist = load_flow_settings[11]  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
 		# 2 Acording to Primary Control, 3 Acording to Inertias)
-		self.iopt_plim = load_flow_settings[12 - offset]  # Consider Active Power Limits
-		self.iPbalancing = load_flow_settings[
-			13 - offset]  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
+		self.iopt_plim = load_flow_settings[12]  # Consider Active Power Limits
+		self.iPbalancing = load_flow_settings[13]  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
 
 		# Get DataObject handle for reference busbar
-		net_folder_name, substation, terminal = load_flow_settings[14 - offset].split('\\')
+		net_folder_name, substation, terminal = load_flow_settings[14].split('\\')
 		# Confirm that substation and terminal types exist in name
 		if not substation.endswith(constants.PowerFactory.pf_substation):
 			self.substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
@@ -1591,65 +1637,61 @@ class LFSettings:
 			self.terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
 
 
-		self.phiini = load_flow_settings[15 - offset]  # Angle
+		self.phiini = load_flow_settings[15]  # Angle
 
 		# Advanced Options
-		self.i_power = load_flow_settings[16 - offset]  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
-		self.iopt_notopo = load_flow_settings[17 - offset]  # No Topology Rebuild
-		self.iopt_noinit = load_flow_settings[18 - offset]  # No initialisation
-		self.utr_init = load_flow_settings[19 - offset]  # Consideration of transformer winding ratio
-		self.maxPhaseShift = load_flow_settings[20 - offset]  # Max Transformer Phase Shift
-		self.itapopt = load_flow_settings[21 - offset]  # Tap Adjustment ( 0 Direct, 1 Step)
-		self.krelax = load_flow_settings[22 - offset]  # Min COntroller Relaxation Factor
+		self.i_power = load_flow_settings[16]  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
+		self.iopt_notopo = load_flow_settings[17]  # No Topology Rebuild
+		self.iopt_noinit = load_flow_settings[18]  # No initialisation
+		self.utr_init = load_flow_settings[19]  # Consideration of transformer winding ratio
+		self.maxPhaseShift = load_flow_settings[20]  # Max Transformer Phase Shift
+		self.itapopt = load_flow_settings[21]  # Tap Adjustment ( 0 Direct, 1 Step)
+		self.krelax = load_flow_settings[22]  # Min COntroller Relaxation Factor
 
-		self.iopt_stamode = load_flow_settings[23 - offset]  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
-		self.iopt_igntow = load_flow_settings[
-			24 - offset]  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
-		self.initOPF = load_flow_settings[25 - offset]  # Use this load flow for initialisation of OPF
-		self.zoneScale = load_flow_settings[
-			26 - offset]  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
+		self.iopt_stamode = load_flow_settings[23]  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
+		self.iopt_igntow = load_flow_settings[24]  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
+		self.initOPF = load_flow_settings[25]  # Use this load flow for initialisation of OPF
+		self.zoneScale = load_flow_settings[26]  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
 
 		# Iteration Control
-		self.itrlx = load_flow_settings[27 - offset]  # Max No Iterations for Newton-Raphson Iteration
-		self.ictrlx = load_flow_settings[28 - offset]  # Max No Iterations for Outer Loop
-		self.nsteps = load_flow_settings[29 - offset]  # Max No Iterations for Number of steps
+		self.itrlx = load_flow_settings[27]  # Max No Iterations for Newton-Raphson Iteration
+		self.ictrlx = load_flow_settings[28]  # Max No Iterations for Outer Loop
+		self.nsteps = load_flow_settings[29]  # Max No Iterations for Number of steps
 
-		self.errlf = load_flow_settings[30 - offset]  # Max Acceptable Load Flow Error for Nodes
-		self.erreq = load_flow_settings[31 - offset]  # Max Acceptable Load Flow Error for Model Equations
-		self.iStepAdapt = load_flow_settings[32 - offset]  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
-		self.relax = load_flow_settings[33 - offset]  # If Fixed Relaxation factor
-		self.iopt_lev = load_flow_settings[34 - offset]  # Automatic Model Adaptation for Convergence
+		self.errlf = load_flow_settings[30]  # Max Acceptable Load Flow Error for Nodes
+		self.erreq = load_flow_settings[31]  # Max Acceptable Load Flow Error for Model Equations
+		self.iStepAdapt = load_flow_settings[32]  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
+		self.relax = load_flow_settings[33]  # If Fixed Relaxation factor
+		self.iopt_lev = load_flow_settings[34]  # Automatic Model Adaptation for Convergence
 
 		# Outputs
-		self.iShowOutLoopMsg = load_flow_settings[35 - offset]  # Show 'outer Loop' Messages
-		self.iopt_show = load_flow_settings[36 - offset]  # Show Convergence Progress Report
-		self.num_conv = load_flow_settings[37 - offset]  # Number of reported buses/models per iteration
-		self.iopt_check = load_flow_settings[38 - offset]  # Show verification report
-		self.loadmax = load_flow_settings[39 - offset]  # Max Loading of Edge Element
-		self.vlmin = load_flow_settings[40 - offset]  # Lower Limit of Allowed Voltage
-		self.vlmax = load_flow_settings[41 - offset]  # Upper Limit of Allowed Voltage
+		self.iShowOutLoopMsg = load_flow_settings[35]  # Show 'outer Loop' Messages
+		self.iopt_show = load_flow_settings[36]  # Show Convergence Progress Report
+		self.num_conv = load_flow_settings[37]  # Number of reported buses/models per iteration
+		self.iopt_check = load_flow_settings[38]  # Show verification report
+		self.loadmax = load_flow_settings[39]  # Max Loading of Edge Element
+		self.vlmin = load_flow_settings[40]  # Lower Limit of Allowed Voltage
+		self.vlmax = load_flow_settings[41]  # Upper Limit of Allowed Voltage
 		# ldf.outcmd =  load_flow_settings[42-offset]          		# Output
-		self.iopt_chctr = load_flow_settings[43 - offset]  # Check Control Conditions
+		self.iopt_chctr = load_flow_settings[43]  # Check Control Conditions
 		# ldf.chkcmd = load_flow_settings[44-offset]            	# Command
 
 		# Load Generation Scaling
-		self.scLoadFac = load_flow_settings[45 - offset]  # Load Scaling Factor
-		self.scGenFac = load_flow_settings[46 - offset]  # Generation Scaling Factor
-		self.scMotFac = load_flow_settings[47 - offset]  # Motor Scaling Factor
+		self.scLoadFac = load_flow_settings[45]  # Load Scaling Factor
+		self.scGenFac = load_flow_settings[46]  # Generation Scaling Factor
+		self.scMotFac = load_flow_settings[47]  # Motor Scaling Factor
 
 		# Low Voltage Analysis
-		self.Sfix = load_flow_settings[48 - offset]  # Fixed Load kVA
-		self.cosfix = load_flow_settings[49 - offset]  # Power Factor of Fixed Load
-		self.Svar = load_flow_settings[50 - offset]  # Max Power Per Customer kVA
-		self.cosvar = load_flow_settings[51 - offset]  # Power Factor of Variable Part
-		self.ginf = load_flow_settings[52 - offset]  # Coincidence Factor
-		self.i_volt = load_flow_settings[
-			53 - offset]  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
+		self.Sfix = load_flow_settings[48]  # Fixed Load kVA
+		self.cosfix = load_flow_settings[49]  # Power Factor of Fixed Load
+		self.Svar = load_flow_settings[50]  # Max Power Per Customer kVA
+		self.cosvar = load_flow_settings[51]  # Power Factor of Variable Part
+		self.ginf = load_flow_settings[52]  # Coincidence Factor
+		self.i_volt = load_flow_settings[53]  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
 
 		# Advanced Simulation Options
-		self.iopt_prot = load_flow_settings[
-			54 - offset]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
-		self.ign_comp = load_flow_settings[55 - offset]  # Ignore Composite Elements
+		self.iopt_prot = load_flow_settings[54]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
+		self.ign_comp = load_flow_settings[55]  # Ignore Composite Elements
 
 
 	def find_reference_terminal(self, app):

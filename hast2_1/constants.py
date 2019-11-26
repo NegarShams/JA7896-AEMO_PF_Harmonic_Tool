@@ -288,15 +288,26 @@ analysis_sheets2 = dict()
 analysis_sheets2[PowerFactory.sht_Study] = (0, 1, None, [0,1,2,3], 20)
 analysis_sheets2[PowerFactory.sht_Scenarios] = (None, 3, 3, [0,1,2], 20)
 
+# In format:  (sheet_name, header row, data columns, rows to skip) - all numbers 0 indexed
 analysis_sheets = (
-	(PowerFactory.sht_Study, "B5"),
-	(PowerFactory.sht_Scenarios, "A5"),
-	(PowerFactory.sht_Contingencies, "A5"),
-	(PowerFactory.sht_Terminals, "A5"),
-	(PowerFactory.sht_LF, "D4"),
-	(PowerFactory.sht_Freq, "D5"),
-	(PowerFactory.sht_HLF, "D5"),
-	(PowerFactory.sht_Filters, "A5"))
+	(PowerFactory.sht_Study, None, 'B', 4),
+	(PowerFactory.sht_Scenarios, 0, 'A:D', 3),
+	(PowerFactory.sht_Contingencies, 0, 'A:AB', 3),
+	(PowerFactory.sht_Terminals, 0, 'A:D', 3),
+	(PowerFactory.sht_LF, None, 'D', 3),
+	(PowerFactory.sht_Freq, None, 'D', 4),
+	(PowerFactory.sht_HLF, None, 'D', 4),
+	(PowerFactory.sht_Filters, 0, 'A:L', 3))
+
+#analysis_sheets = (
+#	(PowerFactory.sht_Study, None, 'D', 4),
+#	(PowerFactory.sht_Scenarios, 3, 'A:D', 4),
+#	(PowerFactory.sht_Contingencies, 'A5'),
+#	(PowerFactory.sht_Terminals, "A5"),
+#	(PowerFactory.sht_LF, "D4"),
+#	(PowerFactory.sht_Freq, "D5"),
+#	(PowerFactory.sht_HLF, "D5"),
+#	(PowerFactory.sht_Filters, "A5"))
 
 iec_limits = [
 	["IEC", "61000-3-6", "Harmonics", "THD", 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
