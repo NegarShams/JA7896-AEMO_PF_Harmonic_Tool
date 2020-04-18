@@ -178,16 +178,19 @@ class Excel:
 		self.log_info = print_info
 		self.log_error = print_error
 
-	def import_excel_harmonic_inputs(self, workbookname):  # Import Excel Harmonic Input Settings
+		# Value set to true if importing workbook is a success
+		self.import_success = False
+
+	def import_excel_harmonic_inputs(self, pth_workbook):  # Import Excel Harmonic Input Settings
 		"""
 			Import Excel Harmonic Input Settings
-		:param str workbookname: Name of workbook to be imported
+		:param str pth_workbook: Name of workbook to be imported
 		:return analysis_dict: Dictionary of the settings for the analysis work
 		"""
 		# Initialise empty dictionary
 		analysis_dict = dict()
 
-		# #wb = self.xl.Workbooks.Open(workbookname)  # Open workbook
+		# #wb = self.xl.Workbooks.Open(pth_workbook)  # Open workbook
 		# #c = self.excel_constants
 		# print(c.xlDown)
 		# #self.xl.Visible = False  # Make excel Visible
@@ -200,7 +203,7 @@ class Excel:
 			# TODO: Need to add something to capture when sheet name is missing
 			current_worksheet = x[0]
 			df = pd.read_excel(
-				workbookname, sheet_name=x[0], header=x[1], usecols=x[2], skiprows=x[3]
+				pth_workbook, sheet_name=x[0], header=x[1], usecols=x[2], skiprows=x[3]
 			)
 
 			row_input = []
@@ -266,7 +269,7 @@ class HASTInputs:
 	def __init__(self, hast_inputs=None, uid_time=time.strftime('%y_%m_%d_%H_%M_%S'), filename=''):
 		"""
 			Initialises the settings based on the HAST Study Settings spreadsheet
-		:param dict hast_inputs:  Dictionary of input data returned from excel_writing.Excel.import_excel_harmonic_inputs
+		:param dict hast_inputs:  Dictionary of input data returned from file_io.Excel.import_excel_harmonic_inputs
 		:param str uid_time:  Time string to use as the uid for these files
 		:param str filename:  Filename of the HAST Inputs file used from which this data is extracted
 		"""
@@ -444,7 +447,7 @@ class HASTInputs:
 	def process_filters(self, list_of_filters):
 		"""
 			Processes the filters from the HAST input into a list of all filters
-		:param list list_of_filters: List of handles to type excel_writing.FilterDetails
+		:param list list_of_filters: List of handles to type file_io.FilterDetails
 		:return None
 		"""
 		# Get handle for logger
@@ -872,5 +875,5 @@ class TestExcelSetup(unittest.TestCase):
 		input_file = os.path.join(pth, pth_test_files, test_workbook)
 
 		xl = Excel(print_info=print, print_error=print)
-		analysis_dict = xl.import_excel_harmonic_inputs(workbookname=input_file)
+		analysis_dict = xl.import_excel_harmonic_inputs(pth_workbook=input_file)
 		self.assertEqual(len(analysis_dict.keys()), 8)

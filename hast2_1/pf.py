@@ -96,7 +96,7 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	"""
 		Adds the filter detailed to the PF model
 	:param _app: handle to power factory application
-	:param excel_writing.FilterDetails filter_ref:  Handle to FilterDetails class form HAST import
+	:param file_io.FilterDetails filter_ref:  Handle to FilterDetails class form HAST import
 	:param float q:  MVAR value for filter
 	:param float freq:  Frequency value for filter
 	:param str filter_name:  Name of filter being added which includes associated contingency
@@ -308,7 +308,7 @@ class PFStudyCase:
 		"""
 			Create a load flow command in the study case so that the same settings will be run with the
 			frequency scan and HAST file so that there are no issues with non-convergence.
-		:param hast2_1.excel_writing.HASTInputs hast_inputs:
+		:param hast2_1.file_io.HASTInputs hast_inputs:
 		:param powerfactory.GetApplication app:  Handle to powerfactory application
 		:return None:
 		"""

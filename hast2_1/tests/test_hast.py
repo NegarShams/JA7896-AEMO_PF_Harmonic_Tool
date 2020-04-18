@@ -175,11 +175,11 @@ class TestHASTInputsProcessing(unittest.TestCase):
 	"""
 	def test_long_terminal_names(self):
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_long_term_names.xlsx')
-		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+		with TestModule.hast2.file_io.Excel(print_info=print, print_error=print) as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(
-				workbookname=hast_inputs_file)
+				pth_workbook=hast_inputs_file)
 		with self.assertRaises(ValueError):
-			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict)
+			TestModule.hast2.file_io.HASTInputs(hast_inputs=analysis_dict)
 
 	def test_duplicated_study_case_names(self):
 		"""
@@ -188,11 +188,11 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_study_cases.xlsx')
-		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+		with TestModule.hast2.file_io.Excel(print_info=print, print_error=print) as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(
-				workbookname=hast_inputs_file)
+				pth_workbook=hast_inputs_file)
 		with self.assertRaises(ValueError):
-			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+			TestModule.hast2.file_io.HASTInputs(hast_inputs=analysis_dict,
 													  filename=hast_inputs_file)
 
 	def test_duplicated_contingency_names(self):
@@ -202,11 +202,11 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_contingencies.xlsx')
-		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+		with TestModule.hast2.file_io.Excel(print_info=print, print_error=print) as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(
-				workbookname=hast_inputs_file)
+				pth_workbook=hast_inputs_file)
 		with self.assertRaises(ValueError):
-			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+			TestModule.hast2.file_io.HASTInputs(hast_inputs=analysis_dict,
 													  filename=hast_inputs_file)
 
 	def test_duplicated_terminals(self):
@@ -216,11 +216,11 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_terminals.xlsx')
-		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+		with TestModule.hast2.file_io.Excel(print_info=print, print_error=print) as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(
-				workbookname=hast_inputs_file)
+				pth_workbook=hast_inputs_file)
 		with self.assertRaises(ValueError):
-			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+			TestModule.hast2.file_io.HASTInputs(hast_inputs=analysis_dict,
 													  filename=hast_inputs_file)
 
 	def test_duplicated_filters(self):
@@ -230,11 +230,11 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_duplicated_filters.xlsx')
-		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+		with TestModule.hast2.file_io.Excel(print_info=print, print_error=print) as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(
-				workbookname=hast_inputs_file)
+				pth_workbook=hast_inputs_file)
 		with self.assertRaises(ValueError):
-			TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict,
+			TestModule.hast2.file_io.HASTInputs(hast_inputs=analysis_dict,
 													  filename=hast_inputs_file)
 
 	def test_missing_study_case_names(self):
@@ -245,11 +245,11 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_missing_study_case_names.xlsx')
-		with TestModule.hast2.excel_writing.Excel(print_info=print, print_error=print) as excel_cls:
+		with TestModule.hast2.file_io.Excel(print_info=print, print_error=print) as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(
-				workbookname=hast_inputs_file)
+				pth_workbook=hast_inputs_file)
 		# Get handle to hast
-		cls_hast = TestModule.hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict)
+		cls_hast = TestModule.hast2.file_io.HASTInputs(hast_inputs=analysis_dict)
 		# Confirm that length is only 1
 		self.assertTrue(len(cls_hast.sc_names) == 1)
 
@@ -262,4 +262,4 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		:return:
 		"""
 		hast_inputs_file = os.path.join(TESTS_DIR, 'HAST_Inputs_stage0.xlsx')
-		TestModule.hast2.excel_writing.HASTInputs(filename=hast_inputs_file)
+		TestModule.hast2.file_io.HASTInputs(filename=hast_inputs_file)

@@ -231,7 +231,7 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	"""
 		# Process the imported HAST results file into a dataframe with the relevant multi-index
 	:param str pth_file:  Full path to results that need importing
-	:param hast2_1.excel_writing.HASTInputs hast_inputs:  Handle to the HAST inputs data
+	:param hast2_1.file_io.HASTInputs hast_inputs:  Handle to the HAST inputs data
 	:param dict manual_adjustments:  Contains naming conversions to use for the variables if they need adjusting
 	:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
 	"""
@@ -617,7 +617,7 @@ def import_all_results(search_pth, hast_inputs, search_type='FS'):
 	"""
 		Function to import all results into a single DataFrame
 	:param str search_pth: Directory which contains the exported results files which are to be imported
-	:param hast2_1.excel_writing.HASTInputs hast_inputs:  Handle to the HAST inputs data
+	:param hast2_1.file_io.HASTInputs hast_inputs:  Handle to the HAST inputs data
 	:param str search_type: (Optional='FS') - Leading characters to use in search string
 	:return pd.DataFrame single_df:  Combined imported files into single DataFrame
 	"""
@@ -652,7 +652,7 @@ def get_hast_values(search_pth):
 	"""
 		Function to import the HAST inputs and return the class reference needed
 	:param str search_pth:  Directory which contains the HAST Inputs
-	:return hast2.excel_writing.HASTInputs processed_inputs:  Processed import
+	:return hast2.file_io.HASTInputs processed_inputs:  Processed import
 	"""
 	# Obtain reference to HAST workbook from target directory
 	c = constants.HASTInputs
@@ -673,13 +673,13 @@ def get_hast_values(search_pth):
 	else:
 		hast_inputs_workbook = list_of_input_files[0]
 
-	# Import HAST workbook using excel_writing import
-	# #with hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
-	excel_cls = hast2.excel_writing.Excel(print_info=logger.info, print_error=logger.error)
-	analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=hast_inputs_workbook)
+	# Import HAST workbook using file_io import
+	# #with hast2.file_io.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
+	excel_cls = hast2.file_io.Excel(print_info=logger.info, print_error=logger.error)
+	analysis_dict = excel_cls.import_excel_harmonic_inputs(pth_workbook=hast_inputs_workbook)
 
 	# Process the imported workbook into
-	processed_inputs = hast2.excel_writing.HASTInputs(analysis_dict)
+	processed_inputs = hast2.file_io.HASTInputs(analysis_dict)
 	logger.info('Inputs from HAST file: {} extracted'.format(hast_inputs_workbook))
 	return processed_inputs
 

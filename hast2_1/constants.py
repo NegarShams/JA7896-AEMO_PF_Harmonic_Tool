@@ -312,6 +312,28 @@ iec_limits = [
 # Format to use to mark debug log
 DEBUG = 'DEBUG'
 
+class GuiDefaults:
+	gui_title='PSC - Automated PowerFactory Frequency Scans Tool'
+	color_main_window = '#%02x%02x%02x' % (160, 216, 192)
+
+	# Default labels for buttons (only those which get changed during running)
+	button_select_settings_label = 'Select Settings File'
+
+	# Default extensions used in file type selection windows
+	xlsx_types = (('xlsx files', '*.xlsx'), ('All Files', '*.*'))
+
+	font_family = 'Helvetica'
+	psc_uk = 'PSC UK'
+	psc_phone = '\nPSC UK:  +44 1926 675 851'
+	psc_font = ('Calibri', '10', 'bold')
+	psc_color_web_blue = '#%02x%02x%02x' % (43, 112, 170)
+	psc_color_grey = '#%02x%02x%02x' % (89, 89, 89)
+
+	# Set to WPD green
+	color_main_window = '#%02x%02x%02x' % (160, 216, 192)
+	color_pop_up_window = 'light grey'
+
+
 class TestResultsExtract(unittest.TestCase):
 	"""
 		Unit Test to test the operation and constant definition of the Results Extract class

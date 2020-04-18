@@ -24,7 +24,7 @@ Code uses TABS for indenting rather than SPACES.
 
 Notepad ++ is a useful tool for viewing python coded (DM - recommends PyCharm instead as it conforms to PEP)
 Install Python 3.5 to your C:\ or D:\ drive. Do not install in C:\\programfiles  as the win32com module needs write
-	cess to create a cache and it wont have that in program files
+	access to create a cache and it wont have that in program files
 Use these commands to check Environment variables are setup correctly
 1. help("modules")
 	1.1 Check if powerfactory is in your modules, if not copy powerfactory python dll
@@ -375,7 +375,7 @@ def activate_stage(stage):
 def load_flow(hast_inputs, sc, studycase_name=''):		# Inputs load flow settings and executes load flow
 	"""
 		Run load flow in powerfactory
-	:param hast2_1.excel_writing.HASTInputs hast_inputs: 
+	:param hast2_1.file_io.HASTInputs hast_inputs: 
 	:param sc:  Studycase handle
 	:param str studycase_name:  Name of study case being run to include in error message reporting	
 	:return (int error_code, ldf): Error code provided by powerfactory determining its success, 
@@ -1297,7 +1297,7 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 def check_terminals(list_of_points, prj_name, sc_name): 		# This checks and creates the list of terminals to add to the Results file
 	"""
 		Creates list of terminals to be added to the results file
-	:param list list_of_points:  List of terminal references defined in excel_writing.TerminalDetails
+	:param list list_of_points:  List of terminal references defined in file_io.TerminalDetails
 	:param str prj_name:  Name of current project terminals being looked for in
 	:param str sc_name:  Name of study case currently being looked for in
 	:return: (list, bool) (terminals_index, terminals_error): (list of terminal indexes, 
@@ -1345,7 +1345,7 @@ def check_terminals(list_of_points, prj_name, sc_name): 		# This checks and crea
 						   .format(terminal.terminal, terminal.substation, prj_name, sc_name, terminal.name,
 								   terminals_in_substation[0]))
 
-		# Add PowerFactory handle reference to terminal class <excel_writing.TerminalDetails>
+		# Add PowerFactory handle reference to terminal class <file_io.TerminalDetails>
 		terminal.pf_handle = terminals_in_substation[0]
 		# Added to list of terminals_index for backwards compatibility
 		# TODO: Rather than adding to list here just add handle reference to class and deal with when needed
@@ -1425,7 +1425,7 @@ def check_contingencies(list_of_contingencies): 		# This checks and creates the 
 def check_filters(list_of_filters):			# Checks and creates list of terminals to add the Filters to
 	"""
 			Checks the status of each contingency
-		:param list list_of_filters: List of filters to be checked where each filter is of type excel_writing.FilterDetails
+		:param list list_of_filters: List of filters to be checked where each filter is of type file_io.FilterDetails
 		:return: List of filters to actually be studied 
 		"""
 	filters_ok = True
@@ -1598,13 +1598,13 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	Variation_Name = "Temporary_Variation" + start1
 
 	# Create excel instance to deal with retrieving import data from excel
-	# TODO: Make use of class in <hast2.excel_writing> for complete processing of inputs
-	# #with hast2.excel_writing.Excel(print_info=print1, print_error=print2) as excel_cls:
+	# TODO: Make use of class in <hast2.file_io> for complete processing of inputs
+	# #with hast2.file_io.Excel(print_info=print1, print_error=print2) as excel_cls:
 	# #	# Reads in the Settings from the spreadsheet
-	excel_cls = hast2.excel_writing.Excel(print_info=print1, print_error=print2)
-	analysis_dict = excel_cls.import_excel_harmonic_inputs(workbookname=import_workbook)
+	excel_cls = hast2.file_io.Excel(print_info=print1, print_error=print2)
+	analysis_dict = excel_cls.import_excel_harmonic_inputs(pth_workbook=import_workbook)
 	# TODO: Complete processing to convert everything to use class for processing
-	cls_hast_inputs = hast2.excel_writing.HASTInputs(hast_inputs=analysis_dict, uid_time=start1)
+	cls_hast_inputs = hast2.file_io.HASTInputs(hast_inputs=analysis_dict, uid_time=start1)
 
 	study_settings = analysis_dict[constants.HASTInputs.study_settings]
 	if len(study_settings) != 20:

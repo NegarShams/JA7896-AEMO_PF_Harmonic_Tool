@@ -25,6 +25,7 @@
       <w>krelax</w>
       <w>loadflow</w>
       <w>loadmax</w>
+      <w>messagebox</w>
       <w>mutelm</w>
       <w>netelm</w>
       <w>newcol</w>
@@ -42,6 +43,7 @@
       <w>plim</w>
       <w>pnight</w>
       <w>powerfactory</w>
+      <w>precase</w>
       <w>prot</w>
       <w>pspf</w>
       <w>rembar</w>
