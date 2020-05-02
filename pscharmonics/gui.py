@@ -16,8 +16,8 @@ import tkinter.ttk as ttk
 import sys
 import os
 import logging
-import hast2_1.constants as constants
-import hast2_1.file_io as file_io
+import pscharmonics.constants as constants
+import pscharmonics.file_io as file_io
 import inspect
 
 logger = logging.getLogger()

@@ -81,10 +81,10 @@ import distutils.version
 
 # HAST module package requires reload during code development since python does not reload itself
 # HAST module package used as functions start to be transferred for efficiency
-import hast2_1
-hast2 = importlib.reload(hast2_1)
-import hast2_1.constants as constants
-import hast2_1.pf as pf
+import pscharmonics
+hast2 = importlib.reload(pscharmonics)
+import pscharmonics.constants as constants
+import pscharmonics.pf as pf
 import Process_HAST_extract
 
 # Meta Data
@@ -1142,16 +1142,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 						net_element_folder = get_object(Net_Elm)[0]
 
 						# Check base case converges, otherwise skip all contingencies
-						cls_base_sc = hast2_1.pf.PFStudyCase(full_name=base_case_name,
-															 list_parameters=sc_list_parameters,
-															 cont_name=constants.HASTInputs.base_case,
-															 sc=sc_base,
-															 op=op_base,
-															 prj=_prj,
-															 task_auto=task_automation,
-															 uid=start1,
-															 base_case=True,
-															 results_pth=Temp_Results_Export)
+						cls_base_sc = pscharmonics.pf.PFStudyCase(full_name=base_case_name,
+																  list_parameters=sc_list_parameters,
+																  cont_name=constants.HASTInputs.base_case,
+																  sc=sc_base,
+																  op=op_base,
+																  prj=_prj,
+																  task_auto=task_automation,
+																  uid=start1,
+																  base_case=True,
+																  results_pth=Temp_Results_Export)
 
 						# Add load flow command to study case
 						cls_base_sc.create_load_flow(hast_inputs=Load_Flow_Setting,
@@ -1174,11 +1174,11 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 							objects_to_delete = [study_case_results_folder,
 												 _op_sc_results_folder,
 												 _variations_folder]
-							prj_dict[project_name] = hast2_1.pf.PFProject(name=project_name,
-																		  prj=_prj,
-																		  task_auto=task_automation,
-																		  folders=objects_to_delete,
-																		  include_mutual=Excel_Export_Z12)
+							prj_dict[project_name] = pscharmonics.pf.PFProject(name=project_name,
+																			   prj=_prj,
+																			   task_auto=task_automation,
+																			   folders=objects_to_delete,
+																			   include_mutual=Excel_Export_Z12)
 						prj_dict[project_name].sc_cases.append(cls_base_sc)
 						prj_dict[project_name].sc_base = sc_base
 
@@ -1225,16 +1225,16 @@ def check_list_of_studycases(list_to_check):		# Check List of Projects, Study Ca
 
 							# Create new class reference with all the details for this contingency and then add to
 							# list to be returned
-							_study_cls = hast2_1.pf.PFStudyCase(full_name=cont_name,
-																list_parameters=sc_list_parameters,
-																cont_name=new_contingency_list[cont_count][0],
-																sc=cont_study_case,
-																op=cont_scenario,
-																prj=_prj,
-																task_auto=task_automation,
-																uid=start1,
-																base_case=False,
-																results_pth=Temp_Results_Export)
+							_study_cls = pscharmonics.pf.PFStudyCase(full_name=cont_name,
+																	 list_parameters=sc_list_parameters,
+																	 cont_name=new_contingency_list[cont_count][0],
+																	 sc=cont_study_case,
+																	 op=cont_scenario,
+																	 prj=_prj,
+																	 task_auto=task_automation,
+																	 uid=start1,
+																	 base_case=False,
+																	 results_pth=Temp_Results_Export)
 							# Create load flow case and check if error
 							_study_cls.create_load_flow(hast_inputs=Load_Flow_Setting,
 														app=app)

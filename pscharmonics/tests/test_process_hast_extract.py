@@ -27,7 +27,7 @@ RESULTS_EXTRACT_3 = os.path.join(TESTS_DIR, 'Processed Hast Results3.xlsx')
 two_up = os.path.abspath(os.path.join(TESTS_DIR, '../..'))
 sys.path.append(two_up)
 import Process_HAST_extract as TestModule
-import hast2_1.constants as constants
+import pscharmonics.constants as constants
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
 # testing for this is done elsewhere and this takes longer to run.  Setting to false skips the longer tests.

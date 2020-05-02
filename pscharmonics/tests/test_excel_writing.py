@@ -1,5 +1,5 @@
 import unittest
-import hast2_1.file_io as TestModule
+import pscharmonics.file_io as TestModule
 import os
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the

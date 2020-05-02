@@ -9,11 +9,11 @@
 #######################################################################################################################
 """
 
-import hast2_1.logger
-import hast2_1.file_io
-import hast2_1.pf
-import hast2_1.constants
-import hast2_1.gui
+import pscharmonics.logger
+import pscharmonics.file_io
+import pscharmonics.pf
+import pscharmonics.constants
+import pscharmonics.gui
 
 # Meta Data
 __author__ = 'David Mills'

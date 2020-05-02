@@ -19,8 +19,8 @@ import pandas as pd
 import numpy as np
 import glob
 import logging
-import hast2_1 as hast2
-import hast2_1.constants as constants
+import pscharmonics as hast2
+import pscharmonics.constants as constants
 import time
 import collections
 import math

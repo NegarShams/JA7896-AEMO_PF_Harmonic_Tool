@@ -12,7 +12,7 @@
 
 import os
 import math
-import hast2_1.constants as constants
+import pscharmonics.constants as constants
 import multiprocessing
 import unittest
 import time

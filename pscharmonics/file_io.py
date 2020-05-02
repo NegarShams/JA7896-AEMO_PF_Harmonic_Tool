@@ -14,7 +14,7 @@ import os
 import time
 import numpy as np
 import itertools
-import hast2_1.constants as constants
+import pscharmonics.constants as constants
 import logging
 import pandas as pd
 

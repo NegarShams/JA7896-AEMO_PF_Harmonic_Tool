@@ -12,7 +12,7 @@
 """
 import logging
 import logging.handlers
-import hast2_1.constants as constants
+import pscharmonics.constants as constants
 import sys
 import os
 import unittest

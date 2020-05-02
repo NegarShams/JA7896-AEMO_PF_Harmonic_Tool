@@ -1,6 +1,6 @@
 import unittest
 import os
-import hast2_1.gui as test_module
+import pscharmonics.gui as test_module
 
 FULL_TEST = True
 
