@@ -375,7 +375,7 @@ def activate_stage(stage):
 def load_flow(hast_inputs, sc, studycase_name=''):		# Inputs load flow settings and executes load flow
 	"""
 		Run load flow in powerfactory
-	:param hast2_1.file_io.HASTInputs hast_inputs: 
+	:param hast2_1.file_io.StudyInputs hast_inputs: 
 	:param sc:  Studycase handle
 	:param str studycase_name:  Name of study case being run to include in error message reporting	
 	:return (int error_code, ldf): Error code provided by powerfactory determining its success, 

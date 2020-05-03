@@ -262,9 +262,9 @@ class Excel:
 		# #wb.Close()  # Close Workbook
 		return analysis_dict
 
-class HASTInputs:
+class StudyInputs:
 	"""
-		Class that the HAST Spreadsheet is fed into for processing
+		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
 	"""
 	def __init__(self, hast_inputs=None, uid_time=time.strftime('%y_%m_%d_%H_%M_%S'), filename=''):
 		"""
@@ -566,6 +566,105 @@ class HASTInputs:
 
 
 		return list(self.cont_details.keys())
+
+
+class StudySettings:
+	"""
+		Class contains the processing of each of the DataFrame items passed as part of the
+	"""
+	def __init__(self, sht=constants.HASTInputs.study_settings, wkbk=None, pth_file=None):
+		# Constants used as part of this
+		self.export_folder = str()
+		self.results_name = str()
+		self.pf_network_elm = str()
+		self.pre_case_check = bool()
+		self.delete_created_folders = bool()
+		self.export_to_excel = bool()
+		self.export_rx = bool()
+		self.export_mutual = bool()
+
+		self.c = constants.StudySettings
+		self.logger = logging.getLogger(constants.logger_name)
+
+		# Import workbook as dataframe
+		if wkbk is None:
+			if pth_file:
+				wkbk = pd.ExcelFile(pth_file)
+			else:
+				raise IOError('No workbook or path to file provided')
+
+		# Import Study settings into a DataFrame and process
+		self.df = pd.read_excel(wkbk, sheet_name=sht, index_col=0, usecols=(0, 1), skiprows=4, header=None, squeeze=True)
+
+	def process_inputs(self):
+		""" Process all of the inputs into attributes of the class """
+		# Process results_folder
+		self.export_folder = self.process_export_folder()
+		# TODO: Got to here, need to process rest of settings
+
+	def process_export_folder(self, def_value=os.path.join(os.path.dirname(__file__), '..')):
+		"""
+			Process the export folder and if a blank value is provided then use the default value
+		:param str def_value:  Default path to use
+		:return str folder:
+		"""
+		# Get folder from DataFrame, if empty or invalid path then use default folder
+		folder = self.df.loc[self.c.export_folder]
+		# Normalise path
+		def_value = os.path.normpath(def_value)
+
+		if not folder:
+			# If no folder provided then use default value
+			folder = os.path.normpath(def_value)
+		elif not os.path.isdir(os.path.dirname(folder)):
+			# If folder provided but not a valid directory for display warning message to user and use default directory
+			self.logger.warning((
+				'The parent directory for the results export path: {} does not exist and therefore the default directory '
+				'of {} has been used instead'
+			).format(os.path.dirname(folder), def_value))
+			folder = def_value
+
+		# Check if target directory exists and if not create
+		if not os.path.isdir(folder):
+			os.mkdir(folder)
+			self.logger.info('The directory for the results {} does not exist but has been created'.format(folder))
+
+		return folder
+
+
+
+
+
+
+class StudyInputsDev:
+	"""
+		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
+	"""
+	def __init__(self, pth_file=None):
+		"""
+			Initialises the settings based on the Study Settings spreadsheet
+		:param str file_name:  Path to input settings file
+		"""
+		# General constants
+		self.pth = pth_file
+		self.filename = os.path.basename(pth_file)
+
+
+
+	def study_settings(self, sht=constants.HASTInputs.study_settings, wkbk=None):
+		"""
+			Populate study settings
+		:param str sht:  Sheet to import which contains the study settings
+		:param pd.ExcelFile wkbk: (optional=None), if workbook provided then will import from that instead which will be
+									faster
+		"""
+		# Import workbook as dataframe
+		if wkbk is None:
+			wkbk = pd.ExcelFile(self.filename)
+
+		# Import Study settings into a DataFrame and process
+		df = pd.read_excel(wkbk, sheet_name=sht, index_col=0, usecols=(0, 1), skiprows=4)
+
 
 class StudyCaseDetails:
 	def __init__(self, list_of_parameters):

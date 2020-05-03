@@ -333,6 +333,15 @@ class GuiDefaults:
 	color_main_window = '#%02x%02x%02x' % (160, 216, 192)
 	color_pop_up_window = 'light grey'
 
+class StudySettings:
+	export_folder = 'Results_Export_Folder'
+	results_name = 'Excel_Results'
+	pf_network_elm = 'Net_Elm'
+	pre_case_check = 'Pre_Case_Check'
+	delete_created_folders = 'Delete_Created_Folders'
+	export_to_excel = 'Export_to_Excel'
+	export_rx = 'Excel_Export_RX'
+	export_mutual = 'Excel_Export_Z12'
 
 class TestResultsExtract(unittest.TestCase):
 	"""

@@ -18,8 +18,8 @@ class TestHASTInputs(unittest.TestCase):
 		with TestModule.Excel() as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(pth_workbook=hast_inputs_file)  # Reads in the Settings from the spreadsheet
 
-		cls_hast_inputs = TestModule.HASTInputs(hast_inputs=analysis_dict,
-												uid_time='HAST Inputs v1_2')
+		cls_hast_inputs = TestModule.StudyInputs(hast_inputs=analysis_dict,
+												 uid_time='HAST Inputs v1_2')
 		print(cls_hast_inputs.list_of_terms)
 		self.assertTrue(cls_hast_inputs.list_of_terms[0][3])
 	def test_hast_inputs_v2_1_3(self):
@@ -31,7 +31,7 @@ class TestHASTInputs(unittest.TestCase):
 		with TestModule.Excel() as excel_cls:
 			analysis_dict = excel_cls.import_excel_harmonic_inputs(pth_workbook=hast_inputs_file)  # Reads in the Settings from the spreadsheet
 
-		cls_hast_inputs = TestModule.HASTInputs(hast_inputs=analysis_dict,
-												uid_time='HAST Inputs v2_1_3')
+		cls_hast_inputs = TestModule.StudyInputs(hast_inputs=analysis_dict,
+												 uid_time='HAST Inputs v2_1_3')
 		print(cls_hast_inputs.list_of_terms)
 		self.assertFalse(cls_hast_inputs.list_of_terms[0][3])

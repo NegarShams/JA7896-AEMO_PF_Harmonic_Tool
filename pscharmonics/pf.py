@@ -308,7 +308,7 @@ class PFStudyCase:
 		"""
 			Create a load flow command in the study case so that the same settings will be run with the
 			frequency scan and HAST file so that there are no issues with non-convergence.
-		:param hast2_1.file_io.HASTInputs hast_inputs:
+		:param hast2_1.file_io.StudyInputs hast_inputs:
 		:param powerfactory.GetApplication app:  Handle to powerfactory application
 		:return None:
 		"""
