@@ -586,21 +586,45 @@ class StudySettings:
 		self.c = constants.StudySettings
 		self.logger = logging.getLogger(constants.logger_name)
 
+		# Unique identifier created from the filename
+		self.uid = time.strftime('%y%m%d_%H%M%S')
+
+		# Sheet name
+		self.sht = sht
+
 		# Import workbook as dataframe
 		if wkbk is None:
 			if pth_file:
 				wkbk = pd.ExcelFile(pth_file)
+				self.pth = pth_file
 			else:
 				raise IOError('No workbook or path to file provided')
+		else:
+			# Get workbook path in case path has not been provided
+			self.pth = wkbk.io
 
 		# Import Study settings into a DataFrame and process
-		self.df = pd.read_excel(wkbk, sheet_name=sht, index_col=0, usecols=(0, 1), skiprows=4, header=None, squeeze=True)
+		self.df = pd.read_excel(
+			wkbk, sheet_name=self.sht, index_col=0, usecols=(0, 1), skiprows=4, header=None, squeeze=True
+		)
 
 	def process_inputs(self):
 		""" Process all of the inputs into attributes of the class """
 		# Process results_folder
 		self.export_folder = self.process_export_folder()
-		# TODO: Got to here, need to process rest of settings
+		self.results_name = self.process_result_name()
+		self.pf_network_elm = self.process_net_elements()
+
+		self.pre_case_check = self.process_booleans(key=self.c.pre_case_check)
+		self.delete_created_folders = self.process_booleans(key=self.c.delete_created_folders)
+		self.export_to_excel = self.process_booleans(key=self.c.export_to_excel)
+		self.export_rx = self.process_booleans(key=self.c.export_rx)
+		self.export_mutual = self.process_booleans(key=self.c.export_mutual)
+
+		# Sanity check for Boolean values
+		self.boolean_sanity_check()
+
+		return None
 
 	def process_export_folder(self, def_value=os.path.join(os.path.dirname(__file__), '..')):
 		"""
@@ -631,9 +655,99 @@ class StudySettings:
 
 		return folder
 
+	def process_result_name(self, def_value=constants.StudySettings.def_results_name):
+		"""
+			Processes the results file name
+		:param str def_value:  (optional) Default value to use
+		:return str results_name:
+		"""
+		results_name = self.df.loc[self.c.results_name]
 
+		if not results_name:
+			# If no value provided then use default value
+			self.logger.warning((
+				'No value provided in the Input Settings for the results name and so the default value of {} will be '
+				'used instead'
+			).format(def_value)
+			)
+			results_name = def_value
 
+		# Add study_time to end of results name
+		results_name = '{}_{}{}'.format(results_name, self.uid, constants.Extensions.excel)
 
+		return results_name
+
+	def process_net_elements(self):
+		"""
+			Processes the details of the folder that contains all the network elements with the appropriate extension
+		:return str net_elements:
+		"""
+		network_folder = str(self.df.loc[self.c.pf_network_elm])
+
+		# TODO: Check if there is an alternative way to handle these network element folders
+		if network_folder == '':
+			raise ValueError(
+				'No value has been provided for the network element folder and it is therefore not possible to identify '
+				'the relevant components in PowerFactory'
+			)
+
+		if not network_folder.endswith(constants.PowerFactory.pf_network_elements):
+			network_folder = '{}.{}'.format(network_folder, constants.PowerFactory.pf_network_elements)
+
+		return network_folder
+
+	def process_booleans(self, key):
+		"""
+			Function imports the relevant boolean value and confirms it is either True / False, if empty then just
+			raises warning message to the user
+		:param str key:
+		:return bool value:
+		"""
+		# Get folder from DataFrame, if empty or invalid path then use default folder
+		value = self.df.loc[key]
+
+		if value == '':
+			value = False
+			self.logger.warning(
+				(
+					'No value has been provided for key item <{}> in worksheet <{}> of the input file <{}> and so '
+					'{} will be assumed'
+				).format(
+					key, self.sht, self.pth, value
+				)
+			)
+		else:
+			# Ensure value is a suitable Boolean
+			value = bool(value)
+
+		return value
+
+	def boolean_sanity_check(self):
+		"""
+			Function to check if any of the input Booleans have not been set which require something to be set for
+			results to be of any use.
+
+			Throws an error if nothing suitable / logs a warning message
+
+		:return None:
+		"""
+
+		if not self.export_to_excel and self.delete_created_folders:
+			self.logger.critical((
+				'Your input settings for {} = {} means that no results are exported.  However, you are also deleting '
+				'all the created results with the command {} = {}.  This is probably not what you meant to happen so '
+				'I am stopping here for you to correct your inputs!').format(
+				self.c.export_to_excel, self.export_to_excel, self.c.delete_created_folders, self.delete_created_folders)
+			)
+			raise ValueError('Your input settings mean nothing would be produced')
+
+		if not self.pre_case_check:
+			self.logger.warning((
+				'You have opted not to run a pre-case check with the input {} = {}, this means that if there are any '
+				'issues with an individual contingency the entire studyset may fail'
+			).format(self.c.pre_case_check, self.pre_case_check))
+
+		return None
 
 
 class StudyInputsDev:
@@ -649,22 +763,10 @@ class StudyInputsDev:
 		self.pth = pth_file
 		self.filename = os.path.basename(pth_file)
 
-
-
-	def study_settings(self, sht=constants.HASTInputs.study_settings, wkbk=None):
-		"""
-			Populate study settings
-		:param str sht:  Sheet to import which contains the study settings
-		:param pd.ExcelFile wkbk: (optional=None), if workbook provided then will import from that instead which will be
-									faster
-		"""
-		# Import workbook as dataframe
-		if wkbk is None:
-			wkbk = pd.ExcelFile(self.filename)
-
-		# Import Study settings into a DataFrame and process
-		df = pd.read_excel(wkbk, sheet_name=sht, index_col=0, usecols=(0, 1), skiprows=4)
-
+		with pd.ExcelFile(io=self.pth) as wkbk:
+			# Import StudySettings
+			self.settings = StudySettings(wkbk=wkbk)
+			# TODO: Need to write importers for rest of StudySettings
 
 class StudyCaseDetails:
 	def __init__(self, list_of_parameters):

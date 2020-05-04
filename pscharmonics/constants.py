@@ -334,6 +334,8 @@ class GuiDefaults:
 	color_pop_up_window = 'light grey'
 
 class StudySettings:
+	# Names for index in Inputs spreadsheet
+	# TODO: Ensure first column is locked to prevent any changes.
 	export_folder = 'Results_Export_Folder'
 	results_name = 'Excel_Results'
 	pf_network_elm = 'Net_Elm'
@@ -342,6 +344,14 @@ class StudySettings:
 	export_to_excel = 'Export_to_Excel'
 	export_rx = 'Excel_Export_RX'
 	export_mutual = 'Excel_Export_Z12'
+
+	# Default values
+	def_results_name = 'Results_'
+
+
+class Extensions:
+	""" Default extension """
+	excel = '.xlsx'
 
 class TestResultsExtract(unittest.TestCase):
 	"""
