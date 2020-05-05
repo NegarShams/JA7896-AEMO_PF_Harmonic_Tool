@@ -22,6 +22,57 @@ class TestInputs(unittest.TestCase):
 		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		cls.inputs = pscharmonics.file_io.StudyInputsDev(pth_file=pth_inputs)
 
+	def test_study_case_no_inputs(self):
+		""" Confirm that if no inputs provided then will raise error """
+		self.assertRaises(IOError, self.inputs.process_study_cases)
+
+	def test_study_case_duplicated_input(self):
+		""" Confirm is processed correctly """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		dict_cases = self.inputs.process_study_cases(pth_file=pth_inputs)
+
+		# Confirm length as expected
+		self.assertEqual(len(dict_cases), 2)
+
+		# Confirm keys as expected and in correct order
+		self.assertEqual(list(dict_cases.keys())[1], 'BASE(1)')
+
+	def test_overall_import(self):
+		""" Spot check some of the values are as expected """
+
+		self.assertEqual(self.inputs.cases['BASE'].name, 'BASE')
+
+
+
+class GeneralTests(unittest.TestCase):
+	"""
+		This class is for testing functions which are stand-alone and not part of any
+		of the other classes being tested
+	"""
+	def test_duplicate_entry_updates(self):
+		""" Test that duplicate entries in a DataFrame are correctly changed """
+		# Create dataset for testing
+		key = 'KEY'
+		data = [['A', 1, 2],['B',2,3],['A',5,6]]
+		columns = ('KEY', 'OTHER', 'OTHER2')
+
+		df_original = pd.DataFrame(data=data, columns=columns)
+		df_new, updated = pscharmonics.file_io.update_duplicates(key=key, df=df_original)
+
+		# Confirm no changes in shape after update
+		self.assertEqual(df_original.shape, df_new.shape)
+		self.assertTrue(updated)
+		print(df_new)
+		# Confirm a single value
+		self.assertTrue('A(1)' in df_new[key].values)
+
+		# Confirm order remains the same
+		self.assertTrue(df_original.index.equals(df_new.index))
+
+
+		# Repeat test with new DataFrame and confirm get no update
+		_, updated = pscharmonics.file_io.update_duplicates(key=key, df=df_new)
+		self.assertFalse(updated)
 
 class TestStudySettings(unittest.TestCase):
 	"""
@@ -160,7 +211,4 @@ class TestStudySettings(unittest.TestCase):
 
 		# Test just confirms that runs correctly
 		self.assertIsNone(study_settings.process_inputs())
-
-
-
 

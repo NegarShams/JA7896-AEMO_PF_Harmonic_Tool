@@ -17,6 +17,7 @@ import itertools
 import pscharmonics.constants as constants
 import logging
 import pandas as pd
+import collections
 
 
 # Meta Data
@@ -573,6 +574,12 @@ class StudySettings:
 		Class contains the processing of each of the DataFrame items passed as part of the
 	"""
 	def __init__(self, sht=constants.HASTInputs.study_settings, wkbk=None, pth_file=None):
+		"""
+			Process the worksheet to extract the relevant StudyCase details
+		:param str sht:  (optional) Name of worksheet to use
+		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
+		:param str pth_file: (optional) Handle to workbook
+		"""
 		# Constants used as part of this
 		self.export_folder = str()
 		self.results_name = str()
@@ -762,11 +769,98 @@ class StudyInputsDev:
 		# General constants
 		self.pth = pth_file
 		self.filename = os.path.basename(pth_file)
+		self.logger = logging.getLogger(constants.logger_name)
 
 		with pd.ExcelFile(io=self.pth) as wkbk:
 			# Import StudySettings
 			self.settings = StudySettings(wkbk=wkbk)
+			self.cases = self.process_study_cases(wkbk=wkbk)
 			# TODO: Need to write importers for rest of StudySettings
+
+	def process_study_cases(self, sht=constants.HASTInputs.study_cases, wkbk=None, pth_file=None):
+		"""
+			Function imports the DataFrame of study cases and then separates each one into it's own study case.  These
+			are then returned as a dictionary with the name being used as the key.
+
+			These inputs are based on the Scenarios detailed in the Inputs spreadsheet
+
+			:param str sht:  (optional) Name of worksheet to use
+			:param pd.ExcelFile wkbk:  (optional) Handle to workbook
+			:param str pth_file: (optional) Handle to workbook
+		:return dict study_cases:
+		"""
+
+		# Import workbook as dataframe
+		if wkbk is None:
+			if pth_file:
+				wkbk = pd.ExcelFile(pth_file)
+				self.pth = pth_file
+			else:
+				raise IOError('No workbook or path to file provided')
+		else:
+			# Get workbook path in case path has not been provided
+			self.pth = wkbk.io
+
+		# Import Study settings into a DataFrame and process, do not need to worry about unique columns since done by
+		# position
+		df = pd.read_excel(wkbk, sheet_name=sht, skiprows=3, header=0, usecols=(0, 1, 2, 3))
+		cols = df.columns
+
+		# Process df names to confirm unique
+		name_key = cols[0]
+		df, updated = update_duplicates(key=name_key, df=df)
+
+		if updated:
+			self.logger.warning(
+				(
+					'Duplicated names for StudyCases provided in the column {} of worksheet <{}> and so some have been '
+					'renamed so the new list of names is:\n\t{}'
+				).format(name_key, sht, '\n\t'.join(df[name_key].values))
+			)
+
+		# Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in order
+		study_cases = collections.OrderedDict()
+		for key, item in df.iterrows():
+			new_case = StudyCaseDetails(list_of_parameters=item.values)
+			study_cases[new_case.name] = new_case
+
+		return study_cases
+
+
+def update_duplicates(key, df):
+	"""
+		Function will look for any duplicates in a particular column and then append a number to everything after
+		the first one
+	:param str key:  Column to lookup
+	:param pd.DataFrame df: DataFrame to be processed
+	:return pd.DataFrame, bool df_updated, updated: Updated DataFrame and status flag to show updated for log messages
+	"""
+	# Empty list and initialised value to show no changes
+	dfs = list()
+	updated = False
+
+	# Group data frame by key value
+	# TODO: Do we need to ensure the order of the overall DataFrame remains unchanged
+	for _, df_group in df.groupby(key):
+		# Extract all key values into list and then loop through to append new value
+		names = list(df_group[key])
+		if len(names) > 1:
+			updated = True
+			# Check if number of entries is greater than 1, i.e. duplicated
+			for i in range(1, len(names)):
+				names[i] = '{}({})'.format(names[i], i)
+
+		# Produce new DataFrame with updated names and add to list
+		df_updated = df_group
+		df_updated[key] = names
+		dfs.append(df_updated)
+
+	# Combine returned DataFrames
+	df_updated = pd.concat(dfs)
+	# Ensure order remains as originally
+	df_updated.sort_index(axis=0, inplace=True)
+
+	return df_updated, updated
 
 class StudyCaseDetails:
 	def __init__(self, list_of_parameters):
