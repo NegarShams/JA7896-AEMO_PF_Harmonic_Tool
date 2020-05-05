@@ -775,7 +775,23 @@ class StudyInputsDev:
 			# Import StudySettings
 			self.settings = StudySettings(wkbk=wkbk)
 			self.cases = self.process_study_cases(wkbk=wkbk)
+			self.contingencies = self.process_contingencies(wkbk=wkbk)
 			# TODO: Need to write importers for rest of StudySettings
+
+	def load_workbook(self, pth_file=None):
+		"""
+			Function to load the workbook and return a handle to it
+		:param str pth_file: (optional) File path to workbook
+		:return pd.ExcelFile wkbk: Handle to workbook
+		"""
+		if pth_file:
+			# Load the workbook using pd.ExcelFile and return the reference to the workbook
+			wkbk = pd.ExcelFile(pth_file)
+			self.pth = pth_file
+		else:
+			raise IOError('No workbook or path to file provided')
+
+		return wkbk
 
 	def process_study_cases(self, sht=constants.HASTInputs.study_cases, wkbk=None, pth_file=None):
 		"""
@@ -792,14 +808,7 @@ class StudyInputsDev:
 
 		# Import workbook as dataframe
 		if wkbk is None:
-			if pth_file:
-				wkbk = pd.ExcelFile(pth_file)
-				self.pth = pth_file
-			else:
-				raise IOError('No workbook or path to file provided')
-		else:
-			# Get workbook path in case path has not been provided
-			self.pth = wkbk.io
+			wkbk = self.load_workbook(pth_file=pth_file)
 
 		# Import Study settings into a DataFrame and process, do not need to worry about unique columns since done by
 		# position
@@ -815,7 +824,7 @@ class StudyInputsDev:
 				(
 					'Duplicated names for StudyCases provided in the column {} of worksheet <{}> and so some have been '
 					'renamed so the new list of names is:\n\t{}'
-				).format(name_key, sht, '\n\t'.join(df[name_key].values))
+				).format(name_key, sht, '\n\t'.join(df.loc[:, name_key].values))
 			)
 
 		# Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in order
@@ -825,6 +834,91 @@ class StudyInputsDev:
 			study_cases[new_case.name] = new_case
 
 		return study_cases
+
+	def process_contingencies(self, sht=constants.HASTInputs.contingencies, wkbk=None, pth_file=None):
+		"""
+			Function imports the DataFrame of study cases and then separates each one into it's own study case.  These
+			are then returned as a dictionary with the name being used as the key.
+
+			These inputs are based on the Scenarios detailed in the Inputs spreadsheet
+
+		:param str sht:  (optional) Name of worksheet to use
+		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
+		:param str pth_file: (optional) File path to workbook
+		:return dict study_cases:
+		"""
+
+		# Import workbook as dataframe
+		if wkbk is None:
+			wkbk = self.load_workbook(pth_file=pth_file)
+
+		# Import Contingencies into a DataFrame and process, do not need to worry about unique columns since done by
+		# position
+		df = pd.read_excel(wkbk, sheet_name=sht, skiprows=2, header=(0, 1))
+		cols = df.columns
+
+		# Process df names to confirm unique
+		name_key = cols[0]
+		df, updated = update_duplicates(key=name_key, df=df)
+
+		if updated:
+			self.logger.warning(
+				(
+					'Duplicated names for Contingencies provided in the column {} of worksheet <{}> and so some have been '
+					'renamed and the new list of names is:\n\t{}'
+				).format(name_key, sht, '\n\t'.join(df.loc[:, name_key].values))
+			)
+
+		# Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in order
+		contingencies = collections.OrderedDict()
+		for key, item in df.iterrows():
+			cont = ContingencyDetails(list_of_parameters=item.values)
+			contingencies[cont.name] = cont
+
+		return contingencies
+
+	def process_terminals(self, sht=constants.HASTInputs.terminals, wkbk=None, pth_file=None):
+		"""
+			Function imports the DataFrame of terminals.
+			These are then returned as a dictionary with the name being used as the key.
+
+			These inputs are based on the Scenarios detailed in the Inputs spreadsheet
+
+		:param str sht:  (optional) Name of worksheet to use
+		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
+		:param str pth_file: (optional) File path to workbook
+		:return dict study_cases:
+		"""
+
+		# Import workbook as dataframe
+		if wkbk is None:
+			wkbk = self.load_workbook(pth_file=pth_file)
+
+		# Import Contingencies into a DataFrame and process, do not need to worry about unique columns since done by
+		# position
+		df = pd.read_excel(wkbk, sheet_name=sht, skiprows=3, header=0)
+		cols = df.columns
+
+		# Process df names to confirm unique
+		name_key = cols[0]
+		df, updated = update_duplicates(key=name_key, df=df)
+
+		if updated:
+			self.logger.warning(
+				(
+					'Duplicated names for Terminals provided in the column {} of worksheet <{}> and so some have been '
+					'renamed and the new list of names is:\n\t{}'
+				).format(name_key, sht, '\n\t'.join(df.loc[:, name_key].values))
+			)
+
+		# Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in order
+		terminals = collections.OrderedDict()
+		for key, item in df.iterrows():
+			term = TerminalDetails(list_of_parameters=item.values)
+			terminals[term.name] = term
+
+		return terminals
+
 
 
 def update_duplicates(key, df):
@@ -843,7 +937,7 @@ def update_duplicates(key, df):
 	# TODO: Do we need to ensure the order of the overall DataFrame remains unchanged
 	for _, df_group in df.groupby(key):
 		# Extract all key values into list and then loop through to append new value
-		names = list(df_group[key])
+		names = list(df_group.loc[:, key])
 		if len(names) > 1:
 			updated = True
 			# Check if number of entries is greater than 1, i.e. duplicated
@@ -851,8 +945,9 @@ def update_duplicates(key, df):
 				names[i] = '{}({})'.format(names[i], i)
 
 		# Produce new DataFrame with updated names and add to list
-		df_updated = df_group
-		df_updated[key] = names
+		# (copy statement to avoid updating original dataframe during loop)
+		df_updated = df_group.copy()
+		df_updated.loc[:, key] = names
 		dfs.append(df_updated)
 
 	# Combine returned DataFrames
@@ -896,19 +991,28 @@ class TerminalDetails:
 	"""
 		Details for each terminal that data is required for from HAST processing
 	"""
-	def __init__(self, name, substation, terminal, include_mutual=True):
+	def __init__(self, name=str(), substation=str(), terminal=str(), include_mutual=True, list_of_parameters=list()):
 		"""
+			Process each terminal
+		:param list list_of_parameters: (optional=none)
 		:param str name:  HAST Input name to use
 		:param str substation:  Name of substation within which terminal is contained
 		:param str terminal:   Name of terminal in substation
 		:param bool include_mutual:  (optional=True) - If mutual impedance data is not required for this terminal then
 			set to False
 		"""
+
+		if len(list_of_parameters) > 0:
+			name = str(list_of_parameters[0])
+			substation = str(list_of_parameters[1])
+			terminal = str(list_of_parameters[2])
+			include_mutual = bool(list_of_parameters[3])
+
+		# TODO: Add in processing of terminals and substation elements here?
 		self.name = name
 		self.substation = substation
 		self.terminal = terminal
 		self.include_mutual = include_mutual
-		# Reference to PowerFactory established as part of HAST_V2_1.check_terminals
 		self.pf_handle = None
 
 class FilterDetails:
@@ -1153,22 +1257,3 @@ class LFSettings:
 		self.rembar = pf_term
 
 		return None
-
-#  ----- UNIT TESTS -----
-class TestExcelSetup(unittest.TestCase):
-	"""
-		UnitTest to test the operation of various excel workbook functions
-	"""
-
-	def test_hast_settings_import(self):
-		"""
-			Tests that excel will import setting appropriately
-		"""
-		pth = os.path.dirname(os.path.abspath(__file__))
-		pth_test_files = 'tests'
-		test_workbook = 'HAST_Inputs.xlsx'
-		input_file = os.path.join(pth, pth_test_files, test_workbook)
-
-		xl = Excel(print_info=print, print_error=print)
-		analysis_dict = xl.import_excel_harmonic_inputs(pth_workbook=input_file)
-		self.assertEqual(len(analysis_dict.keys()), 8)

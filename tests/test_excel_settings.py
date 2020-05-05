@@ -5,6 +5,7 @@
 import unittest
 import os
 import pandas as pd
+import math
 
 from .context import pscharmonics
 
@@ -212,3 +213,49 @@ class TestStudySettings(unittest.TestCase):
 		# Test just confirms that runs correctly
 		self.assertIsNone(study_settings.process_inputs())
 
+class TestContingencies(unittest.TestCase):
+	""" Class to deal with testing the reading and processing of contingencies """
+	@classmethod
+	def setUpClass(cls):
+		# Shortening of reference to class and functions under test
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		cls.test_cls = pscharmonics.file_io.StudyInputsDev(pth_inputs)
+
+	def test_dataframe_import_from_file(self):
+		""" Confirm DataFrame imported when loaded using a file """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+
+		contingencies = self.test_cls.process_contingencies(pth_file=pth_inputs)
+
+		# Confirm contingencies are all base case
+		self.assertTrue('Base_Case(1)' in contingencies.keys())
+
+		couplers = contingencies['Base_Case'].couplers
+		for coupler in couplers:
+			self.assertTrue(math.isnan(coupler.breaker))
+			self.assertTrue(math.isnan(coupler.status))
+
+
+class TestTerminals(unittest.TestCase):
+	""" Class to deal with testing the reading and processing of terminals """
+	@classmethod
+	def setUpClass(cls):
+		# Shortening of reference to class and functions under test
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		cls.test_cls = pscharmonics.file_io.StudyInputsDev(pth_inputs)
+
+	def test_dataframe_import_from_file(self):
+		""" Confirm DataFrame imported when loaded using a file """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		test_term = 'Dunstown'
+
+		terminals = self.test_cls.process_terminals(pth_file=pth_inputs)
+
+		# Confirm contingencies are all base case
+		self.assertTrue(test_term in terminals.keys())
+
+		terminal = terminals[test_term]
+		self.assertEqual(terminal.name, test_term)
+		self.assertEqual(terminal.substation, test_term)
+		self.assertEqual(terminal.terminal, '220 kV A1')
+		self.assertFalse(terminal.include_mutual, '220 kV A1')
