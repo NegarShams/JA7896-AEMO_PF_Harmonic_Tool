@@ -1,7 +1,10 @@
 import unittest
-import HAST_V2_1 as TestModule
 import os
 import shutil
+
+from .context import pscharmonics
+import pscharmonics.pf as TestModule
+
 
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
 # testing for this is done elsewhere and this takes longer to run.  Setting to false skips the longer tests.
@@ -9,6 +12,10 @@ FULL_TEST = True
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 TestModule.DEBUG_MODE=True
+
+
+class TestPFInitialisation(unittest.TestCase):
+	""" Tests that the correct python version can be found """
 
 
 # ----- UNIT TESTS -----

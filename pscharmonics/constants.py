@@ -12,7 +12,10 @@
 import pandas as pd
 import numpy as np
 import os
+import sys
 import unittest
+import glob
+import logging
 
 # Meta Data
 __author__ = 'David Mills'
@@ -21,7 +24,7 @@ __phone__ = '+44 7899 984158'
 __status__ = 'Constants'
 
 nom_freq = 50.0
-logger_name = None
+logger_name = str()
 
 # When parallel processing will ensure this number of cpus are kept free
 cpu_keep_free = 1
@@ -142,6 +145,66 @@ class PowerFactory:
 		shift_time = 'iopt_rscl'
 		# Filter time of results (0 = None, 1 = filter)
 		filtered_time = 'filtered'
+
+	def __init__(self, year='2019', service_pack='5'):
+		"""
+			Initialises the relevant python paths depending on the version that has been loaded
+		:param str year: Year of version to use
+		:param str service_pack: Service pack to use
+		"""
+		# Get reference to logger
+		self.logger = logging.getLogger(logger_name)
+
+		default_install_directory = r'C:\Program Files\DIgSILENT'
+		power_factory_search = 'PowerFactory 20*'
+
+		# Target PowerFactory version =
+		if service_pack:
+			self.target_power_factory = 'PowerFactory {} SP{}'.format(year, service_pack)
+		else:
+			self.target_power_factory = 'PowerFactory {}'.format(year)
+
+		# Find all PowerFactory versions installed in this location
+		power_factory_paths = glob.glob(os.path.join(default_install_directory, power_factory_search))
+		power_factory_versions = [os.path.basename(x) for x in power_factory_paths]
+		power_factory_versions.sort()
+
+		# Check if target version exists in list
+		if self.target_power_factory not in power_factory_versions:
+			self.logger.error(
+				(
+					'The selected python version: {} cannot be found, only the following versions are available:\n\t{}\n'
+					'The script is going to try and continue with the use of the following version: {}'
+				.format(self.target_power_factory, '\n\t'.join(power_factory_versions), power_factory_versions[-1])
+				)
+			)
+			self.target_power_factory = power_factory_versions[-1]
+			# Gets the last version in an ascending list
+		self.dig_path = os.path.join(default_install_directory, self.target_power_factory)
+
+		# Now checks for Python versions within this PowerFactory
+		current_python_version = '{}.{}'.format(sys.version_info.major, sys.version_info.minor)
+
+		self.dig_python_path = os.path.join(self.dig_path, 'Python', current_python_version)
+		if not os.path.isdir(self.dig_python_path):
+			# Get list of supported python versions
+			list_of_available_versions = glob.glob(os.path.join(self.dig_path, 'Python', '*'))
+			self.logger.critical(
+				(
+					'You are running python version: {} but only the following versions are supported by this version of'
+					'PowerFactory ({}):\n\t{}'
+				).format(current_python_version, self.target_power_factory, '\n\t'.join(list_of_available_versions))
+			)
+			raise EnvironmentError('Incompatible Python version')
+
+
+
+
+
+
+
+
+
 
 class ResultsExtract:
 	"""
