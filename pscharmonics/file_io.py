@@ -919,8 +919,6 @@ class StudyInputsDev:
 
 		return terminals
 
-
-
 def update_duplicates(key, df):
 	"""
 		Function will look for any duplicates in a particular column and then append a number to everything after
@@ -1257,3 +1255,36 @@ class LFSettings:
 		self.rembar = pf_term
 
 		return None
+
+class ResultsExport:
+	"""
+		Class to deal with handling of the results that are created
+	"""
+	def __init__(self, pth, name):
+		"""
+			Initialises, if path passed then results saved there
+		:param str pth:  Path to where the results should be saved
+		:param str name:  Name that should be used for the results file
+		"""
+		self.logger = logging.getLogger(constants.logger_name)
+
+		self.parent_pth = pth
+		self.results_name = name
+
+		self.results_folder = str()
+
+	def create_results_folder(self):
+		"""
+			Routine creates the sub_folder which will contain all of the detailed results
+		:return None:
+		"""
+
+		self.results_folder = os.path.join(self.parent_pth, self.results_name)
+
+		# Check if already exists and if not create it
+		if not os.path.exists(self.results_folder):
+			os.mkdir(self.results_folder)
+
+		return None
+
+

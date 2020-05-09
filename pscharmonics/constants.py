@@ -35,6 +35,13 @@ class PowerFactory:
 	"""
 		Constants used in this script
 	"""
+	# Constants relating to the paths
+	pf_year = 2019
+	year_max_tested = 2019
+	pf_service_pack = ''
+	dig_path = str()
+	dig_python_path = str()
+
 	# String used to define the tuning frequency of the filter
 	hz='Hz'
 	sht_Filters = 'Filters'
@@ -76,6 +83,7 @@ class PowerFactory:
 	pf_stage = 'IntSstage'
 	pf_results = 'ElmRes'
 	pf_network_elements = 'ElmNet'
+	pf_project = 'IntPrj'
 
 	# General Types
 	pf_folder_type = 'IntFolder'
@@ -146,11 +154,13 @@ class PowerFactory:
 		# Filter time of results (0 = None, 1 = filter)
 		filtered_time = 'filtered'
 
-	def __init__(self, year='2019', service_pack='5'):
+	def __init__(self, year=pf_year, service_pack=pf_service_pack, mock_python_version=str()):
 		"""
 			Initialises the relevant python paths depending on the version that has been loaded
 		:param str year: Year of version to use
 		:param str service_pack: Service pack to use
+		:param str mock_python_version:  For TESTING only, gets replaced with a different version to check correct
+										errors thrown if incorrect version provided
 		"""
 		# Get reference to logger
 		self.logger = logging.getLogger(logger_name)
@@ -158,7 +168,27 @@ class PowerFactory:
 		default_install_directory = r'C:\Program Files\DIgSILENT'
 		power_factory_search = 'PowerFactory 20*'
 
-		# Target PowerFactory version =
+		# Confirm the year is > 2017 and < 2020 otherwise warn that hasn't been fully tested
+		if int(year) < 2018:
+			self.logger.warning(
+				(
+					'You are using PowerFactory version {}.\n'
+					'In the 2018 version there were some API changes which have been considered in this script.  The '
+					'previous versions may still work but they have not been considered as part of the development '
+					'testing and so you are advised to carefully check your results.'
+				).format(year)
+			)
+		elif int(year) > self.year_max_tested:
+			self.logger.warning(
+				(
+					'You are using PowerFactory version {}.\n'
+					'This script has only been tested up to year {} and therefore changes in the PowerFactory API may '
+					'impact on the running and results you produce.  You are advised to check the results carefully or '
+					'consider updating the developments testing for this version.  For further details contact:\n{}'
+				).format(year, self.year_max_tested, Author.contact_summary)
+			)
+
+		# Check which service pack is being used and if none the create target path appropriately
 		if service_pack:
 			self.target_power_factory = 'PowerFactory {} SP{}'.format(year, service_pack)
 		else:
@@ -183,12 +213,19 @@ class PowerFactory:
 		self.dig_path = os.path.join(default_install_directory, self.target_power_factory)
 
 		# Now checks for Python versions within this PowerFactory
-		current_python_version = '{}.{}'.format(sys.version_info.major, sys.version_info.minor)
+		if mock_python_version:
+			# Running in a test mode to check an error is created
+			self.logger.warning('TESTING - Testing with a mock python version to raise exception, if not expected then there is a '
+							 'script error! - TESTING')
+			current_python_version = mock_python_version
+		else:
+			# Formulate string for python version
+			current_python_version = '{}.{}'.format(sys.version_info.major, sys.version_info.minor)
 
 		self.dig_python_path = os.path.join(self.dig_path, 'Python', current_python_version)
 		if not os.path.isdir(self.dig_python_path):
 			# Get list of supported python versions
-			list_of_available_versions = glob.glob(os.path.join(self.dig_path, 'Python', '*'))
+			list_of_available_versions = [os.path.basename(x) for x in glob.glob(os.path.join(self.dig_path, 'Python', '*'))]
 			self.logger.critical(
 				(
 					'You are running python version: {} but only the following versions are supported by this version of'
@@ -442,3 +479,16 @@ class TestResultsExtract(unittest.TestCase):
 		dict_color_map = self.res_extract.get_color_map()
 		self.assertEqual('#000000', dict_color_map[0])
 
+class Author:
+	""" Contains details of the author """
+	developer = 'David Mills'
+	email = 'david.mills@PSCconsulting.com'
+	phone = '+44 7899 984158'
+	company = 'PSC UK'
+	website = 'https:\\www.pscconsulting.com'
+	contact_summary = '\t{}\n\t{}\n\t{} - {}\n\t{}'.format(
+		developer,
+		company,
+		email, phone,
+		website
+	)

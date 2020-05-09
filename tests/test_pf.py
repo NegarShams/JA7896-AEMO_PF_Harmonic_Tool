@@ -1,5 +1,6 @@
 import unittest
 import os
+import sys
 import shutil
 
 from .context import pscharmonics
@@ -9,14 +10,98 @@ import pscharmonics.pf as TestModule
 # If full test then will confirm that the importing of the variables from the hast file is correct but the
 # testing for this is done elsewhere and this takes longer to run.  Setting to false skips the longer tests.
 FULL_TEST = True
-TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+TESTS_DIR = os.path.join(os.path.dirname(__file__), 'test_files')
+
+pf_test_model = 'pscharmonics_test_model'
+
+# When this is set to True tests which require initialising PowerFactory are skipped
+skip_slow_tests = True
 
 TestModule.DEBUG_MODE=True
 
 
 class TestPFInitialisation(unittest.TestCase):
-	""" Tests that the correct python version can be found """
+	""" Tests that the correct python version can be found and then PowerFactory can be initialised """
+	@classmethod
+	def setUp(cls):
+		""" Gets initial references that are need for PowerFactory class initialisation """
+		cls.pf = pscharmonics.pf.PowerFactory()
 
+	def test_adding_python_paths_works(self):
+		"""
+			This test only confirms that PowerFactory can be imported, there is no actual test to be
+			performed
+		:return:
+		"""
+		self.pf.add_python_paths()
+
+		# Confirm that python is now in the path
+		self.assertTrue(any(['PowerFactory' in x for x in sys.path]))
+
+	@unittest.skipUnless(skip_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+	def test_pf_initialisation(self):
+		""" Function tests that powerfactory can be initialised """
+		self.pf.initialise_power_factory()
+
+		# Test confirms that app has been initialised and that the installation directory matches the system path
+		# that has been provided
+		pf_directory = pscharmonics.pf.app.GetInstallationDirectory()
+
+		self.assertEqual(os.path.abspath(pf_directory), os.path.abspath(self.pf.c.dig_path))
+
+	@unittest.skipUnless(skip_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+	def test_pf_processors(self):
+		""" Function tests checking of powerfactory parallel processors """
+		self.pf.initialise_power_factory()
+		self.pf.check_parallel_processing()
+
+
+@unittest.skipUnless(skip_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+class TestsOnPFCase(unittest.TestCase):
+	"""
+		This class carries out tests on a specific PowerFactory case, if it doesn't exist in the PowerFactory model
+		already then it is initially imported and then removed at the end
+	"""
+	pf = None
+	pf_test_project = None
+
+	@classmethod
+	def setUpClass(cls):
+		""" Initialise PowerFactory and then check if model already exists """
+		cls.pf = pscharmonics.pf.PowerFactory()
+		cls.pf.initialise_power_factory()
+
+		# Try to activate the test project and if it doesn't work then load power factory case in
+		if not cls.pf.active_project(project_name=pf_test_model):
+			pf_test_file = os.path.join(TESTS_DIR, '{}.pfd'.format(pf_test_model))
+
+			# Import the project
+			cls.pf.import_project(project_pth=pf_test_file)
+			cls.pf.active_project(project_name=pf_test_model)
+
+		cls.pf_test_project = cls.pf.get_active_project()
+
+	def test_deactivate_project(self):
+		""" Function tests that activating and deactivating a project works as expected """
+		# Confirm project already active
+		pf_prj = self.pf.active_project(project_name=pf_test_model)
+
+		# Confirm that if project is activated
+		self.assertEqual(pf_prj, self.pf.get_active_project())
+
+		# Deactivate project
+		self.pf.deactivate_project()
+
+		# Confirm no longer equal and that project can be deactivated
+		self.assertNotEqual(pf_prj, self.pf.get_active_project())
+		self.assertTrue(self.pf.get_active_project() is None)
+
+	@classmethod
+	def tearDownClass(cls):
+		""" Function ensures the deletion of the PowerFactory project """
+		# Deactivate and then delete the project
+		cls.pf.deactivate_project()
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
 # ----- UNIT TESTS -----
 class TestHast(unittest.TestCase):

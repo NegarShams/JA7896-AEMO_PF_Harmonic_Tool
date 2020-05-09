@@ -11,12 +11,17 @@
 """
 
 import os
+import sys
 import math
 import pscharmonics.constants as constants
 import multiprocessing
-import unittest
 import time
 import logging
+import distutils.version
+
+# powerfactory will be defined after initialisation by the PowerFactory class
+powerfactory = None
+app = None
 
 # Meta Data
 __author__ = 'David Mills'
@@ -25,7 +30,8 @@ __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Beta'
 
-def create_object(location, pfclass, name):			# Creates a database object in a specified location of a specified class
+
+def create_object(location, pfclass, name):  # Creates a database object in a specified location of a specified class
 	"""
 		Creates a database object in a specified location of a specified class
 	:param powerfactory.Location location: Location in which new object should be created 
@@ -43,7 +49,8 @@ def create_object(location, pfclass, name):			# Creates a database object in a s
 		already_existed = False
 	return _new_object, already_existed
 
-def retrieve_results(elmres, res_type, write_as_df=False):			# Reads results into python lists from results file
+
+def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into python lists from results file
 	"""
 		Reads results into python lists from results file for processing to add to Excel		
 		TODO:  Adjust processing of results to write into a DataFrame for easier extraction to Excel / manipulation
@@ -58,13 +65,13 @@ def retrieve_results(elmres, res_type, write_as_df=False):			# Reads results int
 	# The Objects then have sub variables (m:R, m:X etc)
 	# TODO: This processing is slow, 20seconds per study, improve data extraction
 	elmres.Load()
-	cno = elmres.GetNumberOfColumns()	# Returns number of Columns
-	rno = elmres.GetNumberOfRows()		# Returns number of Rows in File
+	cno = elmres.GetNumberOfColumns()  # Returns number of Columns
+	rno = elmres.GetNumberOfRows()  # Returns number of Rows in File
 	results = []
 	for i in range(cno):
 		column = []
-		p = elmres.GetObject(i) 		# Object
-		d = elmres.GetVariable(i)		# Variable
+		p = elmres.GetObject(i)  # Object
+		d = elmres.GetVariable(i)  # Variable
 		column.append(d)
 		column.append(str(p))
 		# column.append(d)
@@ -81,6 +88,7 @@ def retrieve_results(elmres, res_type, write_as_df=False):			# Reads results int
 	elmres.Release()
 	return scale[0], results
 
+
 def remove_string_endings(astring, trailing):
 	"""
 		Function to strip the end from a string if it exists, used to remove .IntCase
@@ -91,6 +99,7 @@ def remove_string_endings(astring, trailing):
 	if astring.endswith(trailing):
 		return astring[:-len(trailing)]
 	return astring
+
 
 def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	"""
@@ -107,7 +116,7 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	if not filter_ref.include:
 		logger.error(
 			'Filter <{}> is set to not be included but has been attempted to be added, there is an error somewhere'
-		.format(filter_ref.name))
+				.format(filter_ref.name))
 		raise IOError('An error has occured trying to add a filter which should not be added')
 
 	hdl_substation = _app.GetCalcRelevantObjects(filter_ref.sub)
@@ -115,7 +124,6 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	hdl_filter, _ = create_object(location=hdl_substation[0],
 								  pfclass=constants.PowerFactory.pf_filter,
 								  name=filter_name)
-
 
 	c = constants.PowerFactory
 	# Add cubicle for filter
@@ -148,18 +156,22 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	logger.debug('Filter input mode set to: {} and should be {}'.format(hdl_filter.GetAttribute(c.pf_shn_inputmode),
 																		c.pf_shn_selectedinput))
 	logger.debug('Connected cubicle = {} = {}'.format(hdl_cubicle, hdl_filter.GetAttribute(c.pf_shn_term)))
-	logger.debug('Nominal voltage = {}kV = {}kV'.format(filter_ref.nom_voltage, hdl_filter.GetAttribute(c.pf_shn_voltage)))
+	logger.debug(
+		'Nominal voltage = {}kV = {}kV'.format(filter_ref.nom_voltage, hdl_filter.GetAttribute(c.pf_shn_voltage)))
 	logger.debug('Shunt type = {} = {}'.format(filter_ref.type, hdl_filter.GetAttribute(c.pf_shn_type)))
 	logger.debug('Shunt Q = {}MVAR = {}MVAR'.format(q, hdl_filter.GetAttribute(c.pf_shn_q)))
 	logger.debug('Shunt tuning frequency = {:.2f}Hz = {:.2f}Hz'.format(freq, hdl_filter.GetAttribute(c.pf_shn_freq)))
-	logger.debug('Shunt tuning order = {:.1f} = {:.1f}'.format(freq/constants.nom_freq, hdl_filter.GetAttribute(c.pf_shn_tuning)))
-	logger.debug('Shunt Q factor = {} = {}'.format(filter_ref.quality_factor, hdl_filter.GetAttribute(c.pf_shn_qfactor)))
+	logger.debug('Shunt tuning order = {:.1f} = {:.1f}'.format(freq / constants.nom_freq,
+															   hdl_filter.GetAttribute(c.pf_shn_tuning)))
+	logger.debug(
+		'Shunt Q factor = {} = {}'.format(filter_ref.quality_factor, hdl_filter.GetAttribute(c.pf_shn_qfactor)))
 	logger.debug('Shunt Rp = {} = {}'.format(filter_ref.resistance_parallel, hdl_filter.GetAttribute(c.pf_shn_rp)))
 
 	# Update drawing so will appear if go and investigate study case
 	_app.ExecuteCmd('grp/abi')
 
 	return None
+
 
 def set_max_processes(_app, logger):
 	"""
@@ -214,7 +226,7 @@ def set_max_processes(_app, logger):
 		logger.debug('Total memory = {} bytes'.format(memory_total))
 		logger.debug('Free memory = {} bytes'.format(memory_free))
 		# Calculate max number of processes
-		max_processes = int(memory_total/memory_free)
+		max_processes = int(memory_total / memory_free)
 		logger.debug('Max processes = {}'.format(max_processes))
 
 	else:
@@ -240,14 +252,16 @@ def set_max_processes(_app, logger):
 	else:
 		return 0
 
-def check_if_object_exists(location, name):  	# Check if the object exists
-	#_new_object used instead of new_object to avoid shadowing
+
+def check_if_object_exists(location, name):  # Check if the object exists
+	# _new_object used instead of new_object to avoid shadowing
 	new_object = location.GetContents(name)
 	return new_object[0]
 
 
 class PFStudyCase:
 	""" Class containing the details for each new study case created """
+
 	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid,
 				 results_pth, filter_name=None, base_case=False):
 		"""
@@ -333,7 +347,8 @@ class PFStudyCase:
 				# Create new load flow command based on pre-defined load flow command
 				ldf = self.sc.AddCopy(ldf_existing, 'HAST_{}'.format(self.uid))
 
-				self.logger.debug('Load flow for study case, <{}> based on settings in <{}>'.format(self.sc, ldf_existing))
+				self.logger.debug(
+					'Load flow for study case, <{}> based on settings in <{}>'.format(self.sc, ldf_existing))
 			else:
 				# Create new object for the load flow on the base case so that existing settings are not overwritten
 				lf_settings = hast_inputs.lf
@@ -468,7 +483,6 @@ class PFStudyCase:
 			frq.ifshow = settings[9]  # Harmonic Order
 			frq.p_resvar = results_file  # Results Variable
 
-
 			# Advanced
 			frq.errmax = settings[12]  # Setting for Step Size Adaption    Maximum Prediction Error
 			frq.errinc = settings[13]  # Minimum Prediction Error
@@ -509,14 +523,15 @@ class PFStudyCase:
 			hldf.iopt_harmsrc = settings[9]  # Treatment of Harmonic Sources
 
 			# Advanced Options
-			hldf.iopt_thd = settings[10]  # Calculate HD and THD 0 Based on Fundamental Frequency values 1 Based on rated voltage/current
+			hldf.iopt_thd = settings[
+				10]  # Calculate HD and THD 0 Based on Fundamental Frequency values 1 Based on rated voltage/current
 			hldf.maxHrmOrder = settings[11]  # Max Harmonic order for calculation of THD and THF
 			hldf.iopt_HF = settings[12]  # Calculate Harmonic Factor (HF)
 			hldf.ioutall = settings[13]  # Calculate R, X at output frequency for all nodes
 			hldf.expQ = settings[14]  # Calculation of Factor-K (BS 7821) for Transformers
 
 		# Load flow command to use
-		hldf.cbutldf =  self.ldf
+		hldf.cbutldf = self.ldf
 		self.hldf = hldf
 
 		return self.hldf
@@ -564,10 +579,10 @@ class PFStudyCase:
 		"""
 		hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
 
-		hrm_scale.insert(1,"THD")													# Inserts the THD
-		hrm_scale.insert(1,"Harmonic")												# Arranges the Harmonic Scale
-		hrm_scale.insert(1,"Scale")
-		hrm_scale.pop(4)															# Takes out the 50 Hz
+		hrm_scale.insert(1, "THD")  # Inserts the THD
+		hrm_scale.insert(1, "Harmonic")  # Arranges the Harmonic Scale
+		hrm_scale.insert(1, "Scale")
+		hrm_scale.pop(4)  # Takes out the 50 Hz
 		hrm_scale.pop(4)
 		for res12 in hrm_res:
 			# Rather than retrieving THD from the calculated parameters in PowerFactory it is calculated from the
@@ -579,24 +594,24 @@ class PFStudyCase:
 			try:
 				# res12[3:] used since at this stage the res12 format is:
 				# [result type (i.e. m:HD), terminal (i.e. *.ElmTerm), H1, H2, H3, ..., Hx]
-				thd = math.sqrt(sum(i*i for i in res12[3:]))
+				thd = math.sqrt(sum(i * i for i in res12[3:]))
 
 			except TypeError:
 				logger.error(('Unable to calculate the THD since harmonic results retrieved from results variable {} ' +
-							 ' have come out in an unexpected order and now contain a string \n' +
-							 'The returned results <res12> are {}').format(self.hldf_results, res12))
+							  ' have come out in an unexpected order and now contain a string \n' +
+							  'The returned results <res12> are {}').format(self.hldf_results, res12))
 				thd = 'NA'
 
-			res12.insert(2, thd)															# Insert THD
-			res12.insert(2, self.cont_name)												# Op scenario
-			res12.insert(2, self.sc_name)												# Study case description
+			res12.insert(2, thd)  # Insert THD
+			res12.insert(2, self.cont_name)  # Op scenario
+			res12.insert(2, self.sc_name)  # Study case description
 			res12.pop(5)
 
 		self.hrm_scale = hrm_scale
 
 		return hrm_res
 
-	def update_results_files(self,fs,hldf):
+	def update_results_files(self, fs, hldf):
 		c = constants.PowerFactory
 		# Update FS results file
 		if fs:
@@ -616,7 +631,7 @@ class PFStudyCase:
 					c.default_hldf_extension,
 					c.pf_results))
 
-	def create_studies(self,logger,fs=False,hldf=False,fs_settings=[],hldf_settings=[]):
+	def create_studies(self, logger, fs=False, hldf=False, fs_settings=[], hldf_settings=[]):
 		"""
 			Function to create the frq and hldf studies including exporting to a pre-determined folder
 		:param logging.logger logger: Handle for log messages
@@ -626,13 +641,13 @@ class PFStudyCase:
 		:param list hldf_settings:  (optional=[]) - Contains the settings for HLDF if required
 		:return:
 		"""
-		self.update_results_files(fs=fs,hldf=hldf)
+		self.update_results_files(fs=fs, hldf=hldf)
 		if fs:
 			_ = self.create_freq_sweep(results_file=self.fs_results,
 									   settings=fs_settings)
 			self.frq_export_com, export_pth = self.set_results_export(
 				result=self.fs_results,
-				name='{}_{}'.format('FS',self.name))
+				name='{}_{}'.format('FS', self.name))
 			self.fs_result_exports.append(export_pth)
 			logger.debug(('For study case {}, frequency scan command {} and results export {} have been created'
 						  'with results being exported to: {}')
@@ -717,6 +732,7 @@ class PFStudyCase:
 
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
+
 	def __init__(self, name, prj, task_auto, folders, include_mutual=False):
 		"""
 			Initialise class
@@ -736,7 +752,6 @@ class PFProject:
 		self.task_auto = task_auto
 		self.sc_cases = []
 		self.folders = folders
-
 
 		# Populated with the base study case
 		self.sc_base = None
@@ -818,5 +833,233 @@ class PFProject:
 				self.task_auto.AppendCommand(cls_sc.hldf, 0)
 				self.task_auto.AppendCommand(cls_sc.hldf_export_com, 0)
 		return
+
+
+class PowerFactory:
+	"""
+		Class to deal with system level interfacing in PowerFactory
+	"""
+
+	def __init__(self):
+		""" Gets the relevant powerfactory version and initialises """
+		self.c = constants.PowerFactory
+		self.logger = logging.getLogger(constants.logger_name)
+
+	def add_python_paths(self):
+		"""
+			Function retrieves the relevant python paths, adds them and then imports the powerfactory module
+			Importing of the powerfactory module has to happen here due to the location
+		"""
+		# Get the python paths if not already populated
+		if not (self.c.dig_path and self.c.dig_python_path):
+			# Initialise so that the paths are looked for
+			self.c = self.c()
+
+		# Add the paths to system and the environment and then try and import powerfactory
+		sys.path.append(self.c.dig_path)
+		sys.path.append(self.c.dig_python_path)
+		os.environ['PATH'] = '{};{}'.format(os.environ['PATH'], self.c.dig_path)
+
+		# Try and import the powerfactory module
+		try:
+			global powerfactory
+			import powerfactory
+		except ImportError:
+			self.logger.critical(
+				(
+					'It has not been possible to import the powerfactory module and therefore the script cannot be run.\n'
+					'This is most likely due to there not being a powerfactory.pyc file located in the following path:\n\t'
+					'<{}>\n'
+					'Please check this exists and the error messages above.'
+				).format(self.c.dig_python_path)
+			)
+			raise ImportError('PowerFactory module not found')
+
+		return None
+
+	def initialise_power_factory(self):
+		"""
+			Function initialises powerfactory and provides an object reference to it
+		:return None:
+		"""
+		# Check the paths have already been found and if not call the relevant function
+		if not (self.c.dig_path and self.c.dig_python_path):
+			# Initialise so that the paths are looked for
+			self.c = self.c()
+			self.add_python_paths()
+
+		# Different APIs exist for different PowerFactory versions, if an old version is run then different
+		# initialisation route.  When initialising need to warn user that old version is being used
+		global app
+		if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
+			# powerfactory after 2017 has an error handler when trying to load
+			try:
+				app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine mode
+			except powerfactory.ExitError as error:
+				self.logger.critical(
+					(
+						'An error occurred trying to start PowerFactory.\n'
+						'The following error message was returned by PowerFactory \n\t{}\n'
+						'and associated error code: {}'
+					).format(error, error.code)
+				)
+				raise ImportError('Power Factory Load Error - Unable to run')
+
+		else:
+			# In case of an older version of PowerFactory being run
+			app = powerfactory.GetApplication()
+			if app is None:
+				self.logger.critical(
+					'Unable to load PowerFactory and this version does not return any error codes, you will need '
+					'to user a newer version of PowerFactory or investigate the error messages detailed above.'
+				)
+				raise ImportError('Power Factory Load Error - Unable to run')
+
+			# Clear the powerfactory output window
+			app.ClearOutputWindow()  # Clear Output Window
+
+	def active_project(self, project_name):
+		"""
+			Active a project for which a name is provided and return False if project cannot be found
+		:param str project_name:  Name of project to be activated
+		:return powerfactory.DataObject pf_prj: Either returns a handle to the project or False if fails
+		"""
+		# Before trying to activate a project confirm that PowerFactory has been initialised
+		if not app:
+			self.initialise_power_factory()
+
+		# Check project name already has correct ending and if not add
+		if not project_name.endswith(self.c.pf_project):
+			project_name = '{}.{}'.format(project_name, self.c.pf_project)
+
+		success = app.ActivateProject(project_name)
+
+		# If successfully activated then get a handle for this project
+		if not success:
+			pf_prj = app.GetActiveProject()
+		else:
+			pf_prj = None
+
+		return pf_prj
+
+	def get_active_project(self):
+		"""
+			Function just returns a handle to the currently active project
+		:return powerfactory.DataObject pf_prj:
+		"""
+		# Get reference to the currently activated project
+		pf_prj = app.GetActiveProject()
+
+		return pf_prj
+
+	def import_project(self, project_pth):
+		"""
+			This function will import a project into PowerFactory and then activates
+			Project is imported to the current user location
+			Further details here:
+				https://www.digsilent.de/en/faq-reader-powerfactory/how-to-import-export-pfd-files-by-using-script.html
+		:param str project_pth:  Path to the project file to be imported
+		:return None: Will throw errors if not possible to import
+		"""
+
+		# Check file exists before continuing
+		if not os.path.exists(project_pth):
+			self.logger.critical(
+				(
+					'The following file containing the PowerFactory project to be imported does not exist:\n\t{}'
+				).format(project_pth)
+			)
+			raise ValueError('No file exists to import')
+
+		# Determine the location the imported project should be saved which is the current user
+		location = app.GetCurrentUser()
+
+		# Create an object for the import command
+		import_object = location.CreateObject('CompfdImport', 'Import')
+
+		# Set the file attribute to be imported and the target location (current user)
+		import_object.SetAttribute('e:g_file', project_pth)
+		import_object.g_target = location
+
+		# Execute command (returns 0 for success) and alert user if error importing
+		error = import_object.Execute()
+
+		if error:
+			self.logger.critical(
+				(
+					'Critical error occurred when trying to import the project from location:\n\t{}\n'
+					'PowerFactory returned the following error code from the function\n'
+					'\tCommand: {}\n'
+					'\tTarget User Location: {}\n'
+					'\tError Code: {}'
+				).format(project_pth, import_object, location, error)
+			)
+			raise ImportError('Unable to import the PowerFactory project')
+
+		# Delete newly created script
+		self.delete_object(import_object)
+
+		return None
+
+	def deactivate_project(self):
+		""" Function to deactivate the current project """
+		pf_prj = self.get_active_project()
+
+		# Deactivate project if project active
+		if pf_prj:
+			error = pf_prj.Deactivate()
+		else:
+			error = 0
+
+		if error:
+			self.logger.error(
+				(
+					'Unable to deactivate the currently active project {}'
+				).format(pf_prj.GetFullName(type=0))
+			)
+
+		return None
+
+	def delete_object(self, pf_obj):
+		"""
+			Function will delete a PowerFactory object from the DataManager
+		:param powerfactory.DataObject pf_obj:  Reference to the object to be deleted
+		:return None:
+		"""
+
+		# Function deletes the object (it is only moved to the Recycle Bin)
+		error = pf_obj.Delete()
+
+		if error:
+			self.logger.error(
+				(
+					'It has not been possible to delete the following object\n\t{}'
+				).format(pf_obj.GetFullName(type=0))
+			)
+
+		return None
+
+	def check_parallel_processing(self):
+		"""
+			Function determines the number of processes that powerfactory is set to run
+		"""
+
+		# Get number of cpus available
+		number_of_cpu = multiprocessing.cpu_count()
+
+		# Check number of processors set to be run
+		current_processors = app.GetNumSlave()
+
+		# Display warning of a small value
+		if current_processors == 1 or current_processors < number_of_cpu:
+			self.logger.warning(
+				(
+					'Your PowerFactory settings are set to only allow running on {} parallel processors, this does not'
+					'take full advantage of the machines capability and therefore may take longer to run.'
+				).format(current_processors)
+			)
+
+		return None
+
 
 

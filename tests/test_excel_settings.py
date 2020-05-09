@@ -6,6 +6,7 @@ import unittest
 import os
 import pandas as pd
 import math
+import shutil
 
 from .context import pscharmonics
 
@@ -235,7 +236,6 @@ class TestContingencies(unittest.TestCase):
 			self.assertTrue(math.isnan(coupler.breaker))
 			self.assertTrue(math.isnan(coupler.status))
 
-
 class TestTerminals(unittest.TestCase):
 	""" Class to deal with testing the reading and processing of terminals """
 	@classmethod
@@ -259,3 +259,29 @@ class TestTerminals(unittest.TestCase):
 		self.assertEqual(terminal.substation, test_term)
 		self.assertEqual(terminal.terminal, '220 kV A1')
 		self.assertFalse(terminal.include_mutual, '220 kV A1')
+
+class TestResultsExport(unittest.TestCase):
+	""" Testing that the routines associated with exporting the results works correctly """
+	def test_results_folder_creation(self):
+		""" Confirm that results folder is created correctly """
+		# Directory name to be created
+		pth = TESTS_DIR
+		name = 'test_results'
+		target_pth = os.path.join(pth, name)
+
+		# Confirm doesn't already exist
+		if os.path.exists(target_pth):
+			shutil.rmtree(target_pth)
+		self.assertFalse(os.path.exists(target_pth))
+
+		# Initialise class
+		res_export = pscharmonics.file_io.ResultsExport(pth=pth, name=name)
+		# Create folder
+		res_export.create_results_folder()
+
+		# Confirm exists
+		self.assertTrue(os.path.exists(target_pth))
+
+		# Delete folder and confirm deleted
+		shutil.rmtree(target_pth)
+		self.assertFalse(os.path.exists(target_pth))

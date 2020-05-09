@@ -1579,7 +1579,7 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
 		# powerfactory after 2017 has an error handler when trying to load
 		try:
-			app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine  mode
+			app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine mode
 		except powerfactory.ExitError as error:
 			print('An error occured trying to start PowerFactory, there error was {}'.format(error))
 			print('Error Code returned by PowerFactory = {}'.format(error.code))
