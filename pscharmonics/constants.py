@@ -16,6 +16,7 @@ import sys
 import unittest
 import glob
 import logging
+import time
 
 # Meta Data
 __author__ = 'David Mills'
@@ -30,6 +31,13 @@ logger_name = str()
 cpu_keep_free = 1
 # If unable to calculate this is the assumed maximum number of processes
 default_max_processes = 3
+
+# Unique identifier populated for each study run
+uid = time.strftime('%y_%m_%d_%H_%M_%S')
+
+class General:
+	# Value that is used as leading value
+	cmd_leader = 'PSCharmonics'
 
 class PowerFactory:
 	"""

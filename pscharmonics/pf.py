@@ -260,98 +260,126 @@ def check_if_object_exists(location, name):  # Check if the object exists
 
 
 class PFStudyCase:
-	""" Class containing the details for each new study case created """
+	""" Class containing the details for each study case contained within a project """
 
-	def __init__(self, full_name, list_parameters, cont_name, sc, op, prj, task_auto, uid,
-				 results_pth, filter_name=None, base_case=False):
+	def __init__(self, name, sc, os, base_case=False):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
-		:param str full_name:  Full name of study case containing base case and contingency
-		:param list list_parameters:  List of parameters from the Base_Scenarios inputs sheet
-		:param str cont_name:  Name of contingency being considered
-		:param str filter_name: (optional=None) Name of filter that has been included if applicable
-		:param powerfactory.DataObject sc:  Handle to newly created study case
-		:param object op:  Handle to newly created operational scenario
-		:param object prj:  Handle to project in which this study case is contained
-		:param object task_auto:  Handle to the Task Automation object created for this project studies
-		:param string uid:  Unique identifier time added to new files created
-		:param string results_pth:  Full path to store results in
-		:param bool base_case:  True / False on whether this is a base case study case, i.e. with no contingencies applied
+		:param str name:  Name of study case
+		:param powerfactory.DataObject sc:  Handle to the study_case
+		:param powerfactory.DataObject os:  Handle to the operating scenario
+		:param bool base_case: (optional=False) - Set to True for the base cases
 		"""
-		# Strings that are used to store
-		self.name = full_name
-		self.base_name = list_parameters[0]
-		self.prj_name = list_parameters[1]
-		self.sc_name = remove_string_endings(astring=list_parameters[2], trailing='.IntCase')
-		self.op_name = remove_string_endings(astring=list_parameters[3], trailing='.IntScenario')
-		self.cont_name = cont_name
-		self.uid = uid
-		self.filter_name = filter_name
-		self.base_case = base_case
-		self.res_pth = results_pth
-
-		# Get logger
 		self.logger = logging.getLogger(constants.logger_name)
 
-		# Handle for study cases that will require activating
+		# Unique name for this studycase
+		self.name = name
+
+		# Reference to powerfactory handle for study case
 		self.sc = sc
-		self.op = op
-		self.prj = prj
-		self.task_auto = task_auto
+		self.os = os
 
-		# Attributes set during study completion
+		self.active = False
+
+		# Handles that will be populated with the relevant commands
 		self.ldf = None
-		self.frq = None
-		self.hldf = None
-		self.frq_export_com = None
-		self.hldf_export_com = None
-		self.fs_results = None
-		self.hldf_results = None
-		self.com_res = None
-		self.fs_scale = []
-		self.hrm_scale = []
+		self.fs = None
 
-		# Dictionary for looking up frequency scan results
-		self.fs_res = dict()
+		# self.base_name = list_parameters[0]
+		# self.prj_name = list_parameters[1]
+		# self.sc_name = remove_string_endings(astring=list_parameters[2], trailing='.IntCase')
+		# self.op_name = remove_string_endings(astring=list_parameters[3], trailing='.IntScenario')
+		# self.cont_name = cont_name
+		# self.uid = uid
+		# self.filter_name = filter_name
+		# self.base_case = base_case
+		# self.res_pth = results_pth
+		#
+		# # Get logger
+		# self.logger = logging.getLogger(constants.logger_name)
+		#
+		# # Handle for study cases that will require activating
+		# self.sc = sc
+		# self.op = op
+		# self.prj = prj
+		# self.task_auto = task_auto
+		#
+		# # Attributes set during study completion
+		# self.ldf = None
+		# self.frq = None
+		# self.hldf = None
+		# self.frq_export_com = None
+		# self.hldf_export_com = None
+		# self.fs_results = None
+		# self.hldf_results = None
+		# self.com_res = None
+		# self.fs_scale = []
+		# self.hrm_scale = []
+		#
+		# # Dictionary for looking up frequency scan results
+		# self.fs_res = dict()
+		#
+		# # Paths for frequency and hlf results that are exported
+		# self.fs_result_exports = []
+		# self.hldf_result_exports = []
 
-		# Paths for frequency and hlf results that are exported
-		self.fs_result_exports = []
-		self.hldf_result_exports = []
+	def toggle_state(self, deactivate=False):
+		"""
+			Function to toggle the state of the study case and operating scenario
+		:param bool deactivate: (optional=False) - Set to True to deactivate
+		:return None:
+		"""
 
-	def create_load_flow(self, hast_inputs, app):
+		if deactivate:
+			# Deactivate study case
+			err = self.sc.Deactivate()
+			self.active = False
+		else:
+			# Activate both study case and operating scenario
+			err = self.sc.Activate()
+			# TODO: Confirm correct operating scenario is actually being activated
+			err = self.os.Activate() + err
+			self.active = True
+
+		if err > 0 and deactivate:
+			self.logger.error('Unable to deactivate the study case: {}'.format(self.sc))
+		elif err > 0:
+			self.logger.error('Unable to activate either the study case {} or operating scenario {}'.format(
+				self.sc, self.os)
+			)
+
+		return None
+
+	def create_load_flow(self, lf_settings):
 		"""
 			Create a load flow command in the study case so that the same settings will be run with the
 			frequency scan and HAST file so that there are no issues with non-convergence.
-		:param hast2_1.file_io.StudyInputs hast_inputs:
-		:param powerfactory.GetApplication app:  Handle to powerfactory application
+		:param pscconsulting.file_io.LFSettings lf_settings:  Existing load flow settings
 		:return None:
 		"""
-		# See if HAST load flow command already existed and if not create a new one
-		ldf, hast_existed = create_object(
-			location=self.sc,
-			pfclass=constants.PowerFactory.ldf_command,
-			name='HAST_{}'.format(self.uid))
+		# If input values have been provided for an existing command then copy that one
+		ldf = None
+		if lf_settings:
+			if lf_settings.cmd:
+				ldf = self.sc.GetContents(lf_settings.cmd)
+				# Check if command exists and if so copy that one with a new name
+				if len(ldf) == 0:
+					self.logger.warning(
+						(
+							'Not able to find load flow command {} in study case {}, provided settings will be used'
+						).format(lf_settings.cmd, self.sc)
+					)
+				else:
+					ldf = self.sc.AddCopy(ldf[0], '{}_{}'.format(constants.General.cmd_leader, constants.uid))
 
-		# Since uid is used in name of HAST load flow only need to update settings if a new
-		# load flow command is created
-		if not hast_existed:
-			# Either copy existing settings or create new settings
-			if hast_inputs.pf_loadflow_command:
-				ldf_existing = check_if_object_exists(self.sc, hast_inputs.pf_loadflow_command)
-				# Since the routine to check if one existed would have returned one need to delete it first and then
-				# copy reference load flow with new name
-				error = ldf.Delete()
-				if error != 0:
-					self.logger.critical('Unable to delete the recently created load flow command <{}>'.format(ldf))
+			if not ldf and not lf_settings.settings_error:
+				# Populate settings based on provided inputs
+				# See if load flow command already existed and if not create a new one
+				ldf, _ = create_object(
+					location=self.sc,
+					pfclass=constants.PowerFactory.ldf_command,
+					name='{}_{}'.format(constants.General.cmd_leader, constants.uid))
 
-				# Create new load flow command based on pre-defined load flow command
-				ldf = self.sc.AddCopy(ldf_existing, 'HAST_{}'.format(self.uid))
-
-				self.logger.debug(
-					'Load flow for study case, <{}> based on settings in <{}>'.format(self.sc, ldf_existing))
-			else:
-				# Create new object for the load flow on the base case so that existing settings are not overwritten
-				lf_settings = hast_inputs.lf
 				# Get handle for load flow command from study case
 				# Basic
 				ldf.iopt_net = lf_settings.iopt_net  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
@@ -446,14 +474,25 @@ class PFStudyCase:
 
 				self.logger.debug(
 					(
-						'Load flow settings for study case <{}> based on settings in HAST inputs spreadsheet and '
+						'Load flow settings for study case <{}> based on settings in inputs spreadsheet and '
 						'detailed in load flow command <{}>'
 					).format(self.sc, ldf)
-				)
-		else:
-			pass
+					)
+
+		# If ldf still hasn't been defined then use default load flow
+		if not ldf:
+			# Get default load flow command, copy and rename
+			def_ldf = self.sc.GetContents('*.{}'.format(constants.PowerFactory.ldf_command))[0]
+			ldf = self.sc.AddCopy(def_ldf, '{}_{}'.format(constants.General.cmd_leader, constants.uid))
+			self.logger.warning(
+				(
+					'Not able to use provided load flow settings or existing load flow command for study case {} and '
+					'therefore a new command <{}> has been created based on the default command <{}>'
+				).format(self.sc, def_ldf, ldf)
+			)
 
 		self.ldf = ldf
+		return None
 
 	def create_freq_sweep(self, results_file, settings):
 		"""
@@ -542,7 +581,7 @@ class PFStudyCase:
 		:param logger:  (optional=None) handle for logger to allow message reporting
 		:return list fs_res
 		"""
-		c = constants.ResultsExtract
+		c = constants.Results
 
 		# Insert data labels into frequency data to act as row labels for data
 		fs_scale, fs_res = retrieve_results(self.fs_results, 0)
@@ -733,49 +772,207 @@ class PFStudyCase:
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
 
-	def __init__(self, name, prj, task_auto, folders, include_mutual=False):
+	def __init__(self, name, df_studycases, uid, lf_settings=None, fs_settings=None):
 		"""
 			Initialise class
 		:param str name:  project name
-		:param object prj:  project reference
-		:param object task_auto:  task automation reference
-		:param list folders:  List of folders created as part of project, these will be deleted at end of study
-		:param bool include_mutual: (Optional=False) - Set to True when mutual impedance data is being exported
-
+		:param pd.DataFrame df_studycases:  DataFrame containing all the base study cases associates with this project
+		:param psconsulting.file_io.LFSettings lf_settings:  (optional=None) - If provided then these settings will be
+															used and if not then default Load Flow command will be used
+		:param psconsulting.file_io.FSSettings fs_settings:  (optional=None) - If provided then these settings will be
+															used and if not then default Frequency Sweep command will be used
+		:param pd.DataFrame df_studycases:  DataFrame containing all the base study cases associates with this project
+		:param str uid:  Unique identifier given for this study
 		"""
-
-		# TODO: When initialising find the initial study case, operating scenario and variations
-		# TODO: So that they can be restored when the project folders are deleted
+		self.logger = logging.getLogger(constants.logger_name)
+		self.logger.debug('New instance for project {} being initialised'.format(name))
+		# self.prj_active = False
 
 		self.name = name
-		self.prj = prj
-		self.task_auto = task_auto
-		self.sc_cases = []
-		self.folders = folders
+		self.uid = uid
+		self.pf = PowerFactory()
 
-		# Populated with the base study case
-		self.sc_base = None
+		# Store details of settings
+		self.lf_settings = lf_settings
+		self.fs_settings = fs_settings
 
-		# If Mutual impedance data required then added here
-		self.include_mutual = include_mutual
-		self.mutual_impedance_folder = None
-		# list of mutual impedance elements in the format:
-		# [(HAST_input_name,
-		# 	mutual_impedance_name (i.e. 'from_to'),
-		# 	reference to mutual element in pf,
-		# 	reference to terminal 1 in pf,
-		# 	reference to terminal 2 in pf)
-		# ]
-		self.list_of_mutual = []
-		# List of names for which mutual impedance elements have been created in the form
-		#	[from1_to1, to1_from1, from2_to2, to2_from2, ...]
-		self.list_of_mutual_names = []
+		# DataFrame of study cases which is populated with status for base_case
+		self.df_sc = df_studycases
 
-		# Network elements folder
-		self.folder_network_elements = None
+		# Activate project to get power_factory instance
+		self.prj = self.pf.activate_project(project_name=name)
+		self.prj_active = True
 
-		# List of terminals for results
-		self.terminals_index = None
+		if self.prj is None:
+			self.logger.warning(
+				(
+					'Not possible to activate project named "{}" and therefore no studies will be carried out for '
+					'study cases associated with this project'
+				).format(self.name)
+			)
+			self.exists = False
+		else:
+			self.exists = True
+
+		# Get reference to project study case and operational scenario folders
+		self.base_sc_folder = app.GetProjectFolder('study')
+		self.base_os_folder = app.GetProjectFolder('scen')
+		# self.base_var_folder = app.GetProjectFolder('scheme')
+
+		# Create temporary folders
+		c = constants.PowerFactory
+		self.sc_folder = self.create_folder(name='{}_{}'.format(c.temp_sc_folder, self.uid), location=self.base_sc_folder)
+		self.os_folder = self.create_folder(name='{}_{}'.format(c.temp_os_folder, self.uid), location=self.base_os_folder)
+		# self.var_folder = self.create_folder(name='{}_{}'.format(c.temp_var_folder, self.uid), location=self.base_var_folder)
+		# self.temp_folders = (self.sc_folder, self.os_folder, self.var_folder)
+		self.temp_folders = (self.sc_folder, self.os_folder)
+
+		# Initialise study_cases
+		self.base_sc = self.initialise_study_cases()
+
+		#
+		#
+		# self.task_auto = task_auto
+		# self.sc_cases = []
+		# self.folders = folders
+		#
+		# # Populated with the base study case
+		# self.sc_base = None
+		#
+		# # If Mutual impedance data required then added here
+		# self.include_mutual = include_mutual
+		# self.mutual_impedance_folder = None
+		# # list of mutual impedance elements in the format:
+		# # [(HAST_input_name,
+		# # 	mutual_impedance_name (i.e. 'from_to'),
+		# # 	reference to mutual element in pf,
+		# # 	reference to terminal 1 in pf,
+		# # 	reference to terminal 2 in pf)
+		# # ]
+		# self.list_of_mutual = []
+		# # List of names for which mutual impedance elements have been created in the form
+		# #	[from1_to1, to1_from1, from2_to2, to2_from2, ...]
+		# self.list_of_mutual_names = []
+		#
+		# # Network elements folder
+		# self.folder_network_elements = None
+		#
+		# # List of terminals for results
+		# self.terminals_index = None
+
+	def initialise_study_cases(self):
+		"""
+			Function loops through all study_case and operational scenario combinations and creates
+			duplicates that are stored in the temporary folders
+		:return dict base_study_cases: Returns a list of all the base study cases that have been created and
+										can be activated
+		"""
+		base_study_cases = dict()
+
+		# Loop through each of the provided study cases and create a reference to the study case to be run
+		for idx, df_sc in self.df_sc.iterrows():
+			# Get the studycase references and ensure correct IntCase or IntScenario reference
+			name = df_sc.loc[constants.StudySettings.name]
+			sc_name = df_sc.loc[constants.StudySettings.studycase].replace(
+				'.{}'.format(constants.PowerFactory.pf_case), '')
+			os_name = df_sc.loc[constants.StudySettings.scenario].replace(
+				'.{}'.format(constants.PowerFactory.pf_scenario), '')
+			sc_name = '{}.{}'.format(sc_name, constants.PowerFactory.pf_case)
+			os_name = '{}.{}'.format(os_name, constants.PowerFactory.pf_scenario)
+
+			# Find handle in powerfactory for study_case
+			pf_sc = self.base_sc_folder.GetContents(sc_name)
+			if len(pf_sc) == 0:
+				# Study case doesn't exist so alert user and skip to next
+				self.logger.error(
+					(
+						'Study Case {} cannot be found in PowerFactory folder {}, no studies will be carried out '
+						'on this case'
+					).format(sc_name, self.base_sc_folder)
+				)
+				self.df_sc[name, constants.Results.skipped] = True
+				continue
+			else:
+				# Get first reference
+				pf_sc = pf_sc[0]
+
+			# Find handle in powerfactory for operating scenario
+			pf_os = self.base_os_folder.GetContents(os_name)
+			if len(pf_os) == 0:
+				# Study case doesn't exist so alert user and skip to next
+				self.logger.error(
+					(
+						'Operating Scenario {} cannot be found in PowerFactory folder {}, no studies will be carried out '
+						'on this case'
+					).format(os_name, self.base_os_folder)
+				)
+				self.df_sc[name, constants.Results.skipped] = True
+				continue
+			else:
+				# Get first reference
+				pf_os = pf_os[0]
+
+			# Create a copy of these study_cases and scenarios
+			new_sc, new_os = self.copy_study_case(name=name, sc=pf_sc, os=pf_os)
+
+			# Create a PFStudyCase instance
+			study_case_class = PFStudyCase(
+				name=name, sc=new_sc, os=new_os, base_case=True
+			)
+			# Assign relevant load flow to study case
+			study_case_class.create_load_flow(lf_settings=self.lf_settings)
+
+			base_study_cases[name] = study_case_class
+
+		return base_study_cases
+
+	def copy_study_case(self, name, sc, os):
+		"""
+			Copy the study case and operating scenario to the temporary folders
+		:param str name:  Name to use for new study case
+		:param powerfactory.DataObject sc: Study case to be copied
+		:param powerfactory.DataObject os: Scenario to be copied
+		:return (powerfactory.DataObject, powerfactory.DataObject) (new_sc, new_op):  Handles to the newly created
+																					study cases and operating scenarios
+		"""
+		# Ensure study case is deactivated before trying to copy
+		self.deactivate_study_case()
+		new_sc = self.sc_folder.AddCopy(sc, name)
+		new_os = self.os_folder.AddCopy(os, name)
+
+		if new_sc is None or new_os is None:
+			self.logger.error(
+				(
+					'Unable to copy one of the following:\n\t'
+					' - Study case {} to folder: {}\n\t'
+					' - Operating Scenario {} to folder: {}\n'
+					'Therefore no studies will be carried out on this case'
+				).format(sc, self.sc_folder, os, self.os_folder)
+			)
+			self.df_sc.loc[name, constants.Results.skipped] = True
+
+		return new_sc, new_os
+
+	def deactivate_study_case(self):
+		"""
+			Deactivate the active study case
+		:return None:
+		"""
+		# Get handle for active study case from PowerFactory
+		study = app.GetActiveStudyCase()
+
+		# If already deactivated then do nothing otherwise deactivate
+		if study is not None:
+			sce = study.Deactivate()
+			if sce == 0:
+				self.logger.debug('Deactivated active study case <{}> successfully'.format(study))
+			elif sce > 0:
+				self.logger.warning('Unable to deactivate study case <{}>, powerfactory return error code: {}'.format(
+					study, sce
+				)
+				)
+		return None
+
 
 	def process_fs_results(self, logger=None):
 		""" Loop through each study case cls and process results files
@@ -834,11 +1031,104 @@ class PFProject:
 				self.task_auto.AppendCommand(cls_sc.hldf_export_com, 0)
 		return
 
+	def project_state(self, deactivate=False):
+		"""
+			Function to toggle the status of this project
+		:return None:
+		"""
+		if deactivate:
+			self.pf.deactivate_project()
+			self.prj_active = False
+		else:
+			self.pf.activate_project(project_name=self.name)
+			self.prj_active = True
+
+		return None
+
+	def create_folder(self, name, location):
+		"""
+			Create temporary folders within the project to store newly created study cases, etc.
+		:param str name:  Name to give to folder
+		:param powerfactory.DataObject location:  Location new folder is to be created in
+		:return powerfactory.DataObject new_folder:  Handle to the newly created folder
+		"""
+		# Default location is in the project (assuming project has been activated successfully)
+		if not self.prj_active:
+			self.logger.critical(
+				'Attempting to create folder {} in non-active project {}'.format(name, self.name)
+			)
+			raise SyntaxError('Creating folder in a non-active project')
+
+		self.logger.debug('Creating new folder {} in location {}'.format(name, location))
+
+		# In case name already has IntProject, remove from the name
+		name = name.replace('.{}'.format(constants.PowerFactory.pf_folder_type),'')
+
+		# Check if folder already exists and if so append (1) to name
+		i = 0
+		folder_exists = True
+		new_name = name
+		while folder_exists:
+			# If on 2nd loop then append (i) to end of original name
+			if i > 0:
+				new_name = '{}({})'.format(name, i)
+				self.logger.debug(
+					'Original folder {} already exists in location {}, testing folder name {}'.format(
+						name, location, new_name)
+				)
+
+			existing_folder = location.GetContents('{}.{}'.format(new_name, constants.PowerFactory.pf_folder_type))
+			if len(existing_folder) > 0:
+				folder_exists = True
+			else:
+				folder_exists = False
+			i+=1
+
+		# Alert user to change
+		if new_name != name:
+			self.logger.warning(
+				(
+					'Folder name {} already existed in PowerFactory project <{}>, new folder {} created instead'
+				).format(name, location, new_name)
+			)
+
+		# Create folder
+		new_folder = location.CreateObject(constants.PowerFactory.pf_folder_type, name)
+		if new_folder is None:
+			self.logger.error(
+				'Unable to create folder {} in location {}, the script is likely to now fail'.format(name, location)
+			)
+		else:
+			self.logger.debug('New folder {} created in location {}'.format(name, location))
+
+		return new_folder
+
+	def delete_temp_folders(self):
+		"""
+			Routine to delete all of the temporary folders created initially
+		:return None:
+		"""
+
+		for folder in self.temp_folders:
+			if folder is not None:
+				self.pf.delete_object(pf_obj=folder)
+				self.logger.debug('Temporary folder {} deleted'.format(folder))
+			folder = None
+
+		self.logger.info('Temporary folders created in project {} have all been deleted'.format(self.prj))
+
+		return None
+
+
+
+
+
 
 class PowerFactory:
 	"""
 		Class to deal with system level interfacing in PowerFactory
 	"""
+	# TODO: Check correct license exists
 
 	def __init__(self):
 		""" Gets the relevant powerfactory version and initialises """
@@ -891,36 +1181,40 @@ class PowerFactory:
 		# Different APIs exist for different PowerFactory versions, if an old version is run then different
 		# initialisation route.  When initialising need to warn user that old version is being used
 		global app
-		if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
-			# powerfactory after 2017 has an error handler when trying to load
-			try:
-				app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine mode
-			except powerfactory.ExitError as error:
-				self.logger.critical(
-					(
-						'An error occurred trying to start PowerFactory.\n'
-						'The following error message was returned by PowerFactory \n\t{}\n'
-						'and associated error code: {}'
-					).format(error, error.code)
-				)
-				raise ImportError('Power Factory Load Error - Unable to run')
+		# Only initialise PowerFactory if not already initialised
+		if app is None:
+			if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
+				# powerfactory after 2017 has an error handler when trying to load
+				try:
+					app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine mode
+				except powerfactory.ExitError as error:
+					self.logger.critical(
+						(
+							'An error occurred trying to start PowerFactory.\n'
+							'The following error message was returned by PowerFactory \n\t{}\n'
+							'and associated error code: {}'
+						).format(error, error.code)
+					)
+					raise ImportError('Power Factory Load Error - Unable to run')
 
-		else:
-			# In case of an older version of PowerFactory being run
-			app = powerfactory.GetApplication()
-			if app is None:
-				self.logger.critical(
-					'Unable to load PowerFactory and this version does not return any error codes, you will need '
-					'to user a newer version of PowerFactory or investigate the error messages detailed above.'
-				)
-				raise ImportError('Power Factory Load Error - Unable to run')
+			else:
+				# In case of an older version of PowerFactory being run
+				app = powerfactory.GetApplication()
+				if app is None:
+					self.logger.critical(
+						'Unable to load PowerFactory and this version does not return any error codes, you will need '
+						'to user a newer version of PowerFactory or investigate the error messages detailed above.'
+					)
+					raise ImportError('Power Factory Load Error - Unable to run')
 
-			# Clear the powerfactory output window
-			app.ClearOutputWindow()  # Clear Output Window
+				# Clear the powerfactory output window
+				app.ClearOutputWindow()  # Clear Output Window
 
-	def active_project(self, project_name):
+		return None
+
+	def activate_project(self, project_name):
 		"""
-			Active a project for which a name is provided and return False if project cannot be found
+			Activate a project for which a name is provided and return False if project cannot be found
 		:param str project_name:  Name of project to be activated
 		:return powerfactory.DataObject pf_prj: Either returns a handle to the project or False if fails
 		"""
@@ -1039,27 +1333,45 @@ class PowerFactory:
 
 		return None
 
-	def check_parallel_processing(self):
-		"""
-			Function determines the number of processes that powerfactory is set to run
-		"""
+	# def check_parallel_processing(self):
+	# 	"""
+	# 		Function determines the number of processes that powerfactory is set to run
+	# 	"""
+	# 	# TODO: Requires reference to ParallelMan Settings to work, needs further development
+	# 	# NOT CURRENTLY WORKING
+	#
+	# 	# Get number of cpus available
+	# 	number_of_cpu = multiprocessing.cpu_count()
+	#
+	# 	# Check number of processors set to be run
+	# 	current_processors = app.GetNumSlave()
+	#
+	# 	# Display warning of a small value
+	# 	if current_processors == 1 or current_processors < (number_of_cpu-1):
+	# 		self.logger.warning(
+	# 			(
+	# 				'Your PowerFactory settings are set to only allow running on {} parallel processors, this does not'
+	# 				'take full advantage of the machines capability which has {} processors and therefore may take '
+	# 				'longer to run.'
+	# 			).format(current_processors, number_of_cpu)
+	# 		)
+	#
+	# 	return None
 
-		# Get number of cpus available
-		number_of_cpu = multiprocessing.cpu_count()
 
-		# Check number of processors set to be run
-		current_processors = app.GetNumSlave()
+def create_pf_project_instances(df_study_cases, uid=constants.uid):
+	"""
+		Loops through each of the projects in the DataFrame of study cases and activates them to check they work
+	:param pd.DataFrame df_study_cases:
+	:return dict pf_projects:  Returns a dictionary of PF project instances
+	"""
+	# Loop through each project and create a PFProject instance, then check can activate
+	pf_projects = dict()
+	for project, df in df_study_cases.groupby(by=constants.StudySettings.project, axis=0):
 
-		# Display warning of a small value
-		if current_processors == 1 or current_processors < number_of_cpu:
-			self.logger.warning(
-				(
-					'Your PowerFactory settings are set to only allow running on {} parallel processors, this does not'
-					'take full advantage of the machines capability and therefore may take longer to run.'
-				).format(current_processors)
-			)
+		pf_project = PFProject(name=project, df_studycases=df, uid=uid)
+		pf_projects[pf_project.name] = pf_project
 
-		return None
-
+	return pf_projects
 
 

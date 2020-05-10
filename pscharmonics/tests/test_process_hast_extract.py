@@ -160,7 +160,7 @@ class TestHASTImportFunctions(unittest.TestCase):
 		self.assertEqual(combined_df.shape, (396,30))
 		# Confirm columns correct
 		self.assertEqual(combined_df.columns.levels[1][1],'Bracetown 220 kV_Clonee 220 kV')
-		self.assertEqual(combined_df.columns.names[6],constants.ResultsExtract.lbl_FullName)
+		self.assertEqual(combined_df.columns.names[6], constants.Results.lbl_FullName)
 		# Check a random value
 		self.assertAlmostEqual(combined_df.iloc[10,15],29.087961, places=4)
 		# Extracts this dataframe to a compressed file so can be used for other tests

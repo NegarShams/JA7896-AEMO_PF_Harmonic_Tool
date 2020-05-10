@@ -338,11 +338,12 @@ class TestLoadFlowSettings(unittest.TestCase):
 
 	def test_missing_input_without_cmd(self):
 		""" Tests importing data while missing a pre-populated command without a complete dataset results in
-			a failed run
+			a incomplete flag and error message the default load flow command will be used
 		"""
 
 		# Create instance with complete set of settings
-		self.assertRaises(
-			ValueError, pscharmonics.file_io.LFSettings,
-			existing_command='', detailed_settings=self.df.iloc[2:]
-		)
+		lf_settings = pscharmonics.file_io.LFSettings(existing_command='', detailed_settings=self.df.iloc[2:])
+
+		# Confirm value of some inputs
+		self.assertTrue(lf_settings.cmd is None)
+		self.assertTrue(lf_settings.settings_error)

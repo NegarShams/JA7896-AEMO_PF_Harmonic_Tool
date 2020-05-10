@@ -2,6 +2,7 @@ import unittest
 import os
 import sys
 import shutil
+import pandas as pd
 
 from .context import pscharmonics
 import pscharmonics.pf as TestModule
@@ -12,13 +13,17 @@ import pscharmonics.pf as TestModule
 FULL_TEST = True
 TESTS_DIR = os.path.join(os.path.dirname(__file__), 'test_files')
 
-pf_test_model = 'pscharmonics_test_model'
+pf_test_project = 'pscharmonics_test_model'
+pf_test_sc = 'High Load Case'
+pf_test_os = 'HighLoadTap_testing'
 
 # When this is set to True tests which require initialising PowerFactory are skipped
-skip_slow_tests = True
+include_slow_tests = True
 
 TestModule.DEBUG_MODE=True
 
+# OLD tests are being skipped
+include_old_tests = False
 
 class TestPFInitialisation(unittest.TestCase):
 	""" Tests that the correct python version can be found and then PowerFactory can be initialised """
@@ -38,7 +43,7 @@ class TestPFInitialisation(unittest.TestCase):
 		# Confirm that python is now in the path
 		self.assertTrue(any(['PowerFactory' in x for x in sys.path]))
 
-	@unittest.skipUnless(skip_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+	@unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
 	def test_pf_initialisation(self):
 		""" Function tests that powerfactory can be initialised """
 		self.pf.initialise_power_factory()
@@ -49,14 +54,7 @@ class TestPFInitialisation(unittest.TestCase):
 
 		self.assertEqual(os.path.abspath(pf_directory), os.path.abspath(self.pf.c.dig_path))
 
-	@unittest.skipUnless(skip_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
-	def test_pf_processors(self):
-		""" Function tests checking of powerfactory parallel processors """
-		self.pf.initialise_power_factory()
-		self.pf.check_parallel_processing()
-
-
-@unittest.skipUnless(skip_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+@unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
 class TestsOnPFCase(unittest.TestCase):
 	"""
 		This class carries out tests on a specific PowerFactory case, if it doesn't exist in the PowerFactory model
@@ -72,19 +70,19 @@ class TestsOnPFCase(unittest.TestCase):
 		cls.pf.initialise_power_factory()
 
 		# Try to activate the test project and if it doesn't work then load power factory case in
-		if not cls.pf.active_project(project_name=pf_test_model):
-			pf_test_file = os.path.join(TESTS_DIR, '{}.pfd'.format(pf_test_model))
+		if not cls.pf.activate_project(project_name=pf_test_project):
+			pf_test_file = os.path.join(TESTS_DIR, '{}.pfd'.format(pf_test_project))
 
 			# Import the project
 			cls.pf.import_project(project_pth=pf_test_file)
-			cls.pf.active_project(project_name=pf_test_model)
+			cls.pf.activate_project(project_name=pf_test_project)
 
 		cls.pf_test_project = cls.pf.get_active_project()
 
 	def test_deactivate_project(self):
 		""" Function tests that activating and deactivating a project works as expected """
 		# Confirm project already active
-		pf_prj = self.pf.active_project(project_name=pf_test_model)
+		pf_prj = self.pf.activate_project(project_name=pf_test_project)
 
 		# Confirm that if project is activated
 		self.assertEqual(pf_prj, self.pf.get_active_project())
@@ -103,7 +101,155 @@ class TestsOnPFCase(unittest.TestCase):
 		cls.pf.deactivate_project()
 		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
-# ----- UNIT TESTS -----
+
+@unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+class TestPFProject(unittest.TestCase):
+	"""
+		Tests PF Project functions
+	"""
+	@classmethod
+	def setUpClass(cls):
+		""" Initialise PowerFactory and then check if model already exists """
+		cls.pf = pscharmonics.pf.PowerFactory()
+		cls.pf.initialise_power_factory()
+
+		# Try to activate the test project and if it doesn't work then load power factory case in
+		if not cls.pf.activate_project(project_name=pf_test_project):
+			pf_test_file = os.path.join(TESTS_DIR, '{}.pfd'.format(pf_test_project))
+
+			# Import the project
+			cls.pf.import_project(project_pth=pf_test_file)
+			cls.pf.activate_project(project_name=pf_test_project)
+
+		cls.pf_test_project = cls.pf.get_active_project()
+
+		# Create DataFrame for project tests
+		cls.test_name = 'TEST'
+		data = [cls.test_name, pf_test_project, pf_test_sc, pf_test_os]
+		columns = pscharmonics.constants.StudySettings.studycase_columns
+		cls.df = pd.DataFrame(data=data).transpose()
+		cls.df.columns = columns
+		# Set the index to be based on the unique name
+		cls.df.set_index(pscharmonics.constants.StudySettings.name, inplace=True, drop=False)
+
+	def test_create_project_temporary_folders(self):
+		"""
+			Confirm that new project instances can be created
+		:return None:
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(df_study_cases=self.df, uid=uid)
+
+		# Check defined as expected
+		pf_project = pf_projects[pf_test_project]
+		self.assertEqual(pf_test_project, pf_project.name)
+		self.assertTrue(pf_project.prj_active)
+
+		# Confirm temporary folders exist in the temporary project folder location
+		temp_folder_location = pscharmonics.pf.app.GetProjectFolder('study')
+		folder = temp_folder_location.GetContents(
+			'{}_{}.{}'.format(
+				pscharmonics.constants.PowerFactory.temp_sc_folder,
+				uid,
+				pscharmonics.constants.PowerFactory.pf_folder_type
+			)
+		)
+		# Confirm folder exists
+		self.assertTrue(len(folder) > 0)
+		# Confirm objects match with first element
+		self.assertEqual(folder[0], pf_project.sc_folder)
+
+		# Delete folders and then confirm folder no longer exists
+		pf_project.delete_temp_folders()
+		folder = temp_folder_location.GetContents(
+			'{}_{}.{}'.format(
+				pscharmonics.constants.PowerFactory.temp_sc_folder,
+				uid,
+				pscharmonics.constants.PowerFactory.pf_folder_type
+			)
+		)
+		self.assertTrue(len(folder) == 0)
+
+		# Deactivate project
+		pf_project.project_state(deactivate=True)
+		# Confirm deactivated
+		active_project = self.pf.get_active_project()
+		self.assertTrue(active_project is None)
+
+	def test_copy_studycases(self):
+		""" tests that new study cases can be created """
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(name=pf_test_project, df_studycases=df_test_project, uid=uid)
+
+		# Confirm study cases created
+		self.assertTrue(self.test_name in pf_project.base_sc.keys())
+
+		# Confirm can activate study case
+		sc = pf_project.base_sc[self.test_name]
+		# Confirm initially deactivated, change state and then confirm active
+		self.assertFalse(sc.active)
+		sc.toggle_state()
+		self.assertTrue(sc.active)
+
+		# Confirm can deactivate
+		sc.toggle_state(deactivate=True)
+		self.assertFalse(sc.active)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_studycase_lf_assignment(self):
+		""" Tests that new study cases can be created with approapriate load flow settings """
+		# Load flow settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		with pd.ExcelFile(def_inputs_file) as wkbk:
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+		# Create instance with complete set of settings
+		lf_settings = pscharmonics.file_io.LFSettings(
+			existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid,
+			lf_settings=lf_settings
+		)
+
+		# Confirm can activate study case
+		sc = pf_project.base_sc[self.test_name]
+
+		# Activate study case
+		sc.toggle_state()
+		self.assertTrue(sc.active)
+
+		# Run load flow and should get error code 0 returned
+		self.assertTrue(pscharmonics.constants.General.cmd_leader in str(sc.ldf))
+		self.assertEqual(sc.ldf.Execute(), 0)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	@classmethod
+	def tearDownClass(cls):
+		""" Function ensures the deletion of the PowerFactory project """
+		# Deactivate and then delete the project
+		cls.pf.deactivate_project()
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)
+
+
+
+# ----- UNIT TESTS OLD -----
+@unittest.skipUnless(include_old_tests, 'Old tests skipped')
 class TestHast(unittest.TestCase):
 	@classmethod
 	def setUp(cls):
@@ -261,6 +407,7 @@ class TestHast(unittest.TestCase):
 									   uid='partially_convergent')
 		self.assertTrue(os.path.isfile(results_file))
 
+@unittest.skipUnless(include_old_tests, 'Old tests skipped')
 class TestHASTInputsProcessing(unittest.TestCase):
 	"""
 		Class of tests to confirm the input processing is working correctly

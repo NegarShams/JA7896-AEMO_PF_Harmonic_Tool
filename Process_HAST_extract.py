@@ -113,8 +113,8 @@ def extract_var_name(var_name, dict_of_terms):
 		elif '.{}'.format(c.pf_results) in var:
 			# This correlates to the frequency data but that has already been provided and so can
 			# be deleted from the results
-			var_name = constants.ResultsExtract.lbl_to_delete
-			ref_terminal = constants.ResultsExtract.lbl_to_delete
+			var_name = constants.Results.lbl_to_delete
+			ref_terminal = constants.Results.lbl_to_delete
 			break
 
 	# Lookup HAST terminal name from input spreadsheet
@@ -177,7 +177,7 @@ def process_file_name(file_name, sc_names, cont_names):
 	:param list cont_names:  List of cont_names considered in study
 	:return list components: [study_type, study_case, contingency, filter_name) where file_name remaining
 	"""
-	c = constants.ResultsExtract
+	c = constants.Results
 	study_type = ''
 	sc_name = ''
 	cont_name = ''
@@ -235,7 +235,7 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 	:param dict manual_adjustments:  Contains naming conversions to use for the variables if they need adjusting
 	:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
 	"""
-	c = constants.ResultsExtract
+	c = constants.Results
 
 	# Import dataframe
 	_df = pd.read_csv(pth_file, header=[0, 1], index_col=0)
@@ -401,12 +401,12 @@ def process_file(pth_file, hast_inputs, manual_adjustments=dict()):
 
 	return _df
 
-def graph_grouping(df, group_by=constants.ResultsExtract.chart_grouping, startcol=0):
+def graph_grouping(df, group_by=constants.Results.chart_grouping, startcol=0):
 	"""
 		Determines sizes for grouping of graphs together
 		CAVEAT:  Assumes that the DataFrame order matches with the order in Excel
 	:param pd.DataFrame df: Dataframe to calculate grouping for
-	:param tuple group_by: (optional = constants.ResultsExtract.graph_grouping) = Levels to group by
+	:param tuple group_by: (optional = constants.Results.graph_grouping) = Levels to group by
 	:param int startcol: (optional=0) Column which graphs start from to be added to the dataframe columns
 	:return dict col_nums:  {Name of graph: Relative column numbers for results
 	"""
@@ -441,7 +441,7 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 	"""
 	logger.info('Exporting imported results to {}'.format(pth_file))
 	# Obtain constants
-	c = constants.ResultsExtract
+	c = constants.Results
 	start_row = c.start_row
 
 	# Delete empty column headers which correlate to either frequency of harmonic number data which
@@ -482,7 +482,7 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 							# Get number of columns to include in each graph grouping
 							dict_graph_grouping = graph_grouping(df=df_to_export, startcol=col+1)
 							names = df_to_export.columns.names
-							row_cont = start_row + names.index(constants.ResultsExtract.lbl_FullName)
+							row_cont = start_row + names.index(constants.Results.lbl_FullName)
 
 
 							add_graph(writer, sheet_name=node_name,
@@ -495,7 +495,7 @@ def extract_results(pth_file, df, vars_to_export, plot_graphs=True):
 
 							# Get grouping of graphs to compare study cases
 							dict_graph_grouping = graph_grouping(df=df_to_export,
-																 group_by=constants.ResultsExtract.chart_grouping_base_case,
+																 group_by=constants.Results.chart_grouping_base_case,
 																 startcol=col+1)
 
 							add_graph(writer, sheet_name=node_name,
@@ -561,7 +561,7 @@ def add_graph(writer, sheet_name, row_cont, row_start, col_freq, num_rows,
 	:param int chrt_row_num:  Number for this chart which determines the vertical row number the chart is added to
 	:return:
 	"""
-	c = constants.ResultsExtract
+	c = constants.Results
 	color_map = c().get_color_map()
 
 	# Get handles
@@ -699,7 +699,7 @@ def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
 	logger.info('Importing all hast results files in list folders: \n' +
 				 '\n'.join('\t{}' for  _ in range(len(search_pths))).format(*search_pths))
 	# Loop through each folder, obtain the hast files and produce the dataframes
-	c = constants.ResultsExtract
+	c = constants.Results
 	all_dfs = []
 	vars_to_export = []
 

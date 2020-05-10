@@ -26,7 +26,7 @@ def file_selector(initial_pth='', open_file=False, save_dir=False,
 				  save_file=False,
 				  lbl_file_select='Select results file(s) to add',
 				  lbl_folder_select='Select folder to store results in',
-				  def_ext=constants.ResultsExtract.extension,
+				  def_ext=constants.Results.extension,
 				  openfile_types=(('CSV files', '*.csv'),
 							  ('All Files', '*.*'))
 				  ):
@@ -94,7 +94,7 @@ class MainGUI:
 		results
 	"""
 	def __init__(self, title='Results Processing', start_directory='', files=False,
-				 def_ext=constants.ResultsExtract.extension):
+				 def_ext=constants.Results.extension):
 		"""
 			Initialise GUI
 		:param str title: (optional) - Title to be used for main window

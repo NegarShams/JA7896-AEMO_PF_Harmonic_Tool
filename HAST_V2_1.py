@@ -198,6 +198,7 @@ def deactivate_study_case(): 		# Deactivate Scenario
 		Deactivate loaded study case
 	:return: None
 	"""
+	# TRANSFERRED
 	# Get handle for active study case from PowerFactory
 	study = app.GetActiveStudyCase()
 	if study is not None:
@@ -1735,6 +1736,7 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	# Check all study cases converge, etc. and produce a new study case + operational scenario for each one
 	# Adjusted to now return a list of handles to class <hast22.pf.PF_Study_Case> which contain handles for the powerfactory
 	# scenario objects that require activating.
+	HERE
 	dict_of_projects = check_list_of_studycases(List_of_Studycases)
 	if len(dict_of_projects) == 0:
 		logger.critical('No base cases converged and so no studies to run.  Check your inputs and that you have a '
@@ -1818,7 +1820,7 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 			drop_duplicates=False
 		)
 		Process_HAST_extract.extract_results(
-			pth_file=excel_results + constants.ResultsExtract.extension,
+			pth_file=excel_results + constants.Results.extension,
 			df=combined_df,
 			vars_to_export=vars_in_hast,
 			plot_graphs=export_graphs)
@@ -1832,7 +1834,7 @@ def main(import_workbook, results_export_folder=None, uid=None, include_nom_volt
 	del logger
 	app = None
 
-	return excel_results + constants.ResultsExtract.extension
+	return excel_results + constants.Results.extension
 
 if __name__ == '__main__':
 	t0 = time.time()

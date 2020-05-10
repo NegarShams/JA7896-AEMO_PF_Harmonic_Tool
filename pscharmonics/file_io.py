@@ -267,7 +267,7 @@ class StudyInputs:
 	"""
 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
 	"""
-	def __init__(self, hast_inputs=None, uid_time=time.strftime('%y_%m_%d_%H_%M_%S'), filename=''):
+	def __init__(self, hast_inputs=None, uid_time=constants.uid, filename=''):
 		"""
 			Initialises the settings based on the HAST Study Settings spreadsheet
 		:param dict hast_inputs:  Dictionary of input data returned from file_io.Excel.import_excel_harmonic_inputs
@@ -1207,14 +1207,14 @@ class LFSettings:
 				)
 				self.settings_error = True
 			else:
-				self.logger.critical(
+				self.logger.warning(
 					(
 						'The load flow settings provided are incorrect / missng some values and no input for an existing '
-						'load flow command (.{}) has been provided.  The study cannot continue'
+						'load flow command (.{}) has been provided.  The study will just use the default load flow '
+						'command associated with each study case but results may be inconsistent!'
 					).format(constants.PowerFactory.ldf_command)
 				)
 				self.settings_error = True
-				raise ValueError('Incomplete Load Flow Settings')
 
 
 	def populate_data(self, load_flow_settings):
