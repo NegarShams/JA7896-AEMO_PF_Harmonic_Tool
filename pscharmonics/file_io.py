@@ -777,7 +777,7 @@ class StudyInputsDev:
 			self.settings = StudySettings(wkbk=wkbk)
 			self.cases = self.process_study_cases(wkbk=wkbk)
 			self.contingencies = self.process_contingencies(wkbk=wkbk)
-			self.terminals = self.process_terminals()
+			self.terminals = self.process_terminals(wkbk=wkbk)
 			# TODO: Need to write importers for rest of StudySettings
 
 	def load_workbook(self, pth_file=None):
