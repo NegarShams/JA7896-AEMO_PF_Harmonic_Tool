@@ -813,11 +813,15 @@ class StudyInputsDev:
 		# Import Study settings into a DataFrame and process, do not need to worry about unique columns since done by
 		# position
 		df = pd.read_excel(wkbk, sheet_name=sht, skiprows=3, header=0, usecols=(0, 1, 2, 3))
-		cols = df.columns
+		cols = constants.StudySettings.studycase_columns
+		df.columns = cols
 
 		# Process df names to confirm unique
 		name_key = cols[0]
 		df, updated = update_duplicates(key=name_key, df=df)
+
+		# Make index of study_cases name after duplicates removed
+		df.set_index(constants.StudySettings.name, inplace=True, drop=False)
 
 		if updated:
 			self.logger.warning(
@@ -861,6 +865,10 @@ class StudyInputsDev:
 		name_key = cols[0]
 		df, updated = update_duplicates(key=name_key, df=df)
 
+		# Make index of contingencies name after duplicates removed
+		df.set_index(name_key, inplace=True, drop=False)
+
+
 		if updated:
 			self.logger.warning(
 				(
@@ -902,6 +910,9 @@ class StudyInputsDev:
 		# Process df names to confirm unique
 		name_key = cols[0]
 		df, updated = update_duplicates(key=name_key, df=df)
+
+		# Make index of terminals name after duplicates removed
+		df.set_index(name_key, inplace=True, drop=False)
 
 		if updated:
 			self.logger.warning(

@@ -108,6 +108,11 @@ class PowerFactory:
 	frq_sweep_command = 'ComFsweep'
 	autotasks_command = '.ComTasks'
 
+	# Folder names for temporary folders
+	temp_sc_folder = 'temp_sc'
+	temp_os_folder = 'temp_sc'
+	temp_var_folder = 'temp_sc'
+
 	class ComRes:
 		# Power Factory class name
 		pf_comres = 'ComRes'
@@ -243,10 +248,13 @@ class PowerFactory:
 
 
 
-class ResultsExtract:
+class Results:
 	"""
 		Constants used in processing the results
 	"""
+	# Lables for all results details
+	skipped = 'Study Skipped'
+
 	study_types = ('FS', 'HLF')
 	extension = '.xlsx'
 	# Labels used for frequency scan results extract
@@ -445,6 +453,13 @@ class StudySettings:
 	export_rx = 'Excel_Export_RX'
 	export_mutual = 'Excel_Export_Z12'
 
+	# Base_Scenario columns
+	name = 'NAME'
+	project = 'Database'
+	studycase = 'Studycase'
+	scenario = 'Operational Scenario'
+	studycase_columns = (name, project, studycase, scenario)
+
 	# Default values
 	def_results_name = 'Results_'
 
@@ -463,13 +478,13 @@ class TestResultsExtract(unittest.TestCase):
 			Setup the handle for the Results Extract class
 		:return:
 		"""
-		cls.res_extract = ResultsExtract()
+		cls.res_extract = Results()
 
 	def test_results_extract_constant(self):
 		"""
 			Simple test to confirm test case is operational
 		"""
-		self.assertEqual(self.res_extract.lbl_StudyCase, ResultsExtract.lbl_StudyCase)
+		self.assertEqual(self.res_extract.lbl_StudyCase, Results.lbl_StudyCase)
 
 	def test_color_map(self):
 		"""
