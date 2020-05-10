@@ -110,8 +110,8 @@ class PowerFactory:
 
 	# Folder names for temporary folders
 	temp_sc_folder = 'temp_sc'
-	temp_os_folder = 'temp_sc'
-	temp_var_folder = 'temp_sc'
+	temp_os_folder = 'temp_os'
+	temp_var_folder = 'temp_var'
 
 	class ComRes:
 		# Power Factory class name
@@ -375,10 +375,12 @@ class HASTInputs:
 						  hldf_term_variables +
 						  res_values)
 	# Names of worksheets which contain the relevant inputs
+	# TODO: Lock worksheets so names can't be changed
 	terminals = 'Terminals'
 	study_settings = 'Study_Settings'
 	study_cases = 'Base_Scenarios'
 	contingencies = 'Contingencies'
+	lf_settings = 'Loadflow_Settings'
 	# Maximum length of an objects name in PowerFactory 2016 is 40 characters.
 	# Therefore the maximum name that can be used for a single terminal is 19 characters to allow two terminals to be
 	# joined together

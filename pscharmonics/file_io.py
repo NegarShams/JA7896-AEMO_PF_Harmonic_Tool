@@ -614,6 +614,7 @@ class StudySettings:
 		self.df = pd.read_excel(
 			wkbk, sheet_name=self.sht, index_col=0, usecols=(0, 1), skiprows=4, header=None, squeeze=True
 		)
+		self.process_inputs()
 
 	def process_inputs(self):
 		""" Process all of the inputs into attributes of the class """
@@ -776,6 +777,7 @@ class StudyInputsDev:
 			self.settings = StudySettings(wkbk=wkbk)
 			self.cases = self.process_study_cases(wkbk=wkbk)
 			self.contingencies = self.process_contingencies(wkbk=wkbk)
+			self.terminals = self.process_terminals()
 			# TODO: Need to write importers for rest of StudySettings
 
 	def load_workbook(self, pth_file=None):
@@ -930,6 +932,26 @@ class StudyInputsDev:
 
 		return terminals
 
+	def process_lf_settings(self, sht=constants.HASTInputs.lf_settings, wkbk=None, pth_file=None):
+		"""
+			Process the provided load flow settings
+		:param str sht:  (optional) Name of worksheet to use
+		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
+		:param str pth_file: (optional) File path to workbook
+		:return LFSettings lf_settings:  Returns reference to instance of load_flow settings
+		"""
+		# Import workbook as dataframe
+		if wkbk is None:
+			wkbk = self.load_workbook(pth_file=pth_file)
+
+		# Import Load flow settings into a DataFrame and process
+		df = pd.read_excel(
+			wkbk, sheet_name=sht, usecols=3, skiprows=3, header=None, squeeze=True
+		)
+
+		lf_settings = LFSettings(existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+
+
 def update_duplicates(key, df):
 	"""
 		Function will look for any duplicates in a particular column and then append a number to everything after
@@ -1070,10 +1092,22 @@ class FilterDetails:
 		self.f_q_values = list(itertools.product(self.f_range, self.q_range))
 
 class LFSettings:
-	def __init__(self):
+	def __init__(self, existing_command, detailed_settings):
 		"""
 			Initialise variables
+		:param str existing_command:  Reference to an existing command where it already exists
+		:param list detailed_settings:  Settings to be used where existing command does not exist
 		"""
+		self.logger = logging.getLogger(constants.logger_name)
+
+		# Add the Load Flow command to string
+		if existing_command:
+			if not existing_command.endswith('.{}'.format(constants.PowerFactory.ldf_command)):
+				existing_command = '{}.{}'.format(existing_command, constants.PowerFactory.ldf_command)
+		else:
+			existing_command = None
+		self.cmd = existing_command
+
 		# Target busbar reference found during runtime
 		self.rembar = str()
 
@@ -1157,11 +1191,38 @@ class LFSettings:
 		self.iopt_prot = int()  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
 		self.ign_comp = int()  # Ignore Composite Elements
 
+		# Value set to True if error occurs when processing settings
+		self.settings_error = False
+
+		try:
+			self.populate_data(load_flow_settings=list(detailed_settings))
+		except (IndexError, AttributeError):
+			if self.cmd:
+				self.logger.warning(
+					(
+						'There were some missing settings in the load flow settings input but an existing command {} '
+						'is being used instead. If this command is missing from the Study Cases then the script will '
+						'fail'
+					).format(self.cmd)
+				)
+				self.settings_error = True
+			else:
+				self.logger.critical(
+					(
+						'The load flow settings provided are incorrect / missng some values and no input for an existing '
+						'load flow command (.{}) has been provided.  The study cannot continue'
+					).format(constants.PowerFactory.ldf_command)
+				)
+				self.settings_error = True
+				raise ValueError('Incomplete Load Flow Settings')
+
+
 	def populate_data(self, load_flow_settings):
 		"""
 			List of settings for the load flow from HAST if using a manual settings file
 		:param list load_flow_settings:
 		"""
+
 		# Loadflow settings
 		# -------------------------------------------------------------------------------------
 		# Create new object for the load flow on the base case so that existing settings are not overwritten
@@ -1253,7 +1314,6 @@ class LFSettings:
 		# Advanced Simulation Options
 		self.iopt_prot = load_flow_settings[54]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
 		self.ign_comp = load_flow_settings[55]  # Ignore Composite Elements
-
 
 	def find_reference_terminal(self, app):
 		"""

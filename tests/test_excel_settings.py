@@ -11,6 +11,7 @@ import shutil
 from .context import pscharmonics
 
 TESTS_DIR = os.path.join(os.path.dirname(__file__), 'test_files')
+def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 
 # ----- UNIT TESTS -----
 class TestInputs(unittest.TestCase):
@@ -43,8 +44,6 @@ class TestInputs(unittest.TestCase):
 		""" Spot check some of the values are as expected """
 
 		self.assertEqual(self.inputs.cases['BASE'].name, 'BASE')
-
-
 
 class GeneralTests(unittest.TestCase):
 	"""
@@ -285,3 +284,65 @@ class TestResultsExport(unittest.TestCase):
 		# Delete folder and confirm deleted
 		shutil.rmtree(target_pth)
 		self.assertFalse(os.path.exists(target_pth))
+
+class TestLoadFlowSettings(unittest.TestCase):
+	""" Testing that load flow settings can be correctly imported with or without a fixed command """
+
+	def setUp(self):
+		"""
+			Initialisation carried out for every test
+		:return:
+		"""
+		# Following command imports the Load Flow settings from the default inputs spreadsheet
+		# TODO: Must ensure reference busbar is defined correctly and default settings match PowerFactory case
+		with pd.ExcelFile(def_inputs_file) as wkbk:
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			self.df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+	def test_complete_inputs(self):
+		""" Tests the complete set of default inputs """
+
+		# Create instance with complete set of settings
+		lf_settings = pscharmonics.file_io.LFSettings(existing_command=self.df.iloc[0], detailed_settings=self.df.iloc[1:])
+
+		# Confirm value of some inputs
+		self.assertFalse(lf_settings.cmd is None)
+		self.assertEqual(lf_settings.iopt_net, 0)
+		self.assertEqual(lf_settings.iopt_at, 1)
+
+	def test_without_cmd(self):
+		""" Tests importing data while missing a pre-populated command """
+
+		# Create instance with complete set of settings
+		lf_settings = pscharmonics.file_io.LFSettings(existing_command='', detailed_settings=self.df.iloc[1:])
+
+		# Confirm value of some inputs
+		self.assertTrue(lf_settings.cmd is None)
+		self.assertEqual(lf_settings.iopt_net, 0)
+		self.assertEqual(lf_settings.iopt_at, 1)
+		self.assertFalse(lf_settings.settings_error)
+
+	def test_missing_input_with_cmd(self):
+		""" Tests importing data while missing a pre-populated command """
+
+		# Create instance with complete set of settings
+		lf_settings = pscharmonics.file_io.LFSettings(existing_command=self.df.iloc[0], detailed_settings=self.df.iloc[2:])
+
+		# Confirm value of some inputs
+		self.assertFalse(lf_settings.cmd is None)
+		self.assertTrue(lf_settings.settings_error)
+
+	def test_missing_input_without_cmd(self):
+		""" Tests importing data while missing a pre-populated command without a complete dataset results in
+			a failed run
+		"""
+
+		# Create instance with complete set of settings
+		self.assertRaises(
+			ValueError, pscharmonics.file_io.LFSettings,
+			existing_command='', detailed_settings=self.df.iloc[2:]
+		)
