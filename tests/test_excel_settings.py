@@ -310,6 +310,7 @@ class TestLoadFlowSettings(unittest.TestCase):
 		lf_settings = pscharmonics.file_io.LFSettings(existing_command=self.df.iloc[0], detailed_settings=self.df.iloc[1:])
 
 		# Confirm value of some inputs
+		# TODO: Add in a manual check to confirm that all settings are correct
 		self.assertFalse(lf_settings.cmd is None)
 		self.assertEqual(lf_settings.iopt_net, 0)
 		self.assertEqual(lf_settings.iopt_at, 1)
@@ -347,3 +348,74 @@ class TestLoadFlowSettings(unittest.TestCase):
 		# Confirm value of some inputs
 		self.assertTrue(lf_settings.cmd is None)
 		self.assertTrue(lf_settings.settings_error)
+
+class TestFreqSweepSettings(unittest.TestCase):
+	""" Testing that frequency sweep settings can be correctly imported with or without a fixed command """
+
+	def setUp(self):
+		"""
+			Initialisation carried out for every test
+		:return:
+		"""
+		# Following command imports the Load Flow settings from the default inputs spreadsheet
+		# TODO: Must ensure reference busbar is defined correctly and default settings match PowerFactory case
+		with pd.ExcelFile(def_inputs_file) as wkbk:
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			self.df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+	def test_complete_inputs(self):
+		""" Tests the complete set of default inputs """
+
+		# Create instance with complete set of settings
+		settings = pscharmonics.file_io.FSSettings(existing_command=self.df.iloc[0], detailed_settings=self.df.iloc[1:])
+
+		# Confirm value of some inputs
+		self.assertFalse(settings.cmd is None)
+
+		# Confirm all following settings match with inputs spreadsheet as test
+		self.assertEqual(settings.frnom, 50.0)
+		self.assertEqual(settings.iopt_net, 0)
+		self.assertEqual(settings.fstart, 50.0)
+		self.assertEqual(settings.fstop, 500.0)
+		self.assertEqual(settings.fstep, 50.0)
+		self.assertEqual(settings.i_adapt, False)
+		self.assertEqual(settings.errmax, 0.01)
+		self.assertEqual(settings.errinc, 0.005)
+		self.assertEqual(settings.ninc, 10.0)
+		self.assertEqual(settings.ioutall, False)
+
+
+	def test_without_cmd(self):
+		""" Tests importing data while missing a pre-populated command """
+
+		# Create instance with complete set of settings
+		settings = pscharmonics.file_io.FSSettings(existing_command='', detailed_settings=self.df.iloc[1:])
+
+		# Confirm value of some inputs
+		self.assertTrue(settings.cmd is None)
+
+	def test_missing_input_with_cmd(self):
+		""" Tests importing data while missing a pre-populated command """
+
+		# Create instance with complete set of settings
+		settings = pscharmonics.file_io.FSSettings(existing_command=self.df.iloc[0], detailed_settings=self.df.iloc[2:])
+
+		# Confirm value of some inputs
+		self.assertFalse(settings.cmd is None)
+		self.assertTrue(settings.settings_error)
+
+	def test_missing_input_without_cmd(self):
+		""" Tests importing data while missing a pre-populated command without a complete dataset results in
+			a incomplete flag and error message the default load flow command will be used
+		"""
+
+		# Create instance with complete set of settings
+		fs_settings = pscharmonics.file_io.FSSettings(existing_command='', detailed_settings=self.df.iloc[2:])
+
+		# Confirm value of some inputs
+		self.assertTrue(fs_settings.cmd is None)
+		self.assertTrue(fs_settings.settings_error)

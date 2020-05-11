@@ -113,7 +113,7 @@ class PowerFactory:
 
 	ldf_command = 'ComLdf'
 	hldf_command = 'ComHldf'
-	frq_sweep_command = 'ComFsweep'
+	fs_command = 'ComFsweep'
 	autotasks_command = '.ComTasks'
 
 	# Folder names for temporary folders
@@ -389,6 +389,7 @@ class HASTInputs:
 	study_cases = 'Base_Scenarios'
 	contingencies = 'Contingencies'
 	lf_settings = 'Loadflow_Settings'
+	fs_settings = 'Frequency_Sweep'
 	# Maximum length of an objects name in PowerFactory 2016 is 40 characters.
 	# Therefore the maximum name that can be used for a single terminal is 19 characters to allow two terminals to be
 	# joined together

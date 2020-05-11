@@ -778,6 +778,9 @@ class StudyInputsDev:
 			self.cases = self.process_study_cases(wkbk=wkbk)
 			self.contingencies = self.process_contingencies(wkbk=wkbk)
 			self.terminals = self.process_terminals(wkbk=wkbk)
+			self.lf_settings = self.process_lf_settings(wkbk=wkbk)
+			self.fs_settings = self.process_fs_settings(wkbk=wkbk)
+
 			# TODO: Need to write importers for rest of StudySettings
 
 	def load_workbook(self, pth_file=None):
@@ -946,10 +949,31 @@ class StudyInputsDev:
 
 		# Import Load flow settings into a DataFrame and process
 		df = pd.read_excel(
-			wkbk, sheet_name=sht, usecols=3, skiprows=3, header=None, squeeze=True
+			wkbk, sheet_name=sht, usecols=(3, ), skiprows=3, header=None, squeeze=True
 		)
 
 		lf_settings = LFSettings(existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+		return lf_settings
+
+	def process_fs_settings(self, sht=constants.HASTInputs.fs_settings, wkbk=None, pth_file=None):
+		"""
+			Process the provided frequency sweep settings
+		:param str sht:  (optional) Name of worksheet to use
+		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
+		:param str pth_file: (optional) File path to workbook
+		:return LFSettings lf_settings:  Returns reference to instance of load_flow settings
+		"""
+		# Import workbook as dataframe
+		if wkbk is None:
+			wkbk = self.load_workbook(pth_file=pth_file)
+
+		# Import Load flow settings into a DataFrame and process
+		df = pd.read_excel(
+			wkbk, sheet_name=sht, usecols=(3, ), skiprows=3, header=None, squeeze=True
+		)
+
+		settings = FSSettings(existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+		return settings
 
 
 def update_duplicates(key, df):
@@ -1326,6 +1350,88 @@ class LFSettings:
 		self.rembar = pf_term
 
 		return None
+
+class FSSettings:
+	""" Class contains the frequency scan settings """
+	def __init__(self, existing_command, detailed_settings):
+		"""
+			Initialise variables
+		:param str existing_command:  Reference to an existing command where it already exists
+		:param list detailed_settings:  Settings to be used where existing command does not exist
+		"""
+		self.logger = logging.getLogger(constants.logger_name)
+
+		# Add the Load Flow command to string
+		if existing_command:
+			if not existing_command.endswith('.{}'.format(constants.PowerFactory.fs_command)):
+				existing_command = '{}.{}'.format(existing_command, constants.PowerFactory.fs_command)
+		else:
+			existing_command = None
+		self.cmd = existing_command
+
+		# Nominal frequency of system
+		self.frnom = float()
+
+		# Basic
+		self.iopt_net = int() # Network representation (0 Balanced, 1 Unbalanced)
+		self.fstart = float() # Impedance calculation start frequency
+		self.fstop = float() # Impedance calculation stop frequency
+		self.fstep = float() # Impedance calculation step size
+		self.i_adapt = bool() # Automatic step size adaption (False = No, True = Yes)
+
+		# Advanced
+		self.errmax = float() # Setting for step size adaption maximum prediction error
+		self.errinc = float() # Setting for step size minimum prediction error
+		self.ninc = float() # Step size increase delay
+		self.ioutall = bool() # Calculate R, X at output frequency for all nodes (False = No, True = Yes)
+
+		# Value set to True if error occurs when processing settings
+		self.settings_error = False
+
+		try:
+			self.populate_data(fs_settings=list(detailed_settings))
+		except (IndexError, AttributeError):
+			if self.cmd:
+				self.logger.warning(
+					(
+						'There were some missing settings in the frequency sweep settings input but an existing command {} '
+						'is being used instead. If this command is missing from the Study Cases then the script will '
+						'fail'
+					).format(self.cmd)
+				)
+				self.settings_error = True
+			else:
+				self.logger.warning(
+					(
+						'The frequency sweep settings provided are incorrect / missing some values and no input for an '
+						'existing frequency sweep command (.{}) has been provided.  The study will just use the default '
+						'frequency sweep command associated with each study case but results may be inconsistent!'
+					).format(constants.PowerFactory.fs_command)
+				)
+				self.settings_error = True
+
+
+	def populate_data(self, fs_settings):
+		"""
+			List of settings for the load flow from HAST if using a manual settings file
+		:param list fs_settings:
+		"""
+
+		# Nominal frequency of system
+		self.frnom = fs_settings[0]
+
+		# Basic
+		self.iopt_net = fs_settings[1]
+		self.fstart = fs_settings[2]
+		self.fstop = fs_settings[3]
+		self.fstep = fs_settings[4]
+		self.i_adapt = fs_settings[5]
+
+		# Advanced
+		self.errmax = fs_settings[6]
+		self.errinc = fs_settings[7]
+		self.ninc = fs_settings[8]
+		self.ioutall = fs_settings[9]
 
 class ResultsExport:
 	"""
