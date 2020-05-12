@@ -8,7 +8,7 @@ import pandas as pd
 import math
 import shutil
 
-from .context import pscharmonics
+from tests.context import pscharmonics
 
 TESTS_DIR = os.path.join(os.path.dirname(__file__), 'test_files')
 def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')

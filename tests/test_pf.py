@@ -4,7 +4,7 @@ import sys
 import shutil
 import pandas as pd
 
-from .context import pscharmonics
+from tests.context import pscharmonics
 import pscharmonics.pf as TestModule
 
 
@@ -235,6 +235,45 @@ class TestPFProject(unittest.TestCase):
 		# Run load flow and should get error code 0 returned
 		self.assertTrue(pscharmonics.constants.General.cmd_leader in str(sc.ldf))
 		self.assertEqual(sc.ldf.Execute(), 0)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_studycase_fs_assignment(self):
+		""" Tests that new study cases can be created with approapriate load flow settings """
+		# Load flow settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		with pd.ExcelFile(def_inputs_file) as wkbk:
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+		# Create instance with complete set of settings
+		fs_settings = pscharmonics.file_io.FSSettings(
+			existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid,
+			fs_settings=fs_settings
+		)
+
+		# Confirm can activate study case
+		sc = pf_project.base_sc[self.test_name]
+
+		# Activate study case
+		sc.toggle_state()
+		self.assertTrue(sc.active)
+
+		# Although no load flow created can run using default, and then confirm correctly executed
+		self.assertFalse(sc.fs is None)
+		self.assertEqual(sc.fs.Execute(), 0)
+		# TODO: Confirm settings match inputs
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()

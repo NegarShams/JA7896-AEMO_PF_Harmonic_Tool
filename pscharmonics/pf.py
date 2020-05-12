@@ -285,6 +285,9 @@ class PFStudyCase:
 		self.ldf = None
 		self.fs = None
 
+		# Reference to the results file that will be created by the frequency sweep
+		self.results = None
+
 		# self.base_name = list_parameters[0]
 		# self.prj_name = list_parameters[1]
 		# self.sc_name = remove_string_endings(astring=list_parameters[2], trailing='.IntCase')
@@ -310,7 +313,7 @@ class PFStudyCase:
 		# self.hldf = None
 		# self.frq_export_com = None
 		# self.hldf_export_com = None
-		# self.fs_results = None
+		# self.results = None
 		# self.hldf_results = None
 		# self.com_res = None
 		# self.fs_scale = []
@@ -494,86 +497,95 @@ class PFStudyCase:
 		self.ldf = ldf
 		return None
 
-	def create_freq_sweep(self, results_file, settings):
+	def create_freq_sweep(self, fs_settings):
 		"""
-			Create a frequency sweep command in the study_case and return this as a reference
-		:param object results_file:  Reference to the power factory results file for frequency sweep results
-		:param list settings:  Settings for the frequency sweep to be created
-		:return object frq_sweep:  Handle to the frq_sweep command that has been created
+			Create a frequencys weep command in the study case so that the same settings will be run for all
+			subsequent study cases.
+		:param pscconsulting.file_io.FSSettings fs_settings:  Settings to use
+		:return None:
 		"""
-		self.fs_results = results_file
-		# Create a new frequency sweep command object and store it in the study case
-		frq, already_existed = create_object(self.sc, constants.PowerFactory.frq_sweep_command,
-											 'FSweep_{}'.format(self.uid))
+		# TODO: Results file need to be created first
+		# Confirm load flow and results file has already been defined since needed for output settings
+		if self.ldf is None:
+			self.logger.error(
+				(
+					'Not possible to create frequency scan for study case {} since no load flow settings have yet'
+					'been determined.  This could be a scripting issue or an error finding a suitable load flow.'
+				).format(self.sc)
+			)
+			self.fs = None
+		else:
 
-		# Since uid is used in frequency command name only need to update settings if new object created
-		if not already_existed:
-			## Frequency Sweep Settings
-			## -------------------------------------------------------------------------------------
-			# Basic
-			# TODO: Check whether all settings from input file are actually used
-			frq.iopt_net = settings[2]  # Network Representation (0=Balanced 1=Unbalanced)
-			frq.fstart = settings[3]  # Impedance Calculation Start frequency
-			frq.fstop = settings[4]  # Stop Frequency
-			frq.fstep = settings[5]  # Step Size
-			frq.i_adapt = settings[6]  # Automatic Step Size Adaption
-			frq.frnom = settings[7]  # Nominal Frequency
-			frq.fshow = settings[8]  # Output Frequency
-			frq.ifshow = settings[9]  # Harmonic Order
-			frq.p_resvar = results_file  # Results Variable
+			# If input values have been provided for an existing command then copy that one
+			fs = None
+			if fs_settings:
+				if fs_settings.cmd:
+					fs = self.sc.GetContents(fs_settings.cmd)
+					# Check if command exists and if so copy that one with a new name
+					if len(fs) == 0:
+						self.logger.warning(
+							(
+								'Not able to find frequency sweep command {} in study case {}, provided settings will be '
+								'used instead.'
+							).format(fs_settings.cmd, self.sc)
+						)
+					else:
+						fs = self.sc.AddCopy(fs[0], '{}_{}'.format(constants.General.cmd_leader, constants.uid))
 
-			# Advanced
-			frq.errmax = settings[12]  # Setting for Step Size Adaption    Maximum Prediction Error
-			frq.errinc = settings[13]  # Minimum Prediction Error
-			frq.ninc = settings[14]  # Step Size Increase Delay
-			frq.ioutall = settings[15]  # Calculate R, X at output frequency for all nodes
+				if not fs and not fs_settings.settings_error:
+					# Populate settings based on provided inputs
+					# See if frequency sweep command already existed and if not create a new one
+					fs, _ = create_object(
+						location=self.sc,
+						pfclass=constants.PowerFactory.fs_command,
+						name='{}_{}'.format(constants.General.cmd_leader, constants.uid))
 
-		# Frequency sweep will use the load flow command created for this study case
-		frq.cbutldf = self.ldf
-		self.frq = frq
-		return self.frq
+					# Get handle for frequency sweep command from study case
+					fs.iopt_net = fs_settings.iopt_net  # Network Representation (0=Balanced 1=Unbalanced)
+					fs.fstart = fs_settings.fstart  # Impedance Calculation Start frequency
+					fs.fstop = fs_settings.fstop  # Stop Frequency
+					fs.fstep = fs_settings.fstep  # Step Size
+					fs.i_adapt = fs_settings.i_adapt  # Automatic Step Size Adaption
+					fs.frnom = fs_settings.frnom  # Nominal Frequency
+					fs.fshow = fs_settings.fstop # Fixzed to be the same as the stop frequency
+					fs.ifshow = float(fs_settings.fstop) / float(fs_settings.frnom)  # Harmonic Order
 
-	def create_harm_load_flow(self, results_file, settings):  # Inputs load flow settings and executes load flow
-		"""
-			Runs harmonic load flow
-		:param object results_file: Results variable provided as an input to the powerfactory harmonic load flow
-		:param list settings: Harmonic load flow settings
-		:return object hldf:  Handle to the hldf that has just been created
-		"""
-		self.hldf_results = results_file
-		# Create a new harmonic load flow object and store it in the study case
-		hldf, already_existed = create_object(self.sc, 'ComHldf', 'HLDF_{}'.format(self.uid))
+					# Advanced
+					fs.errmax = fs_settings.errmax  # Setting for Step Size Adaption    Maximum Prediction Error
+					fs.errinc = fs_settings.errinc  # Minimum Prediction Error
+					fs.ninc = fs_settings.ninc  # Step Size Increase Delay
+					fs.ioutall = fs_settings.ioutall  # Fixed to not include output for R, X at all nodes
 
-		# Since uid in command name only need to update settings if a new object is created
-		if not already_existed:
-			## Loadflow settings
-			## -------------------------------------------------------------------------------------
-			# Basic
-			hldf.iopt_net = settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
-			hldf.iopt_allfrq = settings[1]  # Calculate Harmonic Load Flow 0 - Single Frequency 1 - All Frequencies
-			hldf.iopt_flicker = settings[2]  # Calculate Flicker
-			hldf.iopt_SkV = settings[3]  # Calculate Sk at Fundamental Frequency
-			hldf.frnom = settings[4]  # Nominal Frequency
-			hldf.fshow = settings[5]  # Output Frequency
-			hldf.ifshow = settings[6]  # Harmonic Order
-			hldf.p_resvar = results_file  # Results Variable
+					self.logger.debug(
+						(
+							'Load flow settings for study case <{}> based on settings in inputs spreadsheet and '
+							'detailed in frequency sweep command <{}>'
+						).format(self.sc, fs)
+					)
 
-			# IEC 61000-3-6
-			hldf.iopt_harmsrc = settings[9]  # Treatment of Harmonic Sources
+			# If ldf still hasn't been defined then use default load flow
+			if not fs:
+				# Get default load flow command, copy and rename
+				def_fs = self.sc.GetContents('*.{}'.format(constants.PowerFactory.fs_command))[0]
+				fs = self.sc.AddCopy(def_fs, '{}_{}'.format(constants.General.cmd_leader, constants.uid))
+				self.logger.warning(
+					(
+						'Not able to use provided frequency sweep settings or existing frequency sweep command for study '
+						'case {} and therefore a new command <{}> has been created based on the default command <{}>'
+					).format(self.sc, def_fs, fs)
+				)
 
-			# Advanced Options
-			hldf.iopt_thd = settings[
-				10]  # Calculate HD and THD 0 Based on Fundamental Frequency values 1 Based on rated voltage/current
-			hldf.maxHrmOrder = settings[11]  # Max Harmonic order for calculation of THD and THF
-			hldf.iopt_HF = settings[12]  # Calculate Harmonic Factor (HF)
-			hldf.ioutall = settings[13]  # Calculate R, X at output frequency for all nodes
-			hldf.expQ = settings[14]  # Calculation of Factor-K (BS 7821) for Transformers
+			# Check if results file has already been defined otherwise define a new one
+			if not self.results:
+				self.create_results_files()
+			# Reference to results file where frequency scan results will be saved
+			fs.p_resvar = self.results  # Results Variable
 
-		# Load flow command to use
-		hldf.cbutldf = self.ldf
-		self.hldf = hldf
+			# Frequency sweep will use the load flow command created for this study case
+			fs.cbutldf = self.ldf
 
-		return self.hldf
+			self.fs = fs
+		return None
 
 	def process_fs_results(self, logger=None):
 		"""
@@ -584,7 +596,7 @@ class PFStudyCase:
 		c = constants.Results
 
 		# Insert data labels into frequency data to act as row labels for data
-		fs_scale, fs_res = retrieve_results(self.fs_results, 0)
+		fs_scale, fs_res = retrieve_results(self.results, 0)
 		fs_scale[0:2] = [
 			c.lbl_StudyCase,
 			c.lbl_Contingency,
@@ -611,97 +623,73 @@ class PFStudyCase:
 
 		return fs_res
 
-	def process_hrlf_results(self, logger):
+	# def process_hrlf_results(self, logger):
+	# 	"""
+	# 		Process the hrlf results ready for inclusion into spreadsheet
+	# 	:return hrm_res
+	# 	"""
+	# 	hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
+	#
+	# 	hrm_scale.insert(1, "THD")  # Inserts the THD
+	# 	hrm_scale.insert(1, "Harmonic")  # Arranges the Harmonic Scale
+	# 	hrm_scale.insert(1, "Scale")
+	# 	hrm_scale.pop(4)  # Takes out the 50 Hz
+	# 	hrm_scale.pop(4)
+	# 	for res12 in hrm_res:
+	# 		# Rather than retrieving THD from the calculated parameters in PowerFactory it is calculated from the
+	# 		# calculated harmonic distortion.  This will be calculated upto and including the upper limits set in the
+	# 		# inputs for the harmonic load flow study
+	#
+	# 		# Try / except statement to allow error catching if a poor result is returned and will then be alerted
+	# 		# to user
+	# 		try:
+	# 			# res12[3:] used since at this stage the res12 format is:
+	# 			# [result type (i.e. m:HD), terminal (i.e. *.ElmTerm), H1, H2, H3, ..., Hx]
+	# 			thd = math.sqrt(sum(i * i for i in res12[3:]))
+	#
+	# 		except TypeError:
+	# 			logger.error(('Unable to calculate the THD since harmonic results retrieved from results variable {} ' +
+	# 						  ' have come out in an unexpected order and now contain a string \n' +
+	# 						  'The returned results <res12> are {}').format(self.hldf_results, res12))
+	# 			thd = 'NA'
+	#
+	# 		res12.insert(2, thd)  # Insert THD
+	# 		res12.insert(2, self.cont_name)  # Op scenario
+	# 		res12.insert(2, self.sc_name)  # Study case description
+	# 		res12.pop(5)
+	#
+	# 	self.hrm_scale = hrm_scale
+	#
+	# 	return hrm_res
+
+	def create_results_files(self):
 		"""
-			Process the hrlf results ready for inclusion into spreadsheet
-		:return hrm_res
+			Function creates a results file if it does not already exist
+		:return None:
 		"""
-		hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
-
-		hrm_scale.insert(1, "THD")  # Inserts the THD
-		hrm_scale.insert(1, "Harmonic")  # Arranges the Harmonic Scale
-		hrm_scale.insert(1, "Scale")
-		hrm_scale.pop(4)  # Takes out the 50 Hz
-		hrm_scale.pop(4)
-		for res12 in hrm_res:
-			# Rather than retrieving THD from the calculated parameters in PowerFactory it is calculated from the
-			# calculated harmonic distortion.  This will be calculated upto and including the upper limits set in the
-			# inputs for the harmonic load flow study
-
-			# Try / except statement to allow error catching if a poor result is returned and will then be alerted
-			# to user
-			try:
-				# res12[3:] used since at this stage the res12 format is:
-				# [result type (i.e. m:HD), terminal (i.e. *.ElmTerm), H1, H2, H3, ..., Hx]
-				thd = math.sqrt(sum(i * i for i in res12[3:]))
-
-			except TypeError:
-				logger.error(('Unable to calculate the THD since harmonic results retrieved from results variable {} ' +
-							  ' have come out in an unexpected order and now contain a string \n' +
-							  'The returned results <res12> are {}').format(self.hldf_results, res12))
-				thd = 'NA'
-
-			res12.insert(2, thd)  # Insert THD
-			res12.insert(2, self.cont_name)  # Op scenario
-			res12.insert(2, self.sc_name)  # Study case description
-			res12.pop(5)
-
-		self.hrm_scale = hrm_scale
-
-		return hrm_res
-
-	def update_results_files(self, fs, hldf):
-		c = constants.PowerFactory
 		# Update FS results file
-		if fs:
-			self.fs_results = check_if_object_exists(
-				location=self.sc,
-				name='{}{}.{}'.format(
-					c.default_results_name,
-					c.default_fs_extension,
-					c.pf_results))
+		self.results, _ = create_object(
+			location=self.sc,
+			pfclass=constants.PowerFactory.pf_results,
+			name='{}{}'.format(constants.General.cmd_leader, constants.PowerFactory.default_fs_extension)
+		)
+		return None
 
-		# Update harmonic load flow
-		if hldf:
-			self.hldf_results = check_if_object_exists(
-				location=self.sc,
-				name='{}{}.{}'.format(
-					c.default_results_name,
-					c.default_hldf_extension,
-					c.pf_results))
-
-	def create_studies(self, logger, fs=False, hldf=False, fs_settings=[], hldf_settings=[]):
+	def create_studies(self):
 		"""
 			Function to create the frq and hldf studies including exporting to a pre-determined folder
-		:param logging.logger logger: Handle for log messages
-		:param bool fs: (optional=False) - Set to True to create FS studies
-		:param bool hldf: (optional=False) - Set to True to create HLDF studies
-		:param list fs_settings: (optional=[]) - Contains the settings for FS if required
-		:param list hldf_settings:  (optional=[]) - Contains the settings for HLDF if required
 		:return:
 		"""
-		self.update_results_files(fs=fs, hldf=hldf)
-		if fs:
-			_ = self.create_freq_sweep(results_file=self.fs_results,
-									   settings=fs_settings)
-			self.frq_export_com, export_pth = self.set_results_export(
-				result=self.fs_results,
-				name='{}_{}'.format('FS', self.name))
-			self.fs_result_exports.append(export_pth)
-			logger.debug(('For study case {}, frequency scan command {} and results export {} have been created'
-						  'with results being exported to: {}')
-						 .format(self.sc, self.frq, self.frq_export_com, export_pth))
-
-		if hldf:
-			_ = self.create_harm_load_flow(results_file=self.hldf_results,
-										   settings=hldf_settings)
-			self.hldf_export_com, export_pth = self.set_results_export(
-				result=self.hldf_results,
-				name='{}_{}'.format('HLDF', self.name))
-			self.hldf_result_exports.append(export_pth)
-			logger.debug(('For study case {}, harmonic load flow command {} and results export {} have been created'
-						  'with results being exported to: {}')
-						 .format(self.sc, self.hldf, self.hldf_export_com, export_pth))
+		self.create_results_files()
+		_ = self.create_freq_sweep(results_file=self.results,
+								   settings=fs_settings)
+		self.frq_export_com, export_pth = self.set_results_export(
+			result=self.results,
+			name='{}_{}'.format('FS', self.name))
+		self.fs_result_exports.append(export_pth)
+		logger.debug(('For study case {}, frequency scan command {} and results export {} have been created'
+					  'with results being exported to: {}')
+					 .format(self.sc, self.frq, self.frq_export_com, export_pth))
 
 	def set_results_export(self, result, name):
 		"""
@@ -921,6 +909,8 @@ class PFProject:
 			)
 			# Assign relevant load flow to study case
 			study_case_class.create_load_flow(lf_settings=self.lf_settings)
+			# Assign relevant frequency scan to study case
+			study_case_class.create_freq_sweep(fs_settings=self.fs_settings)
 
 			base_study_cases[name] = study_case_class
 

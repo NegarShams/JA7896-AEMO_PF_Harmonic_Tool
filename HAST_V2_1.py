@@ -560,7 +560,7 @@ def freq_sweep(results, fsweep_settings):		# Inputs Frequency Sweep Settings and
 	## Frequency Sweep Settings
 	## -------------------------------------------------------------------------------------
 	# Get handle for harmonic load flow command from study case
-	frq = app.GetFromStudyCase(constants.PowerFactory.frq_sweep_command)
+	frq = app.GetFromStudyCase(constants.PowerFactory.fs_command)
 	# Basic
 	frq.iopt_net = fsweep_settings[2]                # Network Representation (0=Balanced 1=Unbalanced)
 	frq.fstart = fsweep_settings[3]                	# Impedance Calculation Start frequency
