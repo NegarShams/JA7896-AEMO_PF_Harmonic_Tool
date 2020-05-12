@@ -262,13 +262,14 @@ def check_if_object_exists(location, name):  # Check if the object exists
 class PFStudyCase:
 	""" Class containing the details for each study case contained within a project """
 
-	def __init__(self, name, sc, os, base_case=False):
+	def __init__(self, name, sc, op, base_case=False, res_pth=str()):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str name:  Name of study case
 		:param powerfactory.DataObject sc:  Handle to the study_case
-		:param powerfactory.DataObject os:  Handle to the operating scenario
+		:param powerfactory.DataObject op:  Handle to the operating scenario
 		:param bool base_case: (optional=False) - Set to True for the base cases
+		:param str res_pth: (optional=str()) - This is the path that the processed results will be saved in
 		"""
 		self.logger = logging.getLogger(constants.logger_name)
 
@@ -277,7 +278,7 @@ class PFStudyCase:
 
 		# Reference to powerfactory handle for study case
 		self.sc = sc
-		self.os = os
+		self.os = op
 
 		self.active = False
 
@@ -287,6 +288,11 @@ class PFStudyCase:
 
 		# Reference to the results file that will be created by the frequency sweep
 		self.results = None
+
+		# If no results path is provided then warn user and saved results to same folder as the script
+		if not res_pth:
+			res_pth = os.path.abspath(os.path.join(os.path.abspath(__file__), '..'))
+		self.res_pth = res_pth
 
 		# self.base_name = list_parameters[0]
 		# self.prj_name = list_parameters[1]
@@ -691,20 +697,18 @@ class PFStudyCase:
 					  'with results being exported to: {}')
 					 .format(self.sc, self.frq, self.frq_export_com, export_pth))
 
-	def set_results_export(self, result, name):
+	def set_results_export(self, result):
 		"""
 			Function will create a results export command (.ComRes) to then use to deal with exporting all the results
 			into a CSV file as soon as they are completed.  They can then be processed by a different script.
-		:param str pth:  Path where the file should be saved
-		:param handle result:  handle to powerfactory result that should be extracted
-		:param str name:  Name of file to extract (without extension)
-		:return (h_comres, res_export_pth):  Handle to PF ComRes function, Full path to exported result
+		:param powerfactory.DataObject result:  handle to powerfactory result that should be extracted
+		:return (powerfactory.DataObject, res_export_pth):  Handle to PF ComRes function, Full path to exported result
 		"""
-		c = constants.PowerFactory.ComRes
-		res_export_path = os.path.join(self.res_pth, '{}.csv'.format(name))
+		res_export_path = os.path.join(self.res_pth, '{}.csv'.format(self.name))
 
+		c = constants.PowerFactory.ComRes
 		# Create com_res file to deal with extracting the results
-		h_comres, _ = create_object(location=self.sc, pfclass=c.pf_comres, name=name)
+		h_comres, _ = create_object(location=self.sc, pfclass=c.pf_comres, name=self.name)
 
 		# Set relevant result
 		h_comres.SetAttribute(c.result, result)
@@ -905,7 +909,7 @@ class PFProject:
 
 			# Create a PFStudyCase instance
 			study_case_class = PFStudyCase(
-				name=name, sc=new_sc, os=new_os, base_case=True
+				name=name, sc=new_sc, op=new_os, base_case=True
 			)
 			# Assign relevant load flow to study case
 			study_case_class.create_load_flow(lf_settings=self.lf_settings)

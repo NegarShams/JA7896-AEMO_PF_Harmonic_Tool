@@ -278,6 +278,63 @@ class TestPFProject(unittest.TestCase):
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
+	def test_studycase_fs_result_export(self):
+		""" Tests that new study cases can be created with a frequency scan and then export the results
+			to a suitable file
+		"""
+		test_export_pth = os.path.join(TESTS_DIR)
+
+		# Load flow settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		with pd.ExcelFile(def_inputs_file) as wkbk:
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+		# Create instance with complete set of settings
+		fs_settings = pscharmonics.file_io.FSSettings(
+			existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid,
+			fs_settings=fs_settings
+		)
+
+		# Get handle for study case
+		sc = pf_project.base_sc[self.test_name]
+		# Activate study case
+		sc.toggle_state()
+		self.assertTrue(sc.active)
+
+		# Set results path for associated study case and check file doesn't already exist
+		sc.res_pth = test_export_pth
+		test_export_file = os.path.join(test_export_pth, '{}.csv'.format(sc.name))
+		if os.path.isfile(test_export_file):
+			os.remove(test_export_file)
+		# Create results export command
+		export_cmd, res_pth = sc.set_results_export(result=sc.results)
+
+		# Confirm returned path matches expected value
+		self.assertEqual(test_export_file, res_pth)
+
+		# Run frequency scan and then export results
+		# Although no load flow created can run using default, and then confirm correctly executed
+		sc.fs.Execute()
+		# Confirm returns 0 for successful execute
+		self.assertEqual(export_cmd.Execute(), 0)
+		# Confirm file exists and then delete
+		self.assertTrue(os.path.isfile(test_export_file))
+		os.remove(test_export_file)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
 	@classmethod
 	def tearDownClass(cls):
 		""" Function ensures the deletion of the PowerFactory project """
