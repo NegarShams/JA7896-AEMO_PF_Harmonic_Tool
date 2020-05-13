@@ -276,6 +276,9 @@ class PFStudyCase:
 		# Unique name for this studycase
 		self.name = name
 
+		# Status set to False in combination or study_case and operating_scenario not convergent
+		self.ldf_convergent = True
+
 		# Reference to powerfactory handle for study case
 		self.sc = sc
 		self.os = op
@@ -285,6 +288,7 @@ class PFStudyCase:
 		# Handles that will be populated with the relevant commands
 		self.ldf = None
 		self.fs = None
+		self.fs_export_cmd = None
 
 		# Reference to the results file that will be created by the frequency sweep
 		self.results = None
@@ -293,6 +297,9 @@ class PFStudyCase:
 		if not res_pth:
 			res_pth = os.path.abspath(os.path.join(os.path.abspath(__file__), '..'))
 		self.res_pth = res_pth
+
+		# List of paths that contain the export files
+		self.fs_result_exports = list()
 
 		# self.base_name = list_parameters[0]
 		# self.prj_name = list_parameters[1]
@@ -366,10 +373,18 @@ class PFStudyCase:
 		:param pscconsulting.file_io.LFSettings lf_settings:  Existing load flow settings
 		:return None:
 		"""
+		# Name that is used for custom ldf command
+		ldf_name = '{}_{}'.format(constants.General.cmd_leader, constants.uid)
+
 		# If input values have been provided for an existing command then copy that one
 		ldf = None
 		if lf_settings:
-			if lf_settings.cmd:
+			# Check if command has already been created and if has then just needs assigning
+			existing_ldf = self.sc.GetContents('{}.{}'.format(ldf_name, constants.PowerFactory.ldf_command))
+			if len(existing_ldf) > 1:
+				ldf = existing_ldf[0]
+
+			elif lf_settings.cmd:
 				ldf = self.sc.GetContents(lf_settings.cmd)
 				# Check if command exists and if so copy that one with a new name
 				if len(ldf) == 0:
@@ -379,7 +394,7 @@ class PFStudyCase:
 						).format(lf_settings.cmd, self.sc)
 					)
 				else:
-					ldf = self.sc.AddCopy(ldf[0], '{}_{}'.format(constants.General.cmd_leader, constants.uid))
+					ldf = self.sc.AddCopy(ldf[0], ldf_name)
 
 			if not ldf and not lf_settings.settings_error:
 				# Populate settings based on provided inputs
@@ -387,7 +402,7 @@ class PFStudyCase:
 				ldf, _ = create_object(
 					location=self.sc,
 					pfclass=constants.PowerFactory.ldf_command,
-					name='{}_{}'.format(constants.General.cmd_leader, constants.uid))
+					name=ldf_name)
 
 				# Get handle for load flow command from study case
 				# Basic
@@ -510,7 +525,9 @@ class PFStudyCase:
 		:param pscconsulting.file_io.FSSettings fs_settings:  Settings to use
 		:return None:
 		"""
-		# TODO: Results file need to be created first
+		# Name that is used for custom ldf command
+		fs_name = '{}_{}'.format(constants.General.cmd_leader, constants.uid)
+
 		# Confirm load flow and results file has already been defined since needed for output settings
 		if self.ldf is None:
 			self.logger.error(
@@ -525,6 +542,11 @@ class PFStudyCase:
 			# If input values have been provided for an existing command then copy that one
 			fs = None
 			if fs_settings:
+				# Check if command has already been created and if has then just needs assigning
+				existing_fs = self.sc.GetContents('{}.{}'.format(fs_name, constants.PowerFactory.fs_command))
+				if len(existing_fs) > 1:
+					fs = existing_fs[0]
+
 				if fs_settings.cmd:
 					fs = self.sc.GetContents(fs_settings.cmd)
 					# Check if command exists and if so copy that one with a new name
@@ -536,7 +558,7 @@ class PFStudyCase:
 							).format(fs_settings.cmd, self.sc)
 						)
 					else:
-						fs = self.sc.AddCopy(fs[0], '{}_{}'.format(constants.General.cmd_leader, constants.uid))
+						fs = self.sc.AddCopy(fs[0], fs_name)
 
 				if not fs and not fs_settings.settings_error:
 					# Populate settings based on provided inputs
@@ -573,7 +595,7 @@ class PFStudyCase:
 			if not fs:
 				# Get default load flow command, copy and rename
 				def_fs = self.sc.GetContents('*.{}'.format(constants.PowerFactory.fs_command))[0]
-				fs = self.sc.AddCopy(def_fs, '{}_{}'.format(constants.General.cmd_leader, constants.uid))
+				fs = self.sc.AddCopy(def_fs, fs_name)
 				self.logger.warning(
 					(
 						'Not able to use provided frequency sweep settings or existing frequency sweep command for study '
@@ -681,21 +703,26 @@ class PFStudyCase:
 		)
 		return None
 
-	def create_studies(self):
+	def create_studies(self, lf_settings, fs_settings):
 		"""
-			Function to create the frq and hldf studies including exporting to a pre-determined folder
-		:return:
+			Function to either create a new command or change the reference of an existing command to results file
+			associated with this study
+		:param file_io.LFSettings lf_settings:  Settings to use for the frequency sweep settings
+		:param file_io.FSSettings fs_settings:  Settings to use for the frequency sweep settings
+		:return None:
 		"""
+		self.create_load_flow(lf_settings=lf_settings)
 		self.create_results_files()
-		_ = self.create_freq_sweep(results_file=self.results,
-								   settings=fs_settings)
-		self.frq_export_com, export_pth = self.set_results_export(
-			result=self.results,
-			name='{}_{}'.format('FS', self.name))
+		self.create_freq_sweep(fs_settings=fs_settings)
+		self.fs_export_cmd, export_pth = self.set_results_export(result=self.results)
+
 		self.fs_result_exports.append(export_pth)
-		logger.debug(('For study case {}, frequency scan command {} and results export {} have been created'
-					  'with results being exported to: {}')
-					 .format(self.sc, self.frq, self.frq_export_com, export_pth))
+		self.logger.debug(
+			(
+				'For study case {}, load flow command {}, frequency scan command {} and results export {} have been '
+				'created with results being exported to: {}'
+			).format(self.sc, self.ldf, self.fs, self.fs_export_cmd, export_pth)
+		)
 
 	def set_results_export(self, result):
 		"""
@@ -740,24 +767,30 @@ class PFStudyCase:
 		""" Function to run the embedded load flow command
 		:return bool success: Returns True / False on whether load flow was a success
 		"""
-		logger = logging.getLogger(constants.logger_name)
+		# Execute load flow, track run time and confirm success
 		t1 = time.time()
 		error_code = self.ldf.Execute()
 		t2 = time.time() - t1
 		if error_code == 0:
-			logger.info('\t - Load Flow calculation {} successful for {}, time taken: {:.2f} seconds'
+			self.logger.debug('\t - Load Flow calculation {} successful for {}, time taken: {:.2f} seconds'
 						.format(self.ldf, self.name, t2))
 			success = True
 		elif error_code == 1:
-			logger.error(('Load Flow calculation {} for {} failed due to divergence of inner loops, '
+			self.logger.error(('Load Flow calculation {} for {} failed due to divergence of inner loops, '
 						  'time taken: {:.2f} seconds')
 						 .format(self.ldf, self.name, t2))
 			success = False
 		elif error_code == 2:
-			logger.error(('Load Flow calculation {} failed for {} due to divergence of outer loops, '
+			self.logger.error(('Load Flow calculation {} failed for {} due to divergence of outer loops, '
 						  'time taken: {:.2f} seconds')
 						 .format(self.ldf, self.name, t2))
 			success = False
+		else:
+			success = False
+
+		# Set overall status
+		self.ldf_convergent = success
+
 		return success
 
 
@@ -911,6 +944,8 @@ class PFProject:
 			study_case_class = PFStudyCase(
 				name=name, sc=new_sc, op=new_os, base_case=True
 			)
+
+			# TODO: replace with a create_studies command
 			# Assign relevant load flow to study case
 			study_case_class.create_load_flow(lf_settings=self.lf_settings)
 			# Assign relevant frequency scan to study case

@@ -236,6 +236,10 @@ class TestPFProject(unittest.TestCase):
 		self.assertTrue(pscharmonics.constants.General.cmd_leader in str(sc.ldf))
 		self.assertEqual(sc.ldf.Execute(), 0)
 
+		# Run load flow using in built class command
+		self.assertTrue(sc.run_load_flow())
+		self.assertTrue(sc.ldf_convergent)
+
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
@@ -329,6 +333,73 @@ class TestPFProject(unittest.TestCase):
 		# Confirm returns 0 for successful execute
 		self.assertEqual(export_cmd.Execute(), 0)
 		# Confirm file exists and then delete
+		self.assertTrue(os.path.isfile(test_export_file))
+		os.remove(test_export_file)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_studycase_complete_studies_creation(self):
+		""" Tests that new study cases can be created with relevant studies created in a single
+			command
+		"""
+		test_export_pth = os.path.join(TESTS_DIR)
+
+		# Load flow settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		with pd.ExcelFile(def_inputs_file) as wkbk:
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+			# Create instance with complete set of settings
+			fs_settings = pscharmonics.file_io.FSSettings(
+				existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+			# Create instance with complete set of settings
+			lf_settings = pscharmonics.file_io.LFSettings(
+				existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
+
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+
+		# Get handle for study case
+		sc = pf_project.base_sc[self.test_name]
+		# Activate study case
+		sc.toggle_state()
+		self.assertTrue(sc.active)
+
+		# Set results path for associated study case and check file doesn't already exist
+		sc.res_pth = test_export_pth
+		test_export_file = os.path.join(test_export_pth, '{}.csv'.format(sc.name))
+		if os.path.isfile(test_export_file):
+			os.remove(test_export_file)
+
+		# Create studies
+		sc.create_studies(lf_settings=lf_settings, fs_settings=fs_settings)
+
+		# Confirm returned path matches expected value
+		self.assertEqual(test_export_file, sc.fs_result_exports[0])
+
+		# Run load flow, frequency scan and export
+		self.assertEqual(sc.ldf.Execute(), 0)
+		self.assertEqual(sc.fs.Execute(), 0)
+		self.assertEqual(sc.fs_export_cmd.Execute(), 0)
+
 		self.assertTrue(os.path.isfile(test_export_file))
 		os.remove(test_export_file)
 
