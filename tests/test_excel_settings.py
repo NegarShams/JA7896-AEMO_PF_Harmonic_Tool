@@ -227,6 +227,9 @@ class TestContingencies(unittest.TestCase):
 
 		contingencies = self.test_cls.process_contingencies(pth_file=pth_inputs)
 
+		# Confirm command for contingency analysis is imported correctly
+		self.assertEqual(self.test_cls.contingency_cmd, 'Contingency Analysis')
+
 		# Confirm contingencies are all base case
 		self.assertTrue('Base_Case(1)' in contingencies.keys())
 

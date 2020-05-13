@@ -772,6 +772,9 @@ class StudyInputsDev:
 		self.filename = os.path.basename(pth_file)
 		self.logger = logging.getLogger(constants.logger_name)
 
+		# Populated with command name in PowerFactory that contains details of all of the contingencies
+		self.contingency_cmd = str()
+
 		with pd.ExcelFile(io=self.pth) as wkbk:
 			# Import StudySettings
 			self.settings = StudySettings(wkbk=wkbk)
@@ -780,8 +783,6 @@ class StudyInputsDev:
 			self.terminals = self.process_terminals(wkbk=wkbk)
 			self.lf_settings = self.process_lf_settings(wkbk=wkbk)
 			self.fs_settings = self.process_fs_settings(wkbk=wkbk)
-
-			# TODO: Need to write importers for rest of StudySettings
 
 	def load_workbook(self, pth_file=None):
 		"""
@@ -861,9 +862,22 @@ class StudyInputsDev:
 		if wkbk is None:
 			wkbk = self.load_workbook(pth_file=pth_file)
 
-		# Import Contingencies into a DataFrame and process, do not need to worry about unique columns since done by
-		# position
-		df = pd.read_excel(wkbk, sheet_name=sht, skiprows=2, header=(0, 1))
+		# Get details of existing contingency command and if exists set the reference command
+		# Squeeze command to ensure converted to a series since only a single row is being imported
+		df = pd.read_excel(
+			wkbk, sheet_name=sht, skiprows=2, nrows=1, usecols=(0,1,2,3), index_col=None, header=None
+		).squeeze(axis=0)
+		cmd = df.iloc[3]
+		# Valid command is a string whereas non-valid commands will be either False or an empty string
+		if cmd:
+			self.contingency_cmd = cmd
+		else:
+			self.contingency_cmd = str()
+
+
+		# Import rest of details of contingencies into a DataFrame and process, do not need to worry about unique
+		# columns since done by position
+		df = pd.read_excel(wkbk, sheet_name=sht, skiprows=3, header=(0, 1))
 		cols = df.columns
 
 		# Process df names to confirm unique
