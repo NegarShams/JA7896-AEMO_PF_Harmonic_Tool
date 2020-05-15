@@ -772,14 +772,11 @@ class StudyInputsDev:
 		self.filename = os.path.basename(pth_file)
 		self.logger = logging.getLogger(constants.logger_name)
 
-		# Populated with command name in PowerFactory that contains details of all of the contingencies
-		self.contingency_cmd = str()
-
 		with pd.ExcelFile(io=self.pth) as wkbk:
 			# Import StudySettings
 			self.settings = StudySettings(wkbk=wkbk)
 			self.cases = self.process_study_cases(wkbk=wkbk)
-			self.contingencies = self.process_contingencies(wkbk=wkbk)
+			self.contingency_cmd, self.contingencies = self.process_contingencies(wkbk=wkbk)
 			self.terminals = self.process_terminals(wkbk=wkbk)
 			self.lf_settings = self.process_lf_settings(wkbk=wkbk)
 			self.fs_settings = self.process_fs_settings(wkbk=wkbk)
@@ -870,9 +867,9 @@ class StudyInputsDev:
 		cmd = df.iloc[3]
 		# Valid command is a string whereas non-valid commands will be either False or an empty string
 		if cmd:
-			self.contingency_cmd = cmd
+			contingency_cmd = cmd
 		else:
-			self.contingency_cmd = str()
+			contingency_cmd = str()
 
 
 		# Import rest of details of contingencies into a DataFrame and process, do not need to worry about unique
@@ -902,7 +899,7 @@ class StudyInputsDev:
 			cont = ContingencyDetails(list_of_parameters=item.values)
 			contingencies[cont.name] = cont
 
-		return contingencies
+		return contingency_cmd, contingencies
 
 	def process_terminals(self, sht=constants.HASTInputs.terminals, wkbk=None, pth_file=None):
 		"""
@@ -1043,15 +1040,58 @@ class ContingencyDetails:
 			Single row of contingency parameters imported from spreadsheet are defined into a class for easy lookup
 		:param list list_of_parameters:  Single row of inputs
 		"""
+		# Status flag set to True if cannot be found, contingency fails, etc.
+		self.not_included = False
+
 		self.name = list_of_parameters[0]
 		self.couplers = []
 		for substation, breaker, status in zip(*[iter(list_of_parameters[1:])]*3):
-			if substation != '':
+			if substation != '' and breaker != '' and str(breaker) != 'nan':
 				new_coupler = CouplerDetails(substation, breaker, status)
 				self.couplers.append(new_coupler)
 
+		# Check if this contingency relates to the intact system in which case it will be skipped
+		if len(self.couplers) == 0 or self.name == constants.HASTInputs.base_case:
+			self.skip = True
+		else:
+			self.skip = False
+
 class CouplerDetails:
 	def __init__(self, substation, breaker, status):
+		"""
+			Define the substations, breaker and status
+		:param str substation:  Name of substation
+		:param str breaker: Name of breaker
+		:param bool status: Status breaker is changed to
+		"""
+		# Check if substation already has substation type ending and if not add it
+		if not str(substation).endswith(constants.PowerFactory.pf_substation):
+			substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
+
+		# Check if breaker ends in the correct format
+		if not str(breaker).endswith(constants.PowerFactory.pf_coupler):
+			breaker = '{}.{}'.format(breaker, constants.PowerFactory.pf_coupler)
+
+		# Confirm that status for operation is either true or false
+		if status == constants.HASTInputs.switch_open:
+			status = False
+		elif status == constants.HASTInputs.switch_close:
+			status = True
+		else:
+			logger = logging.getLogger(constants.logger_name)
+			logger.warning(
+				(
+					'The breaker <{}> associated with substation <{}> has a value of {} which is not expected value of '
+					'{} or {}.  The operation is assumed to be {} for this study but the user should check '
+					'that is what they intended'
+				).format(
+					breaker, substation, status,
+					constants.HASTInputs.switch_open, constants.HASTInputs.switch_close,
+					constants.HASTInputs.switch_open
+				)
+			)
+			status = False
+
 		self.substation = substation
 		self.breaker = breaker
 		self.status = status

@@ -73,6 +73,8 @@ class PowerFactory:
 	pf_terminal =  'ElmTerm'
 	pf_coupler = 'ElmCoup'
 	pf_mutual = 'ElmMut'
+	pf_fault_event = 'IntEvt'
+	pf_switch_event = 'EvtSwitch'
 	pf_case = 'IntCase'
 	pf_scenario = 'IntScenario'
 	pf_filter = 'ElmShnt'
@@ -98,7 +100,11 @@ class PowerFactory:
 
 	# General Types
 	pf_folder_type = 'IntFolder'
-	pf_prjfolder_type = 'netdat'
+	pf_fault_cases_folder = 'IntFltcases'
+	pf_netdata_folder_type = 'netdat'
+	pf_faults_folder_type = 'fault'
+	pf_sc_folder_type = 'study'
+	pf_os_folder_type = 'scen'
 
 	# Default results file name
 	default_results_name = 'HAST_Res'
@@ -122,7 +128,8 @@ class PowerFactory:
 	# Folder names for temporary folders
 	temp_sc_folder = 'temp_sc'
 	temp_os_folder = 'temp_os'
-	temp_var_folder = 'temp_var'
+	# temp_var_folder = 'temp_var'
+	temp_faults_folder = 'temp_faults'
 
 	# Constants associated with the handling of PowerFactory initialisation and
 	# potential intermittent errors
@@ -266,7 +273,10 @@ class PowerFactory:
 			)
 			raise EnvironmentError('Incompatible Python version')
 
-
+class FaultEvent:
+	""" Constants associated with a PowerFactory Fault Event """
+	# pf variable to associate a fault case with a contingency
+	mod_cnt = 'mod_cnt'
 
 
 
@@ -418,6 +428,11 @@ class HASTInputs:
 
 	# Default value for automatic tap changing of PST
 	def_automatic_pst_tap = 1
+
+	# Text use to define an open or close status for a switch
+	switch_open = 'Open'
+	switch_close = 'Close'
+
 
 # In format:  (sheet_name, header row, data columns, rows to skip) - all numbers 0 indexed
 analysis_sheets = (

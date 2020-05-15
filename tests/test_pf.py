@@ -16,6 +16,7 @@ TESTS_DIR = os.path.join(os.path.dirname(__file__), 'test_files')
 pf_test_project = 'pscharmonics_test_model'
 pf_test_sc = 'High Load Case'
 pf_test_os = 'HighLoadTap_testing'
+pf_test_inputs = 'Inputs.xlsx'
 
 # When this is set to True tests which require initialising PowerFactory are skipped
 include_slow_tests = True
@@ -415,10 +416,9 @@ class TestPFProject(unittest.TestCase):
 
 
 @unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
-class TestPFContingencyCreation(unittest.TestCase):
+class TestPFProject_ContingencyCases(unittest.TestCase):
 	"""
-		Tests the creation and running of contingency analysis to determine the convergent load
-		flows
+		Tests creation of contingency cases and fault events within the PFProject class
 	"""
 	@classmethod
 	def setUpClass(cls):
@@ -445,37 +445,15 @@ class TestPFContingencyCreation(unittest.TestCase):
 		# Set the index to be based on the unique name
 		cls.df.set_index(pscharmonics.constants.StudySettings.name, inplace=True, drop=False)
 
+		# Import all settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		cls.settings = pscharmonics.file_io.StudyInputsDev(pth_file=def_inputs_file)
 
-	def test_studycase_complete_studies_creation(self):
-		""" Tests that new study cases can be created with relevant studies created in a single
-			command
+	def test_create_fault_cases(self):
+		"""
+			Tests that fault cases can be created for a contingency command
 		"""
 		test_export_pth = os.path.join(TESTS_DIR)
-
-		# Load flow settings
-		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
-			df = pd.read_excel(
-				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
-				usecols=(3,), skiprows=3, header=None, squeeze=True
-			)
-
-			# Create instance with complete set of settings
-			fs_settings = pscharmonics.file_io.FSSettings(
-				existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
-
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
-			df = pd.read_excel(
-				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
-				usecols=(3,), skiprows=3, header=None, squeeze=True
-			)
-
-			# Create instance with complete set of settings
-			lf_settings = pscharmonics.file_io.LFSettings(
-				existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
 
 		# Create new project instances
 		uid = 'TEST_CASE'
@@ -484,41 +462,21 @@ class TestPFContingencyCreation(unittest.TestCase):
 			name=pf_test_project, df_studycases=df_test_project, uid=uid
 		)
 
-		# Get handle for study case
-		sc = pf_project.base_sc[self.test_name]
-		# Activate study case
-		sc.toggle_state()
-		self.assertTrue(sc.active)
-
-		# Set results path for associated study case and check file doesn't already exist
-		sc.res_pth = test_export_pth
-		test_export_file = os.path.join(test_export_pth, '{}.csv'.format(sc.name))
-		if os.path.isfile(test_export_file):
-			os.remove(test_export_file)
-
-		# Create studies
-		sc.create_studies(lf_settings=lf_settings, fs_settings=fs_settings)
-
-		# Confirm returned path matches expected value
-		self.assertEqual(test_export_file, sc.fs_result_exports[0])
-
-		# Run load flow, frequency scan and export
-		self.assertEqual(sc.ldf.Execute(), 0)
-		self.assertEqual(sc.fs.Execute(), 0, msg='Check PQ license exists since frequency scan failed')
-		self.assertEqual(sc.fs_export_cmd.Execute(), 0)
-
-		self.assertTrue(os.path.isfile(test_export_file))
-		os.remove(test_export_file)
+		# Create fault events
+		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
+		HERE
+		# TODO:  Need to implement tests to confirm fault cases created correctly
+		pass
 
 		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
+		#pf_project.delete_temp_folders()
 
 	@classmethod
 	def tearDownClass(cls):
 		""" Function ensures the deletion of the PowerFactory project """
 		# Deactivate and then delete the project
 		cls.pf.deactivate_project()
-		cls.pf.delete_object(pf_obj=cls.pf_test_project)
+	#cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
 
 # ----- UNIT TESTS OLD -----

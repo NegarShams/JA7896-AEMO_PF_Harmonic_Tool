@@ -903,17 +903,22 @@ class PFProject:
 			self.exists = True
 
 		# Get reference to project study case and operational scenario folders
-		self.base_sc_folder = app.GetProjectFolder('study')
-		self.base_os_folder = app.GetProjectFolder('scen')
+		self.base_sc_folder = app.GetProjectFolder(constants.PowerFactory.pf_sc_folder_type)
+		self.base_os_folder = app.GetProjectFolder(constants.PowerFactory.pf_os_folder_type)
 		# self.base_var_folder = app.GetProjectFolder('scheme')
+
+		# Get handle for all network data
+		self.net_data = app.GetProjectFolder(constants.PowerFactory.pf_netdata_folder_type)
 
 		# Create temporary folders
 		c = constants.PowerFactory
 		self.sc_folder = self.create_folder(name='{}_{}'.format(c.temp_sc_folder, self.uid), location=self.base_sc_folder)
 		self.os_folder = self.create_folder(name='{}_{}'.format(c.temp_os_folder, self.uid), location=self.base_os_folder)
+		# Folder to contain the fault cases which is only created if needed
+		self.fault_case_folder = None
 		# self.var_folder = self.create_folder(name='{}_{}'.format(c.temp_var_folder, self.uid), location=self.base_var_folder)
 		# self.temp_folders = (self.sc_folder, self.os_folder, self.var_folder)
-		self.temp_folders = (self.sc_folder, self.os_folder)
+		self.temp_folders = [self.sc_folder, self.os_folder]
 
 		# Initialise study_cases
 		self.base_sc = self.initialise_study_cases()
@@ -1209,6 +1214,136 @@ class PFProject:
 		self.logger.info('Temporary folders created in project {} have all been deleted'.format(self.prj))
 
 		return None
+
+	def create_fault_cases(self, contingencies):
+		"""
+			Function will loop through all of the contingencies and create a fault case for each which are
+			all added to a temporary folder.
+			This list of fault cases can then be added to a contingency case and each study case / operating scenario
+			associated with a project tested for convergence.
+		:param dict contingencies:  Reference to the contingencies returned in a dictionary as part of the inputs
+									processing
+		:return dict fault_cases:  Returns a dictionary which contains a reference to all of the fault cases created
+		"""
+		# Fault cases list initialised to be empty
+		fault_cases = dict()
+
+		# Find base folder for all fault cases to be stored in
+		faults_folder = app.GetProjectFolder(constants.PowerFactory.pf_faults_folder_type)
+
+
+		# Create temporary folder to store all of the fault cases within and add to list of folders to be deleted
+		# self.fault_case_folder = self.create_folder(
+		# 	name='{}_{}'.format(constants.PowerFactory.temp_faults_folder, constants.uid),
+		# 	location=faults_folder
+		# )
+		self.fault_case_folder, _ = create_object(
+			location=faults_folder,
+			pfclass=constants.PowerFactory.pf_fault_cases_folder,
+			name='{}_{}'.format(constants.PowerFactory.temp_faults_folder, constants.uid)
+		)
+		self.temp_folders.append(self.fault_case_folder)
+
+		# Loop through each contingency and look for relevant elements
+		for name, cont in contingencies.items():
+			# Check if status of contingency is set to skip and if so continue
+			if cont.skip:
+				self.logger.debug(
+					'Contingency {} is not considered for analysis and is therefore skipped'.format(cont.name)
+				)
+				continue
+
+			# Create new switch event within the network folder
+			fault_event, _ = create_object(
+				location=self.fault_case_folder,
+				pfclass=constants.PowerFactory.pf_fault_event,
+				name=cont.name
+			)
+
+			# Assign as a contingency case
+			fault_event.mod_cnt = 1
+
+			# Get all folders which contain network elements
+			net_data_items = self.net_data.GetContents('*.{}'.format(constants.PowerFactory.pf_network_elements))
+
+			# Loop through each coupler and add switch event to fault case
+			for coupler in cont.couplers:
+				# Find substation using a recursive search of the network elements folders
+				substation = list()
+				for net_item in net_data_items:
+					# Loop through each net_item folder and extend substation
+					substation.extend(net_item.GetContents(coupler.substation))
+				# substation = self.net_data.GetContents(coupler.substation, recursive=1)
+
+				# Check that only a single substation is found
+				if len(substation) == 0:
+					self.logger.error(
+						(
+							'For contingency {} the substation named {} cannot be found and therefore this '
+							'contingency will not be studied'
+						).format(cont.name, coupler.substation)
+					)
+					cont.not_included = True
+					break
+				elif len(substation) > 1:
+					self.logger.error(
+						(
+							'For contingency {} the substation named {} has been found in multiple locations '
+							'and therefore the specific substation to be included cannot be identified.  This'
+							'contingency will not be studied.  The following substations where found: \n\t'
+							'{}\n'
+						).format(cont.name, coupler.substation, '\n\t'.join([str(x) for x in substation]))
+					)
+					cont.not_included = True
+					break
+				else:
+					substation = substation[0]
+
+				# Find the switch within this substation
+				breaker = substation.GetContents(coupler.breaker)
+
+				# Check that only a single substation is found
+				if len(breaker) == 0:
+					self.logger.error(
+						(
+							'For contingency {} the circuit breaker named {} cannot be found within the substation'
+							'<{}> and therefore this contingency will not be studied'
+						).format(cont.name, coupler.breaker, substation)
+					)
+					cont.not_included = True
+					break
+				else:
+					breaker = breaker[0]
+
+				switch_event, _ = create_object(
+					location=fault_event,
+					pfclass=constants.PowerFactory.pf_switch_event,
+					name=breaker.loc_name
+				)
+				# Set target element
+				switch_event.p_target = breaker
+				# Set status and ensure takes place on all phases
+				switch_event.i_switch = coupler.status
+				switch_event.i_allph = 1
+
+			# Check if all events added successfully otherwise delete fault case
+			if cont.not_included:
+				fault_event.Delete()
+			else:
+				self.logger.debug('Fault case {} successfully created for contingency {}'.format(fault_event, cont.name))
+				fault_cases[cont.name] = fault_event
+				# Reference to the created fault event added to the contingency record
+				cont.fault_event = fault_event
+
+		return fault_cases
+
+
+
+
+
+
+
+
 
 
 

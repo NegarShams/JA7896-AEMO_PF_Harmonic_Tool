@@ -839,7 +839,7 @@ def create_study_case_results_files(cls_sc, cls_prj):
 		if cls_prj.mutual_impedance_folder is None:
 			# Initial folder is created in the Project network data folder and is then moved to the EirGrid network
 			# elements folder.  This is required to resolve issues when running in unattended mode.
-			network_data_folder = app.GetProjectFolder(constants.PowerFactory.pf_prjfolder_type)
+			network_data_folder = app.GetProjectFolder(constants.PowerFactory.pf_netdata_folder_type)
 			# Create mutual impedance folder
 			cls_prj.mutual_impedance_folder, folder_exists3 = create_folder(network_data_folder, Mut_Elm_Fld)
 			logger.debug('New mutual impedance folder = {}'.format(cls_prj.mutual_impedance_folder))
