@@ -33,11 +33,14 @@ cpu_keep_free = 1
 default_max_processes = 3
 
 # Unique identifier populated for each study run
-uid = time.strftime('%y_%m_%d_%H_%M_%S')
+uid = time.strftime('%Y%m%d_%H%M%S')
 
 class General:
 	# Value that is used as leading value
-	cmd_leader = 'PSCharmonics'
+	cmd_lf_leader = 'PSC_LF'
+	cmd_fs_leader = 'PSC_FS'
+	cmd_res_leader = 'PSC_Res'
+
 
 class PowerFactory:
 	"""
@@ -120,6 +123,22 @@ class PowerFactory:
 	temp_sc_folder = 'temp_sc'
 	temp_os_folder = 'temp_os'
 	temp_var_folder = 'temp_var'
+
+	# Constants associated with the handling of PowerFactory initialisation and
+	# potential intermittent errors
+	# Number of attempts to obtain a license
+	license_activation_attempts = 5
+	# Number of seconds to wait between license attempts
+	license_activation_delay = 5.0
+	# Error codes which could be intermittent and therefore the script should try again
+	# Description in PowerFactory help file:  ErrorCodeReference_en.pdf
+	license_activation_error_codes = (3000, 3002, 3005, 3011, 3012, 4000, 4002, 5000)
+
+	# Each results variable has a default type and need to assign the defaults to the newly created results
+	# variables
+	def_results_hlf = 5		# Harmonic load flow
+	def_results_fs = 9		# Frequency sweep
+
 
 	class ComRes:
 		# Power Factory class name

@@ -12,7 +12,6 @@
 
 import os
 import sys
-import math
 import pscharmonics.constants as constants
 import multiprocessing
 import time
@@ -374,14 +373,14 @@ class PFStudyCase:
 		:return None:
 		"""
 		# Name that is used for custom ldf command
-		ldf_name = '{}_{}'.format(constants.General.cmd_leader, constants.uid)
+		ldf_name = '{}_{}'.format(constants.General.cmd_lf_leader, constants.uid)
 
 		# If input values have been provided for an existing command then copy that one
 		ldf = None
 		if lf_settings:
 			# Check if command has already been created and if has then just needs assigning
 			existing_ldf = self.sc.GetContents('{}.{}'.format(ldf_name, constants.PowerFactory.ldf_command))
-			if len(existing_ldf) > 1:
+			if len(existing_ldf) > 0:
 				ldf = existing_ldf[0]
 
 			elif lf_settings.cmd:
@@ -507,7 +506,7 @@ class PFStudyCase:
 		if not ldf:
 			# Get default load flow command, copy and rename
 			def_ldf = self.sc.GetContents('*.{}'.format(constants.PowerFactory.ldf_command))[0]
-			ldf = self.sc.AddCopy(def_ldf, '{}_{}'.format(constants.General.cmd_leader, constants.uid))
+			ldf = self.sc.AddCopy(def_ldf, ldf_name)
 			self.logger.warning(
 				(
 					'Not able to use provided load flow settings or existing load flow command for study case {} and '
@@ -516,6 +515,9 @@ class PFStudyCase:
 			)
 
 		self.ldf = ldf
+
+		self.delete_sc_objects(pf_cmd=self.ldf, pf_type=constants.PowerFactory.ldf_command)
+
 		return None
 
 	def create_freq_sweep(self, fs_settings):
@@ -526,7 +528,7 @@ class PFStudyCase:
 		:return None:
 		"""
 		# Name that is used for custom ldf command
-		fs_name = '{}_{}'.format(constants.General.cmd_leader, constants.uid)
+		fs_name = '{}_{}'.format(constants.General.cmd_fs_leader, constants.uid)
 
 		# Confirm load flow and results file has already been defined since needed for output settings
 		if self.ldf is None:
@@ -544,10 +546,11 @@ class PFStudyCase:
 			if fs_settings:
 				# Check if command has already been created and if has then just needs assigning
 				existing_fs = self.sc.GetContents('{}.{}'.format(fs_name, constants.PowerFactory.fs_command))
-				if len(existing_fs) > 1:
+				if len(existing_fs) > 0:
 					fs = existing_fs[0]
 
-				if fs_settings.cmd:
+				elif fs_settings.cmd:
+					# If no existing command then create a new one
 					fs = self.sc.GetContents(fs_settings.cmd)
 					# Check if command exists and if so copy that one with a new name
 					if len(fs) == 0:
@@ -566,7 +569,7 @@ class PFStudyCase:
 					fs, _ = create_object(
 						location=self.sc,
 						pfclass=constants.PowerFactory.fs_command,
-						name='{}_{}'.format(constants.General.cmd_leader, constants.uid))
+						name=fs_name)
 
 					# Get handle for frequency sweep command from study case
 					fs.iopt_net = fs_settings.iopt_net  # Network Representation (0=Balanced 1=Unbalanced)
@@ -607,13 +610,70 @@ class PFStudyCase:
 			if not self.results:
 				self.create_results_files()
 			# Reference to results file where frequency scan results will be saved
+			# fs.SetAttribute('p_resvar', self.results)
 			fs.p_resvar = self.results  # Results Variable
 
 			# Frequency sweep will use the load flow command created for this study case
-			fs.cbutldf = self.ldf
+			fs.c_butldf = self.ldf
+
+			# Delete all other frequency scan objects
+			self.delete_sc_objects(pf_cmd=fs, pf_type=constants.PowerFactory.fs_command)
 
 			self.fs = fs
 		return None
+
+	def delete_sc_objects(self, pf_cmd, pf_type):
+		"""
+			Function to delete all of the other items of a particular type from the study case except the one provided
+			as a reference as an input
+		:param PowerFactory.DataObject pf_cmd: Reference to object to be kept
+		:param str pf_type:  Extension of variable type to be deleted
+		:return int num_deleted:  Number of objects deleted
+		"""
+
+		# Get all values of a particular type from study case
+		pf_objects = self.sc.GetContents('*.{}'.format(pf_type))
+		original_number = len(pf_objects)
+
+		if original_number == 0:
+			# If none exist then warn user
+			self.logger.warning(
+				(
+					'Attempted to delete all objects of type {} from study case {} except the object <{}> but none '
+					'existed'
+				).format(pf_type, self.sc, pf_cmd)
+			)
+
+		deleted_objects=list()
+		for obj in pf_objects:
+			if obj != pf_cmd:
+				obj.Delete()
+				deleted_objects.append(str(obj))
+
+		if len(deleted_objects) != original_number-1:
+			self.logger.warning(
+				(
+					'Have attempted to delete objects of type {} from the study case {} which originally consisted of \n\t'
+					'{}\n'
+					'But have only been able to delete {} which consisted of the following \n\t'
+					'{}\n'
+				).format(pf_type, self.sc, '\n\t'.join(
+					[str(x) for x in pf_objects]
+				), len(deleted_objects), '\n\t'.join(
+					[str(x) for x in deleted_objects]))
+			)
+		else:
+			self.logger.debug(
+				(
+					'Successfully deleted {} objects of type {} from study case {} except the relevant item {}'
+				).format(len(deleted_objects), pf_type, self.sc, pf_cmd)
+			)
+
+		# Return an index showing the number of objects deleted
+		return len(deleted_objects)
+
+
+
 
 	def process_fs_results(self, logger=None):
 		"""
@@ -699,8 +759,11 @@ class PFStudyCase:
 		self.results, _ = create_object(
 			location=self.sc,
 			pfclass=constants.PowerFactory.pf_results,
-			name='{}{}'.format(constants.General.cmd_leader, constants.PowerFactory.default_fs_extension)
+			name='{}{}'.format(constants.General.cmd_res_leader, constants.PowerFactory.default_fs_extension)
 		)
+		# Set as default results for Freq.Sweep
+		self.results.calTp = constants.PowerFactory.def_results_fs
+		self.delete_sc_objects(pf_cmd=self.results, pf_type=constants.PowerFactory.pf_results)
 		return None
 
 	def create_studies(self, lf_settings, fs_settings):
@@ -947,9 +1010,9 @@ class PFProject:
 
 			# TODO: replace with a create_studies command
 			# Assign relevant load flow to study case
-			study_case_class.create_load_flow(lf_settings=self.lf_settings)
-			# Assign relevant frequency scan to study case
-			study_case_class.create_freq_sweep(fs_settings=self.fs_settings)
+			# study_case_class.create_load_flow(lf_settings=self.lf_settings)
+			# # Assign relevant frequency scan to study case
+			# study_case_class.create_freq_sweep(fs_settings=self.fs_settings)
 
 			base_study_cases[name] = study_case_class
 
@@ -1001,7 +1064,6 @@ class PFProject:
 				)
 				)
 		return None
-
 
 	def process_fs_results(self, logger=None):
 		""" Loop through each study case cls and process results files
@@ -1213,18 +1275,57 @@ class PowerFactory:
 		# Only initialise PowerFactory if not already initialised
 		if app is None:
 			if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
-				# powerfactory after 2017 has an error handler when trying to load
-				try:
-					app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine mode
-				except powerfactory.ExitError as error:
-					self.logger.critical(
-						(
-							'An error occurred trying to start PowerFactory.\n'
-							'The following error message was returned by PowerFactory \n\t{}\n'
-							'and associated error code: {}'
-						).format(error, error.code)
-					)
-					raise ImportError('Power Factory Load Error - Unable to run')
+				# Error sometimes in getting access to a license which returns certain error codes and therefore
+				# script will now make a few attempts for those cases
+				app_init_count = 0
+				while app is None:
+					# powerfactory after 2017 has an error handler when trying to load
+					app_init_count += 1
+					self.logger.debug('Attempting license activation number: {}'.format(app_init_count))
+					try:
+						app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine mode
+					except powerfactory.ExitError as error:
+						# Will attempt to connect to license upto this many times
+						if (
+								app_init_count < constants.PowerFactory.license_activation_attempts and
+								error.code in constants.PowerFactory.license_activation_error_codes
+						):
+							self.logger.warning(
+								(
+									'Unable to connect to license due to a license error which returned error message'
+									'\n\t{}\n and associated error code: {}.\n'
+									'This may be an intermittent error and the script will try again in {:.0f} seconds.\n'
+									'This will be attempt {} of {}'
+								).format(
+									error,
+									error.code,
+									constants.PowerFactory.license_activation_delay,
+									app_init_count,
+									constants.PowerFactory.license_activation_attempts)
+							)
+							time.sleep(constants.PowerFactory.license_activation_delay)
+
+						elif app_init_count >= constants.PowerFactory.license_activation_attempts:
+							# A certain number of attempts have been made and now is the time to fail
+							self.logger.critical(
+								(
+									'Have attempted to connect to PowerFactory {} times and still receiving an error \n\t{}\n '
+									'with associated error code {}.  There is likely to be some permanent connecting to '
+									'the license that the user will need to look into!'
+								).format(app_init_count, error, error.code)
+							)
+							raise ImportError('Unable to load PowerFactory due to a license issue - Unable to run')
+
+						else:
+							# A different error code has been returned and so fail the script
+							self.logger.critical(
+								(
+									'An error occurred trying to start PowerFactory.\n'
+									'The following error message was returned by PowerFactory \n\t{}\n'
+									'and associated error code: {}'
+								).format(error, error.code)
+							)
+							raise ImportError('Power Factory Load Error - Unable to run')
 
 			else:
 				# In case of an older version of PowerFactory being run
@@ -1238,6 +1339,9 @@ class PowerFactory:
 
 				# Clear the powerfactory output window
 				app.ClearOutputWindow()  # Clear Output Window
+
+		# Call function to confirm that the PQ license is available otherwise fail script
+		self.check_pq_license_exists()
 
 		return None
 
@@ -1359,6 +1463,31 @@ class PowerFactory:
 					'It has not been possible to delete the following object\n\t{}'
 				).format(pf_obj.GetFullName(type=0))
 			)
+
+		return None
+
+	def check_pq_license_exists(self):
+		"""
+			Check that the activated power factory installation has a license for the PowerQuality module otherwise
+			there are no studies that can be run
+		:return None:
+		"""
+		# Get reference to the current user
+		pf_user = app.GetCurrentUser()
+
+		# Get license status for power quality module and alert user if not suitable
+		harm_license = pf_user.harm
+		if harm_license == 0:
+			self.logger.critical(
+				(
+					'The activated PowerFactory does not have access to the power quality module required to run '
+					'frequency scans.  Therefore all this study will be able to do anything.'
+					'\n\t - PowerFactory Power Quality and Harmonic Module = {}\n'
+					'This script is running PowerFactory {} and opening that version will allow you to enable the '
+					'license in the UserManager'
+				).format(harm_license, self.c.pf_year)
+			)
+			raise EnvironmentError('PowerFactory Power Quality License Not Available')
 
 		return None
 
