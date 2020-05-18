@@ -17,6 +17,7 @@ import multiprocessing
 import time
 import logging
 import distutils.version
+import pandas as pd
 
 # powerfactory will be defined after initialisation by the PowerFactory class
 powerfactory = None
@@ -51,10 +52,10 @@ def create_object(location, pfclass, name):  # Creates a database object in a sp
 
 def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into python lists from results file
 	"""
-		Reads results into python lists from results file for processing to add to Excel		
+		Reads results into python lists from results file for processing to add to Excel
 		TODO:  Adjust processing of results to write into a DataFrame for easier extraction to Excel / manipulation
-	:param powerfactory.Results elmres: handle for powerfactory results file 
-	:param int res_type: Type of results being dealt with	
+	:param powerfactory.Results elmres: handle for powerfactory results file
+	:param int res_type: Type of results being dealt with
 	:param bool write_as_df:  (optional=False) If set to True will return results in a DataFrame
 	:return: 
 	"""
@@ -272,6 +273,10 @@ class PFStudyCase:
 		"""
 		self.logger = logging.getLogger(constants.logger_name)
 
+		# Status checker on whether this is the base_case study case.  If true then certain functions and additional
+		# datasets are populated
+		self.base_case = base_case
+
 		# Unique name for this studycase
 		self.name = name
 
@@ -288,9 +293,11 @@ class PFStudyCase:
 		self.ldf = None
 		self.fs = None
 		self.fs_export_cmd = None
+		self.cont_analysis = None
 
 		# Reference to the results file that will be created by the frequency sweep
-		self.results = None
+		self.fs_results = None
+		self.cont_results = None
 
 		# If no results path is provided then warn user and saved results to same folder as the script
 		if not res_pth:
@@ -299,6 +306,11 @@ class PFStudyCase:
 
 		# List of paths that contain the export files
 		self.fs_result_exports = list()
+
+		# DataFrame that will be populated with status of each contingency run, only created for the base_case as for
+		# the actual contingency cases analysis is run individually on each study case / operating scenario combination
+		if self.base_case:
+			self.df = pd.DataFrame(columns=constants.Contingencies.df_columns)
 
 		# self.base_name = list_parameters[0]
 		# self.prj_name = list_parameters[1]
@@ -607,11 +619,11 @@ class PFStudyCase:
 				)
 
 			# Check if results file has already been defined otherwise define a new one
-			if not self.results:
+			if not self.fs_results:
 				self.create_results_files()
 			# Reference to results file where frequency scan results will be saved
 			# fs.SetAttribute('p_resvar', self.results)
-			fs.p_resvar = self.results  # Results Variable
+			fs.p_resvar = self.fs_results  # Results Variable
 
 			# Frequency sweep will use the load flow command created for this study case
 			fs.c_butldf = self.ldf
@@ -622,11 +634,151 @@ class PFStudyCase:
 			self.fs = fs
 		return None
 
+	def pre_case_check(self):
+		"""
+			Function to create all the necessary contingency cases and run a pre-case check to confirm that all
+			cases are convergent.  The status of each case is then updated in the DataFrame which will be exported
+			at the end of the study and used as the basis for whether frequency scans should be run
+		:return None:
+		"""
+
+		# Since creating contingency analysis is to confirm that model is convergent for every contingency initially
+		# run a load flow study to confirm the intact condition is convergent.
+		self.run_load_flow()
+		c = constants.Contingencies
+
+		if self.ldf_convergent:
+			# Update dataframe to show intact system is convergent
+			self.df.loc[c.intact, c.status] = True
+		else:
+			self.logger.error(
+				(
+					'The base case for study case <{}> with operating scenario <{}> is not-convergent and therefore no '
+					'studies can be run.  Please check the initial case'
+				).format(self.sc, self.os)
+			)
+			return None
+
+	def create_cont_analysis(self, fault_cases=None, cmd=str()):
+		"""
+			Creates a contingency analysis command in the study case so can iterate through all contingencies
+			and identify those which are not convergent.
+		:param dict fault_cases:  Dictionary of fault_cases as returned by PowerFactory.create_fault_cases
+		:param str cmd:  Name of command if already provided as part of input data
+		:return None:
+		"""
+		c = constants.Contingencies
+
+		# Name that is used for custom ldf command
+		name = '{}_{}'.format(constants.General.cmd_cont_leader, constants.uid)
+		cont_analysis = None
+
+		# Confirm load flow and results file has already been defined since needed for output settings
+		if self.ldf is None:
+			self.logger.error(
+				(
+					'Not possible to create contingency analysis for study case {} since no load flow settings have yet'
+					'been determined.  This could be a scripting issue or an error finding a suitable load flow.'
+				).format(self.sc)
+			)
+			cont_analysis = None
+
+		else:
+			if cmd:
+				# Get existing command from StudyCase and base analysis on that
+				existing = self.sc.GetContents('{}.{}'.format(cmd, constants.PowerFactory.pf_cont_analysis))
+
+				if len(existing) > 0:
+					# Check if already exists and if so duplicate existing one so settings can be changed
+					cont_analysis = self.sc.AddCopy(existing[0], name)
+
+					# Loop through all contingencies within this defined contingency set and update the dataframe with
+					# relevant details.
+					outages = cont_analysis.GetContents('*.{}'.format(constants.PowerFactory.pf_outage))
+					if len(outages) == 0:
+						self.logger.warning(
+							(
+								'No outages have been defined in the provided contingency set {} as part of study case '
+								'<{}>.  If individual outage details have been provided as part of the input these will '
+								'be used instead and otherwise the script will fail.'
+							).format(cmd, self.sc)
+						)
+					else:
+						# Loop through each outage and update DataFrame with some relevant details
+						for outage in outages:
+							cont_name = outage.loc_name
+							self.df.loc[cont_name, c.cont] = cont_name
+							self.df.loc[cont_name, c.idx] = outage.number
+
+				else:
+					# If a command has been provided but cannot be found then display a warning message
+					self.logger.warning(
+						(
+							'The provided contingency set {} does not exist in the study case <{}> and therefore cannot '
+							'be used for contingency analysis.  If individual outage details have been provided they will'
+							'be used instead otherwise the script will fail.'
+						).format(cmd, self.sc)
+					)
+					cont_analysis = None
+
+			if fault_cases and not cont_analysis:
+				# Create Contingency Analysis command and add fault cases to it if has not been possible to establish
+				# cont_analysis from the input provided by the user.
+				cont_analysis, _ = create_object(
+					location=self.sc,
+					pfclass=constants.PowerFactory.pf_cont_analysis,
+					name=name
+				)
+
+				# Loop through each fault case and create a contingency with each contingency being added to the
+				# study case specific dataframe.  The status of each contingency is then updated once the initial
+				# pre-case check is carried out.
+				for cont_name, fault in fault_cases.items():
+					outage, _ = create_object(
+						location=cont_analysis,
+						pfclass=constants.PowerFactory.pf_outage,
+						name=cont_name
+					)
+					# Set Outage up to represent this fault case
+					outage.cpCase = fault
+
+					# Update DataFrame with details of this contingency
+					self.df.loc[cont_name, c.idx] = outage.number
+					self.df.loc[cont_name, c.cont] = cont_name
+
+			if not cont_analysis:
+				# No command or fault cases provided so raise error to user
+				self.logger.critical(
+					(
+						'No fault cases provided as input and no existing command existed in study case <{}>.'
+						' The following inputs were provided:\n\t Fault Cases = {}\n\tCmd = {}'
+					).format(self.sc, fault_cases, cmd)
+				)
+				raise SyntaxError('Incorrect inputs')
+
+			# Set default parameters for contingency analysis to ensure aligns with load flow run
+			# Run based on normal AC load flow with previously created load flow settings
+			cont_analysis.iopt_Linear = 0
+			cont_analysis.ldf = self.ldf
+			# Ensure results are stored in the results variable
+			cont_analysis.p_recnt = self.cont_results
+
+			# If a large number of contingencies then allow parallel running of cases
+			cont_analysis.iEnableParal = 1
+			cont_analysis.minCntcyAC = c.parallel_threshold
+
+			# Delete all other contingency analysis objects
+			self.delete_sc_objects(pf_cmd=cont_analysis, pf_type=constants.PowerFactory.pf_cont_analysis)
+
+		self.cont_analysis = cont_analysis
+		return None
+
 	def delete_sc_objects(self, pf_cmd, pf_type):
 		"""
 			Function to delete all of the other items of a particular type from the study case except the one provided
 			as a reference as an input
-		:param PowerFactory.DataObject pf_cmd: Reference to object to be kept
+		:param (PowerFactory.DataObject, ) pf_cmd: Reference to object(s) to be kept which are input as either a tuple
+													or single item and then converted to a tuple
 		:param str pf_type:  Extension of variable type to be deleted
 		:return int num_deleted:  Number of objects deleted
 		"""
@@ -634,6 +786,10 @@ class PFStudyCase:
 		# Get all values of a particular type from study case
 		pf_objects = self.sc.GetContents('*.{}'.format(pf_type))
 		original_number = len(pf_objects)
+
+		# Check if input is a tuple so can be iterated through
+		if type(pf_cmd) is not tuple:
+			pf_cmd = (pf_cmd, )
 
 		if original_number == 0:
 			# If none exist then warn user
@@ -646,11 +802,11 @@ class PFStudyCase:
 
 		deleted_objects=list()
 		for obj in pf_objects:
-			if obj != pf_cmd:
+			if obj not in pf_cmd:
 				obj.Delete()
 				deleted_objects.append(str(obj))
 
-		if len(deleted_objects) != original_number-1:
+		if len(deleted_objects) != original_number-len(pf_cmd):
 			self.logger.warning(
 				(
 					'Have attempted to delete objects of type {} from the study case {} which originally consisted of \n\t'
@@ -672,9 +828,6 @@ class PFStudyCase:
 		# Return an index showing the number of objects deleted
 		return len(deleted_objects)
 
-
-
-
 	def process_fs_results(self, logger=None):
 		"""
 			Function extracts and processes the load flow results for this study case
@@ -684,7 +837,7 @@ class PFStudyCase:
 		c = constants.Results
 
 		# Insert data labels into frequency data to act as row labels for data
-		fs_scale, fs_res = retrieve_results(self.results, 0)
+		fs_scale, fs_res = retrieve_results(self.fs_results, 0)
 		fs_scale[0:2] = [
 			c.lbl_StudyCase,
 			c.lbl_Contingency,
@@ -756,14 +909,25 @@ class PFStudyCase:
 		:return None:
 		"""
 		# Update FS results file
-		self.results, _ = create_object(
+		self.fs_results, _ = create_object(
 			location=self.sc,
 			pfclass=constants.PowerFactory.pf_results,
-			name='{}{}'.format(constants.General.cmd_res_leader, constants.PowerFactory.default_fs_extension)
+			name='{}{}'.format(constants.General.cmd_fsres_leader, constants.PowerFactory.default_fs_extension)
+		)
+
+		# Update Contingency analysis results file
+		self.cont_results, _ = create_object(
+			location=self.sc,
+			pfclass=constants.PowerFactory.pf_results,
+			name='{}{}'.format(constants.General.cmd_contres_leader, constants.PowerFactory.default_fs_extension)
 		)
 		# Set as default results for Freq.Sweep
-		self.results.calTp = constants.PowerFactory.def_results_fs
-		self.delete_sc_objects(pf_cmd=self.results, pf_type=constants.PowerFactory.pf_results)
+		self.fs_results.calTp = constants.PowerFactory.def_results_fs
+		# Set as default results for contingency analysis based on AC Load Flow
+		self.cont_results.calTp = constants.PowerFactory.def_results_cont
+		self.cont_results.calTpSub = 0
+
+		self.delete_sc_objects(pf_cmd=(self.fs_results, self.cont_results), pf_type=constants.PowerFactory.pf_results)
 		return None
 
 	def create_studies(self, lf_settings, fs_settings):
@@ -777,7 +941,7 @@ class PFStudyCase:
 		self.create_load_flow(lf_settings=lf_settings)
 		self.create_results_files()
 		self.create_freq_sweep(fs_settings=fs_settings)
-		self.fs_export_cmd, export_pth = self.set_results_export(result=self.results)
+		self.fs_export_cmd, export_pth = self.set_results_export(result=self.fs_results)
 
 		self.fs_result_exports.append(export_pth)
 		self.logger.debug(

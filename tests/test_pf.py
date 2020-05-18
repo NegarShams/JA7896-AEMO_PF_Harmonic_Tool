@@ -474,6 +474,188 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
+	def test_create_results_files_works_correctly(self):
+		"""
+			Tests that appropriate results files are created
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+
+		# Get handle to test study case
+		sc = pf_project.base_sc[self.test_name]
+
+		# Confirm no results files have been defined initially
+		self.assertTrue(sc.fs_results is None)
+		self.assertTrue(sc.cont_results is None)
+
+		# Create the results files and confirm they now reference a DataObject
+		sc.create_results_files()
+
+		search_string = pscharmonics.constants.PowerFactory.pf_results
+		self.assertTrue(search_string in str(sc.fs_results))
+		self.assertTrue(search_string in str(sc.cont_results))
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_create_cont_analysis_5_fault_cases(self):
+		"""
+			Tests that fault cases can be created and then a suitable contingency command
+			also created.
+		:return:
+		"""
+		# Create new project instances
+		uid = 'Test_fault_analysis'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+		# Get handle to test study case
+		sc = pf_project.base_sc[self.test_name]
+
+
+		# Create fault events
+		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
+
+		# Create results files for contingency analysis
+		sc.create_results_files()
+		# Create load flow command
+		sc.create_load_flow(lf_settings=None)
+		# Create contingency based on fault cases
+		sc.create_cont_analysis(fault_cases=fault_cases)
+
+		# Carry out validation by firstly confirming the the cont_analysis function has been created and is the
+		# correct type
+		self.assertTrue(pscharmonics.constants.PowerFactory.pf_cont_analysis in str(sc.cont_analysis))
+
+		# Then confirm that the sc.df index contains the default contingencies
+		self.assertTrue('TEST Cont' in sc.df.index)
+		self.assertTrue('TEST Cont NC' in sc.df.index)
+
+		# Attempt to run contingency analysis
+		# TODO: Causes an error when trying to run
+		# self.assertEqual(sc.cont_analysis.Execute())
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_create_cont_analysis_non_existant_cmd(self):
+		"""
+			Tests that fault cases can be created and then a suitable contingency command
+			also created.
+		:return:
+		"""
+		# Create new project instances
+		uid = 'Test_fault_analysis'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+		# Get handle to test study case
+		sc = pf_project.base_sc[self.test_name]
+
+		# Create fault events
+		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
+
+		# Confirm that if runs with a non-existent command still creates the relevant contingency analysis cases
+
+		# Create contingency based on fault cases
+		sc.create_load_flow(lf_settings=None)
+		# Create results files for contingency analysis
+		sc.create_results_files()
+		# Create contingency based on fault cases
+		sc.create_cont_analysis(fault_cases=fault_cases, cmd='A None Existent Command')
+
+		# Carry out validation by firstly confirming the the cont_analysis function has been created and is the
+		# correct type
+		self.assertTrue(pscharmonics.constants.PowerFactory.pf_cont_analysis in str(sc.cont_analysis))
+
+		# Then confirm that the sc.df index contains the default contingencies
+		self.assertTrue('TEST Cont' in sc.df.index)
+		self.assertTrue('TEST Cont NC' in sc.df.index)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_empty_cont_analysis_if_no_loadflow(self):
+		"""
+			Tests that fault cases fails if provided with no inputs
+		:return:
+		"""
+		# Create new project instances
+		uid = 'Test_fault_analysis'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+		# Get handle to test study case
+		sc = pf_project.base_sc[self.test_name]
+
+		self.assertTrue(sc.cont_analysis is None)
+		# Create contingency based on no inputs but shouldn't raise an error since load flow command
+		# has not been defined yet
+		sc.create_cont_analysis()
+		# Should still be none
+		self.assertTrue(sc.cont_analysis is None)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_create_cont_analysis_fails_with_no_input(self):
+		"""
+			Tests that fault cases fails if provided with no inputs
+		:return:
+		"""
+		# Create new project instances
+		uid = 'Test_fault_analysis'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+		# Get handle to test study case
+		sc = pf_project.base_sc[self.test_name]
+
+		# Create contingency based on fault cases
+		sc.create_load_flow(lf_settings=None)
+		# Create load flow command first
+		self.assertRaises(SyntaxError, sc.create_cont_analysis)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_create_cont_analysis_using_command(self):
+		"""
+			Tests that if contingency analysis command is provided then that is used for the analysis and the
+			study case dataframe is updated appropriately
+		:return:
+		"""
+		# Create new project instances
+		uid = 'Test_fault_analysis'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+		# Get handle to test study case
+		sc = pf_project.base_sc[self.test_name]
+
+		# Create results files for contingency analysis
+		sc.create_results_files()
+		# Create load flow command
+		sc.create_load_flow(lf_settings=None)
+		# Create contingency based on fault cases
+		sc.create_cont_analysis(cmd='Contingency Analysis')
+
+		# Confirm cases created correctly
+		self.assertTrue(len(sc.df.index) == 1)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+
 	@classmethod
 	def tearDownClass(cls):
 		""" Function ensures the deletion of the PowerFactory project """

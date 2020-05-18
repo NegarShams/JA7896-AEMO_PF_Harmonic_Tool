@@ -39,7 +39,9 @@ class General:
 	# Value that is used as leading value
 	cmd_lf_leader = 'PSC_LF'
 	cmd_fs_leader = 'PSC_FS'
-	cmd_res_leader = 'PSC_Res'
+	cmd_cont_leader = 'PSC_Cont'
+	cmd_fsres_leader = 'PSC_FS_Res'
+	cmd_contres_leader = 'PSC_Cont_Res'
 
 
 class PowerFactory:
@@ -97,6 +99,9 @@ class PowerFactory:
 	pf_results = 'ElmRes'
 	pf_network_elements = 'ElmNet'
 	pf_project = 'IntPrj'
+	# Command for carrying out contingency analysis and applying each outage
+	pf_cont_analysis = 'ComSimoutage'
+	pf_outage = 'ComOutage'
 
 	# General Types
 	pf_folder_type = 'IntFolder'
@@ -145,6 +150,7 @@ class PowerFactory:
 	# variables
 	def_results_hlf = 5		# Harmonic load flow
 	def_results_fs = 9		# Frequency sweep
+	def_results_cont = 13#
 
 
 	class ComRes:
@@ -278,7 +284,24 @@ class FaultEvent:
 	# pf variable to associate a fault case with a contingency
 	mod_cnt = 'mod_cnt'
 
+class Contingencies:
+	""" Contains constants associated with naming of contingenceis used in export """
+	# Name to give for base_case / intact system condition
+	intact = 'Intact'
 
+	sc = 'Study Case'
+	op = 'Operating Scenario'
+	cont = 'Contingency'
+	idx = 'Contingency Number'
+	status = 'Convergent'
+
+	# Columns that are used for the contingency headers
+	df_columns = (
+		sc, op, cont, idx, status
+	)
+
+	# Maximum number of contingencies before which studies will be run using parallel processing
+	parallel_threshold = 50
 
 
 
