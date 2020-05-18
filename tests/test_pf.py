@@ -416,7 +416,7 @@ class TestPFProject(unittest.TestCase):
 
 
 @unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
-class TestPFProject_ContingencyCases(unittest.TestCase):
+class TestPFProjectContingencyCases(unittest.TestCase):
 	"""
 		Tests creation of contingency cases and fault events within the PFProject class
 	"""
@@ -453,10 +453,9 @@ class TestPFProject_ContingencyCases(unittest.TestCase):
 		"""
 			Tests that fault cases can be created for a contingency command
 		"""
-		test_export_pth = os.path.join(TESTS_DIR)
-
 		# Create new project instances
 		uid = 'TEST_CASE'
+		fc_name = 'TEST Cont'
 		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
 		pf_project = pscharmonics.pf.PFProject(
 			name=pf_test_project, df_studycases=df_test_project, uid=uid
@@ -464,19 +463,23 @@ class TestPFProject_ContingencyCases(unittest.TestCase):
 
 		# Create fault events
 		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-		HERE
-		# TODO:  Need to implement tests to confirm fault cases created correctly
-		pass
+		fc = fault_cases[fc_name]
+
+		switch_name = 'Switch_213211'
+		self.assertEqual(fc.loc_name, fc_name)
+		event = fc.GetContents('{}.{}'.format(switch_name, pscharmonics.constants.PowerFactory.pf_switch_event))[0]
+		self.assertTrue(switch_name in str(event.p_target))
+		self.assertTrue(event.i_switch==0)
 
 		# Tidy up by deleting temporary project folders
-		#pf_project.delete_temp_folders()
+		pf_project.delete_temp_folders()
 
 	@classmethod
 	def tearDownClass(cls):
 		""" Function ensures the deletion of the PowerFactory project """
 		# Deactivate and then delete the project
 		cls.pf.deactivate_project()
-	#cls.pf.delete_object(pf_obj=cls.pf_test_project)
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
 
 # ----- UNIT TESTS OLD -----
