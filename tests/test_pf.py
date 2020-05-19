@@ -3,6 +3,7 @@ import os
 import sys
 import shutil
 import pandas as pd
+import math
 
 from tests.context import pscharmonics
 import pscharmonics.pf as TestModule
@@ -656,6 +657,49 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
+	def test_process_cont_results(self):
+		"""
+			TODO: Being developed
+		:return:
+		"""
+		# Create new project instances
+		uid = 'Test_fault_analysis'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+		# Get handle to test study case
+		sc = pf_project.base_sc[self.test_name]
+
+
+		# Create fault events
+		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
+
+		# Create results files for contingency analysis
+		sc.create_results_files()
+		# Create load flow command
+		sc.create_load_flow(lf_settings=None)
+		# Create contingency based on fault cases
+		sc.create_cont_analysis(fault_cases=fault_cases)
+
+		# Active study case and run cont analysis
+		sc.toggle_state()
+		sc.cont_analysis.Execute()
+
+		# Confirm that initial status is nan
+		c = pscharmonics.constants.Contingencies
+		self.assertTrue(math.isnan(sc.df.loc['TEST Cont', c.status]))
+		self.assertTrue(math.isnan(sc.df.loc['TEST Cont NC', c.status]))
+
+		# Test results
+		sc.process_cont_results()
+
+		# Confirm that the status for one of the DataFrames is now non-convergent
+		self.assertTrue(sc.df.loc['TEST Cont', c.status])
+		self.assertFalse(sc.df.loc['TEST Cont NC', c.status])
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
 
 	@classmethod
 	def tearDownClass(cls):
@@ -909,7 +953,6 @@ class TestHASTInputsProcessing(unittest.TestCase):
 		# Confirm that length is only 1
 		self.assertTrue(len(cls_hast.sc_names) == 1)
 
-	# TODO: Test not yet implemented
 	@unittest.skip('Not Yet Implemented')
 	def test_new_hast_import(self):
 		"""

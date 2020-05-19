@@ -57,7 +57,7 @@ def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into
 	:param powerfactory.Results elmres: handle for powerfactory results file
 	:param int res_type: Type of results being dealt with
 	:param bool write_as_df:  (optional=False) If set to True will return results in a DataFrame
-	:return: 
+	:return (list, list), (scale, results):
 	"""
 	# Note both column number and row start at 1.
 	# The first column is usually the scale ie timestep, frequency etc.
@@ -86,7 +86,12 @@ def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into
 	scale = results[-1:]
 	results = results[:-1]
 	elmres.Release()
-	return scale[0], results
+
+	df = pd.DataFrame(results).transpose()
+	if write_as_df:
+		return df
+	else:
+		return scale[0], results
 
 
 def remove_string_endings(astring, trailing):
@@ -733,6 +738,7 @@ class PFStudyCase:
 				# Loop through each fault case and create a contingency with each contingency being added to the
 				# study case specific dataframe.  The status of each contingency is then updated once the initial
 				# pre-case check is carried out.
+				counter = 1
 				for cont_name, fault in fault_cases.items():
 					outage, _ = create_object(
 						location=cont_analysis,
@@ -743,8 +749,10 @@ class PFStudyCase:
 					outage.cpCase = fault
 
 					# Update DataFrame with details of this contingency
+					outage.number = counter
 					self.df.loc[cont_name, c.idx] = outage.number
 					self.df.loc[cont_name, c.cont] = cont_name
+					counter += 1
 
 			if not cont_analysis:
 				# No command or fault cases provided so raise error to user
@@ -863,6 +871,34 @@ class PFStudyCase:
 					 .format(self.name))
 
 		return fs_res
+
+	def process_cont_results(self):
+		"""
+			Function will process the contingencies to check the results and determine which were convergent
+			with the status being updated in the DataFrame.
+		:return:
+		"""
+		c = constants.Contingencies
+		df = retrieve_results(elmres=self.cont_results, res_type=0, write_as_df=True)
+		# Set columns to be based on first index
+		df.columns = df.loc[0, :]
+
+		# Drop non-relevant rows
+		df.drop(labels=[0, 1], axis=0, inplace=True)
+		# Drop last row which also isn't needed
+		df.drop(df.tail(1).index, inplace=True)
+
+		# Set the index for the DataFrame based on the object number
+		df.set_index(c.col_number, inplace=True)
+
+		# Get list of contingencies which were not convergent
+		for cont_number, series in df.iterrows():
+			# Populate the status of the convergence
+			self.df.loc[self.df[c.idx]==cont_number, c.status] = not bool(series[c.col_nonconvergent])
+
+			# TODO: Add in alert to user about non_convergent cases
+
+		return None
 
 	# def process_hrlf_results(self, logger):
 	# 	"""

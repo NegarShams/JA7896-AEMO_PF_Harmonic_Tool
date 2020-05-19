@@ -303,6 +303,11 @@ class Contingencies:
 	# Maximum number of contingencies before which studies will be run using parallel processing
 	parallel_threshold = 50
 
+	# Variables to keep from cont_results
+	col_object = 'b:i_obj'
+	col_number = 'b:number'
+	col_nonconvergent = 'b:inoconv'
+
 
 
 
