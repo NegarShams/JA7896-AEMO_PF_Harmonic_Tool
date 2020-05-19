@@ -532,13 +532,14 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# correct type
 		self.assertTrue(pscharmonics.constants.PowerFactory.pf_cont_analysis in str(sc.cont_analysis))
 
+
 		# Then confirm that the sc.df index contains the default contingencies
 		self.assertTrue('TEST Cont' in sc.df.index)
 		self.assertTrue('TEST Cont NC' in sc.df.index)
 
-		# Attempt to run contingency analysis
-		# TODO: Causes an error when trying to run
-		# self.assertEqual(sc.cont_analysis.Execute())
+		# Ensure study case is active
+		sc.toggle_state()
+		self.assertEqual(sc.cont_analysis.Execute(), 0)
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
