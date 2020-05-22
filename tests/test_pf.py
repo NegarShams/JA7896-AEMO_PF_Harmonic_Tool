@@ -4,6 +4,8 @@ import sys
 import shutil
 import pandas as pd
 import math
+import random
+import string
 
 from tests.context import pscharmonics
 import pscharmonics.pf as TestModule
@@ -26,6 +28,9 @@ TestModule.DEBUG_MODE=True
 
 # OLD tests are being skipped
 include_old_tests = False
+
+# Set to True and created excel outputs will be deleted during test run
+test_delete_excel_outputs = False
 
 class TestPFInitialisation(unittest.TestCase):
 	""" Tests that the correct python version can be found and then PowerFactory can be initialised """
@@ -406,14 +411,14 @@ class TestPFProject(unittest.TestCase):
 		os.remove(test_export_file)
 
 		# Tidy up by deleting temporary project folders
-		#pf_project.delete_temp_folders()
+		pf_project.delete_temp_folders()
 
 	@classmethod
 	def tearDownClass(cls):
 		""" Function ensures the deletion of the PowerFactory project """
 		# Deactivate and then delete the project
 		cls.pf.deactivate_project()
-		#cls.pf.delete_object(pf_obj=cls.pf_test_project)
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
 
 @unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
@@ -421,6 +426,10 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 	"""
 		Tests creation of contingency cases and fault events within the PFProject class
 	"""
+	# Names used for testing contingencies (convergent and non-convergent)
+	test_cont = 'TEST Cont'
+	test_cont_nc = 'TEST Cont NC'
+
 	@classmethod
 	def setUpClass(cls):
 		""" Initialise PowerFactory and then check if model already exists """
@@ -535,8 +544,8 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 
 		# Then confirm that the sc.df index contains the default contingencies
-		self.assertTrue('TEST Cont' in sc.df.index)
-		self.assertTrue('TEST Cont NC' in sc.df.index)
+		self.assertTrue(self.test_cont in sc.df.index)
+		self.assertTrue(self.test_cont_nc in sc.df.index)
 
 		# Ensure study case is active
 		sc.toggle_state()
@@ -688,18 +697,150 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Confirm that initial status is nan
 		c = pscharmonics.constants.Contingencies
-		self.assertTrue(math.isnan(sc.df.loc['TEST Cont', c.status]))
-		self.assertTrue(math.isnan(sc.df.loc['TEST Cont NC', c.status]))
+		self.assertTrue(math.isnan(sc.df.loc[self.test_cont, c.status]))
+		self.assertTrue(math.isnan(sc.df.loc[self.test_cont_nc, c.status]))
 
 		# Test results
 		sc.process_cont_results()
 
 		# Confirm that the status for one of the DataFrames is now non-convergent
-		self.assertTrue(sc.df.loc['TEST Cont', c.status])
-		self.assertFalse(sc.df.loc['TEST Cont NC', c.status])
+		self.assertTrue(sc.df.loc[self.test_cont, c.status])
+		self.assertFalse(sc.df.loc[self.test_cont_nc, c.status])
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
+
+	def test_pre_case_check_single_study_case(self):
+		"""
+			Test that when the pre-case check is run for the one study cases
+			the dataframe that is returned matches what is expected.  This is
+			only testing the pre case check, the creation of the study cases
+			happens elsewhere.
+
+			# Test is based on inputs
+		:return:
+		"""
+
+		# Create new project instances
+		uid = 'Test_fault_analysis'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+
+		# Carry out pre-case check using fault cases
+		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
+
+		# Confirm that dataframe takes the correct form with the relevant headers for the columns
+		names = df.index.names
+		self.assertTrue(pscharmonics.constants.Contingencies.sc in names)
+
+		# Confirm the contents of a single value matches expectations
+		c = pscharmonics.constants.Contingencies
+		sc_result = df.loc[(self.test_name, self.test_cont), :]
+		self.assertEqual(sc_result[c.cont], self.test_cont)
+		self.assertEqual(sc_result[c.status], True)
+
+		# Confirm the non-convergent case is as expected
+		c = pscharmonics.constants.Contingencies
+		sc_result = df.loc[(self.test_name, self.test_cont_nc), :]
+		self.assertEqual(sc_result[c.cont], self.test_cont_nc)
+		self.assertEqual(sc_result[c.status], False)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_pre_case_check_multiple_study_cases(self):
+		"""
+			Test that when the pre-case check is run for the two study cases
+			the dataframe that is returned matches what is expected.
+
+		:return:
+		"""
+		# Test Names (detailed in Inputs spreadsheet)
+		test_case1 = 'BASE'
+		test_case2 = 'BASE(1)'
+
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get single project
+		pf_project = pf_projects[pf_test_project]
+
+		# Carry out pre-case check using fault cases on what should be two different study_cases
+		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
+
+		# Confirm that dataframe takes the correct form with the relevant headers for the columns
+		names = df.index.names
+		self.assertTrue(pscharmonics.constants.Contingencies.sc in names)
+
+		# Since project is duplicated expect results to be the same in both cases
+		c = pscharmonics.constants.Contingencies
+		sc_result = df.loc[(test_case1, self.test_cont), :]
+		self.assertEqual(sc_result[c.cont], self.test_cont)
+		self.assertEqual(sc_result[c.status], True)
+
+		# Confirm the non-convergent case is as expected
+		c = pscharmonics.constants.Contingencies
+		sc_result = df.loc[(test_case2, self.test_cont), :]
+		self.assertEqual(sc_result[c.cont], self.test_cont)
+		self.assertEqual(sc_result[c.status], True)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_case_creation(self):
+		"""
+			Tests that new cases can be created for each of the convergent contingencies
+		"""
+		"""
+			Test that when the pre-case check is run for the two study cases
+			the dataframe that is returned matches what is expected.
+
+		:return:
+		"""
+		# Test Names (detailed in Inputs spreadsheet)
+		test_case1 = 'BASE'
+		test_case2 = 'BASE(1)'
+
+		# Create random path for temporary files
+		target_pth = os.path.join(
+			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+		)
+		if os.path.isdir(target_pth):
+			raise SyntaxError('Random path {} already exists'.format(target_pth))
+		else:
+			os.mkdir(target_pth)
+
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get single project
+		pf_project = pf_projects[pf_test_project]
+
+		# Carry out pre-case check using fault cases on what should be two different study_cases
+		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
+
+		num_convergent_cases = len(df[df[pscharmonics.constants.Contingencies.status]==True].index)
+
+		# Create cases
+		pf_project.create_cases(export_pth=target_pth, contingencies=self.settings.contingencies)
+
+		self.assertEqual(len(pf_project.cases_to_run), num_convergent_cases)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
 
 	@classmethod
 	def tearDownClass(cls):
@@ -708,6 +849,78 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		cls.pf.deactivate_project()
 		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
+
+class TestPFSingleProjectUsingInputs(unittest.TestCase):
+	"""
+		This class contains tests that are carried out using the complete set of inputs as part of integration
+		testing
+	"""
+	@classmethod
+	def setUpClass(cls):
+		""" Initialise PowerFactory and then check if model already exists """
+		cls.pf = pscharmonics.pf.PowerFactory()
+		cls.pf.initialise_power_factory()
+
+		# Try to activate the test project and if it doesn't work then load power factory case in
+		if not cls.pf.activate_project(project_name=pf_test_project):
+			pf_test_file = os.path.join(TESTS_DIR, '{}.pfd'.format(pf_test_project))
+
+			# Import the project
+			cls.pf.import_project(project_pth=pf_test_file)
+			cls.pf.activate_project(project_name=pf_test_project)
+
+		cls.pf_test_project = cls.pf.get_active_project()
+
+		# Import all settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		cls.settings = pscharmonics.file_io.StudyInputsDev(pth_file=def_inputs_file)
+
+	def test_pre_case_check_for_all_projects(self):
+		"""
+			Function tests that running pre_case check for all projects correctly reports non-convergent cases
+			and produces a suitable excel export
+		:return:
+		"""
+		c = pscharmonics.constants.Contingencies
+
+		# Target excel path
+		excel_pth = os.path.join(TESTS_DIR, 'pre_case_check.xlsx')
+		# Check doesn't exist initially and if it does then delete
+		if os.path.isfile(excel_pth):
+			os.remove(excel_pth)
+		self.assertFalse(os.path.exists(excel_pth))
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get DataFrame from pre_case check and also ask to create file
+		df_summary = pscharmonics.pf.run_pre_case_checks(
+			pf_projects=pf_projects,
+			export_pth=excel_pth,
+			contingencies=self.settings.contingencies
+		)
+
+		# Confirm DataFrame is expected length and number of non_convergent cases is as expected
+		self.assertEqual(len(df_summary.index), 4)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 2)
+
+		# Confirm that excel spreadsheet has been created (and delete if necessary)
+		self.assertTrue(os.path.isfile(excel_pth))
+		if test_delete_excel_outputs:
+			os.remove(excel_pth)
+
+	@classmethod
+	def tearDownClass(cls):
+		""" Function ensures the deletion of the PowerFactory project """
+		# Deactivate and then delete the project
+		cls.pf.deactivate_project()
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)
+
+# TODO: Create pre-case check for multiple projects
 
 # ----- UNIT TESTS OLD -----
 @unittest.skipUnless(include_old_tests, 'Old tests skipped')

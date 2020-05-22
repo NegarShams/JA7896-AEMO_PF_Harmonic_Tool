@@ -289,6 +289,7 @@ class Contingencies:
 	# Name to give for base_case / intact system condition
 	intact = 'Intact'
 
+	prj = 'Project'
 	sc = 'Study Case'
 	op = 'Operating Scenario'
 	cont = 'Contingency'
@@ -297,7 +298,7 @@ class Contingencies:
 
 	# Columns that are used for the contingency headers
 	df_columns = (
-		sc, op, cont, idx, status
+		prj, sc, op, cont, idx, status
 	)
 
 	# Maximum number of contingencies before which studies will be run using parallel processing
@@ -307,6 +308,8 @@ class Contingencies:
 	col_object = 'b:i_obj'
 	col_number = 'b:number'
 	col_nonconvergent = 'b:inoconv'
+
+
 
 
 

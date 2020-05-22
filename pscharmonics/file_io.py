@@ -806,7 +806,7 @@ class StudyInputsDev:
 			:param str sht:  (optional) Name of worksheet to use
 			:param pd.ExcelFile wkbk:  (optional) Handle to workbook
 			:param str pth_file: (optional) Handle to workbook
-		:return dict study_cases:
+		:return pd.DataFrame df:  Returns a DataFrame of the study cases so can group by columns
 		"""
 
 		# Import workbook as dataframe
@@ -834,13 +834,14 @@ class StudyInputsDev:
 				).format(name_key, sht, '\n\t'.join(df.loc[:, name_key].values))
 			)
 
-		# Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in order
-		study_cases = collections.OrderedDict()
-		for key, item in df.iterrows():
-			new_case = StudyCaseDetails(list_of_parameters=item.values)
-			study_cases[new_case.name] = new_case
+		# # Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in
+		# # order
+		# study_cases = collections.OrderedDict()
+		# for key, item in df.iterrows():
+		# 	new_case = StudyCaseDetails(list_of_parameters=item.values)
+		# 	study_cases[new_case.name] = new_case
 
-		return study_cases
+		return df
 
 	def process_contingencies(self, sht=constants.HASTInputs.contingencies, wkbk=None, pth_file=None):
 		"""
