@@ -42,6 +42,7 @@ class General:
 	cmd_cont_leader = 'PSC_Cont'
 	cmd_fsres_leader = 'PSC_FS_Res'
 	cmd_contres_leader = 'PSC_Cont_Res'
+	cmd_autotasks_leader = 'PSC_Auto'
 
 
 class PowerFactory:
@@ -128,7 +129,7 @@ class PowerFactory:
 	ldf_command = 'ComLdf'
 	hldf_command = 'ComHldf'
 	fs_command = 'ComFsweep'
-	autotasks_command = '.ComTasks'
+	autotasks_command = 'ComTasks'
 
 	# Folder names for temporary folders
 	temp_sc_folder = 'temp_sc'

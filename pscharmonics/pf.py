@@ -398,13 +398,14 @@ class PFStudyCase:
 
 		# If input values have been provided for an existing command then copy that one
 		ldf = None
-		if lf_settings:
-			# Check if command has already been created and if has then just needs assigning
-			existing_ldf = self.sc.GetContents('{}.{}'.format(ldf_name, constants.PowerFactory.ldf_command))
-			if len(existing_ldf) > 0:
-				ldf = existing_ldf[0]
 
-			elif lf_settings.cmd:
+		# Check if command has already been created and if has then just needs assigning
+		existing_ldf = self.sc.GetContents('{}.{}'.format(ldf_name, constants.PowerFactory.ldf_command))
+		if len(existing_ldf) > 0:
+			ldf = existing_ldf[0]
+
+		elif lf_settings:
+			if lf_settings.cmd:
 				ldf = self.sc.GetContents(lf_settings.cmd)
 				# Check if command exists and if so copy that one with a new name
 				if len(ldf) == 0:
@@ -564,13 +565,14 @@ class PFStudyCase:
 
 			# If input values have been provided for an existing command then copy that one
 			fs = None
-			if fs_settings:
-				# Check if command has already been created and if has then just needs assigning
-				existing_fs = self.sc.GetContents('{}.{}'.format(fs_name, constants.PowerFactory.fs_command))
-				if len(existing_fs) > 0:
-					fs = existing_fs[0]
+			# Check if command has already been created and if has then just needs assigning
+			existing_fs = self.sc.GetContents('{}.{}'.format(fs_name, constants.PowerFactory.fs_command))
+			if len(existing_fs) > 0:
+				fs = existing_fs[0]
 
-				elif fs_settings.cmd:
+			if fs_settings:
+
+				if fs_settings.cmd:
 					# If no existing command then create a new one
 					fs = self.sc.GetContents(fs_settings.cmd)
 					# Check if command exists and if so copy that one with a new name
@@ -980,12 +982,12 @@ class PFStudyCase:
 		self.delete_sc_objects(pf_cmd=(self.fs_results, self.cont_results), pf_type=constants.PowerFactory.pf_results)
 		return None
 
-	def create_studies(self, lf_settings, fs_settings):
+	def create_studies(self, lf_settings=None, fs_settings=None):
 		"""
 			Function to either create a new command or change the reference of an existing command to results file
 			associated with this study
-		:param file_io.LFSettings lf_settings:  Settings to use for the frequency sweep settings
-		:param file_io.FSSettings fs_settings:  Settings to use for the frequency sweep settings
+		:param file_io.LFSettings lf_settings: (optional=None) Settings to use for the frequency sweep settings
+		:param file_io.FSSettings fs_settings:  (optional=None) Settings to use for the frequency sweep settings
 		:return None:
 		"""
 		self.create_load_flow(lf_settings=lf_settings)
@@ -1104,6 +1106,11 @@ class PFStudyCase:
 				prj=self.prj,
 				res_pth=res_pth
 			)
+
+			# Update load flow and frequency sweep commands to reflect relevant locations
+			case.create_studies()
+
+			#
 			self.logger.debug(
 				(
 					'New case {} created for Study Case {}, Operating Scenario {} with Contingency {}'
@@ -1170,14 +1177,20 @@ class PFProject:
 		self.net_data = app.GetProjectFolder(constants.PowerFactory.pf_netdata_folder_type)
 
 		# Create temporary folders
+		self.temp_folders = list()
 		c = constants.PowerFactory
-		self.sc_folder = self.create_folder(name='{}_{}'.format(c.temp_sc_folder, self.uid), location=self.base_sc_folder)
-		self.op_folder = self.create_folder(name='{}_{}'.format(c.temp_os_folder, self.uid), location=self.base_os_folder)
+		self.sc_folder = self.create_folder(
+			name='{}_{}'.format(c.temp_sc_folder, self.uid),
+			location=self.base_sc_folder,
+			temp=True
+		)
+		self.op_folder = self.create_folder(
+			name='{}_{}'.format(c.temp_os_folder, self.uid),
+			location=self.base_os_folder,
+			temp=True
+		)
 		# Folder to contain the fault cases which is only created if needed
 		self.fault_case_folder = None
-		# self.var_folder = self.create_folder(name='{}_{}'.format(c.temp_var_folder, self.uid), location=self.base_var_folder)
-		# self.temp_folders = (self.sc_folder, self.op_folder, self.var_folder)
-		self.temp_folders = [self.sc_folder, self.op_folder]
 
 		# Populated with the fault cases which are created from the contingencies input where necessary.
 		# Only populated where a contingency analysis command is not provided instead.
@@ -1185,6 +1198,9 @@ class PFProject:
 
 		# List is populates with handles for all of the cases run as part of the frequency scan studies
 		self.cases_to_run = list()
+
+		# Create the command for the auto tasks associated with this project
+		self.task_auto = self.create_task_auto()
 
 		# Initialise study_cases
 		self.base_sc = self.initialise_study_cases()
@@ -1356,26 +1372,19 @@ class PFProject:
 			hrlf_res.extend(sc_cls.process_hrlf_results(logger))
 		return hrlf_res
 
-	def update_auto_exec(self, fs=False, hldf=False):
+	def update_auto_exec(self):
 		"""
-			For the newly added study case, updates the frequency sweep and hldf references and adds to the auto_exec command
-		:param bool fs: (optional=False) - Set to True to include export of frequency scan results
-		:param bool hldf: (optional=False) - Set to True to include export of harmonic load flow results
+			For the newly added study cases, updates the frequency sweep and adds to the auto_exec command
 		:return None:
 		"""
-		for cls_sc in self.sc_cases:
-			self.task_auto.AppendStudyCase(cls_sc.sc)
+		for case in self.cases_to_run:
+			self.task_auto.AppendStudyCase(case.sc)
 
-			if fs:
-				# Add frequency scan commands and results export
-				self.task_auto.AppendCommand(cls_sc.frq, 0)
-				self.task_auto.AppendCommand(cls_sc.frq_export_com, 0)
+			# Add frequency scan commands and results export
+			self.task_auto.AppendCommand(case.fs, 0)
+			self.task_auto.AppendCommand(case.fs_export_cmd, 0)
 
-			if hldf:
-				# Add harmonic load flow commands and results export
-				self.task_auto.AppendCommand(cls_sc.hldf, 0)
-				self.task_auto.AppendCommand(cls_sc.hldf_export_com, 0)
-		return
+		return None
 
 	def project_state(self, deactivate=False):
 		"""
@@ -1391,11 +1400,12 @@ class PFProject:
 
 		return None
 
-	def create_folder(self, name, location):
+	def create_folder(self, name, location, temp=False):
 		"""
 			Create temporary folders within the project to store newly created study cases, etc.
 		:param str name:  Name to give to folder
 		:param powerfactory.DataObject location:  Location new folder is to be created in
+		:param bool temp: (optional) If True then marked as a temporary folder and added to the list of folders
 		:return powerfactory.DataObject new_folder:  Handle to the newly created folder
 		"""
 		# Default location is in the project (assuming project has been activated successfully)
@@ -1447,6 +1457,11 @@ class PFProject:
 		else:
 			self.logger.debug('New folder {} created in location {}'.format(name, location))
 
+		# If a temporary folder then add to list of temporary folders
+		if temp:
+			self.temp_folders.append(new_folder)
+			self.logger.debug('Folder: {} added to list of temporary folders for deletion at the end'.format(new_folder))
+
 		return new_folder
 
 	def delete_temp_folders(self):
@@ -1459,7 +1474,7 @@ class PFProject:
 			if folder is not None:
 				self.pf.delete_object(pf_obj=folder)
 				self.logger.debug('Temporary folder {} deleted'.format(folder))
-			folder = None
+			# folder = None
 
 		self.logger.info('Temporary folders created in project {} have all been deleted'.format(self.prj))
 
@@ -1687,21 +1702,28 @@ class PFProject:
 
 		return None
 
+	def create_task_auto(self):
+		"""
+			Function creates the command for automation of the study results and is saved in the temporary
+			study case folder
+		:return None:
+		"""
+		# Check if study case folder has been created and if not then create
+		if not self.sc_folder:
+			self.logger.warning('Temporary study case folder has not been created and so will be created now')
+			self.sc_folder = self.create_folder(
+				name='{}_{}'.format(constants.PowerFactory.temp_sc_folder, self.uid),
+				location=self.base_sc_folder,
+				temp=True
+			)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		# Create the auto command
+		task_auto, _ = create_object(
+			location=self.sc_folder,
+			pfclass=constants.PowerFactory.autotasks_command,
+			name='{}_{}'.format(constants.General.cmd_autotasks_leader, self.uid)
+		)
+		return task_auto
 
 
 

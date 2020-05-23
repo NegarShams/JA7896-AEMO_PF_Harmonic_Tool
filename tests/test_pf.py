@@ -184,6 +184,46 @@ class TestPFProject(unittest.TestCase):
 		active_project = self.pf.get_active_project()
 		self.assertTrue(active_project is None)
 
+	def test_create_task_auto(self):
+		"""
+			Confirm that new project instances can be created and that it contains the auto_executable task
+		:return None:
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(df_study_cases=self.df, uid=uid)
+
+		# Check defined as expected
+		pf_project = pf_projects[pf_test_project]
+		self.assertEqual(pf_test_project, pf_project.name)
+		self.assertTrue(pf_project.prj_active)
+
+		# Confirm temporary folders exist in the temporary project folder location
+		task_auto = pf_project.sc_folder.GetContents(
+			'{}_{}.{}'.format(
+				pscharmonics.constants.General.cmd_autotasks_leader,
+				uid,
+				pscharmonics.constants.PowerFactory.autotasks_command
+			)
+		)
+		# Confirm folder exists
+		self.assertTrue(len(task_auto) > 0)
+		# Confirm objects match with first element
+		self.assertEqual(task_auto[0], pf_project.task_auto)
+
+		# Change uid and create new task_auto
+		uid='TEST_TASK_AUTO'
+		pf_project.uid = uid
+		task_auto = pf_project.create_task_auto()
+
+		# Confirm that task_auto command now contains new uid and doesn't match previous task_auto
+		self.assertTrue(uid in str(task_auto))
+		self.assertNotEqual(task_auto, pf_project.task_auto)
+
+
+		# Delete temporary folders
+		pf_project.delete_temp_folders()
+
 	def test_copy_studycases(self):
 		""" tests that new study cases can be created """
 		# Create new project instances
@@ -796,18 +836,11 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 	def test_case_creation(self):
 		"""
-			Tests that new cases can be created for each of the convergent contingencies
-		"""
-		"""
 			Test that when the pre-case check is run for the two study cases
 			the dataframe that is returned matches what is expected.
 
 		:return:
 		"""
-		# Test Names (detailed in Inputs spreadsheet)
-		test_case1 = 'BASE'
-		test_case2 = 'BASE(1)'
-
 		# Create random path for temporary files
 		target_pth = os.path.join(
 			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
@@ -837,6 +870,60 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		pf_project.create_cases(export_pth=target_pth, contingencies=self.settings.contingencies)
 
 		self.assertEqual(len(pf_project.cases_to_run), num_convergent_cases)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+
+	def test_case_auto_exec_creation(self):
+		"""
+			Test that the task_auto that is created can be populated with the relevant commands
+		:return:
+		"""
+		# Create random path for temporary files
+		target_pth = os.path.join(
+			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+		)
+		if os.path.isdir(target_pth):
+			raise SyntaxError('Random path {} already exists'.format(target_pth))
+		else:
+			os.mkdir(target_pth)
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get single project
+		pf_project = pf_projects[pf_test_project]
+
+		# Carry out pre-case check using fault cases on what should be two different study_cases
+		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
+
+		# Get number of convergent cases which will then be used to determine the number of files that should exist
+		# in the folder once study completed
+		num_convergent_cases = len(df[df[pscharmonics.constants.Contingencies.status]==True].index)
+
+		# Create cases
+		pf_project.create_cases(export_pth=target_pth, contingencies=self.settings.contingencies)
+		# Update the auto_exec command to contain details of all of these cases
+		pf_project.update_auto_exec()
+
+		# Confirm that the contents of the auto_exec command matches the number of study cases expected
+		# and the correct number of commands
+		# TODO: Check number of study cases and commands matches expectations for auto command
+
+		# Execute command and confirm that the number of entries in the results folder is correct
+		pf_project.project_state()
+		pf_project.task_auto.Execute()
+
+		# Find out how many results have been created
+		num_results = len([name for name in os.listdir(target_pth) if os.path.isfile(os.path.join(target_pth, name))])
+
+		# Confirm number of results matches 1 for each convergent cases
+		self.assertEqual(num_convergent_cases, num_results)
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
