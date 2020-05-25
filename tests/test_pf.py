@@ -866,7 +866,10 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		num_convergent_cases = len(df[df[pscharmonics.constants.Contingencies.status]==True].index)
 
 		# Create cases
-		pf_project.create_cases(export_pth=target_pth, contingencies=self.settings.contingencies)
+		pf_project.create_cases(
+			export_pth=target_pth, study_settings=self.settings.settings,
+			contingencies=self.settings.contingencies
+		)
 
 		self.assertEqual(len(pf_project.cases_to_run), num_convergent_cases)
 
@@ -906,7 +909,10 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		num_convergent_cases = len(df[df[pscharmonics.constants.Contingencies.status]==True].index)
 
 		# Create cases
-		pf_project.create_cases(export_pth=target_pth, contingencies=self.settings.contingencies)
+		pf_project.create_cases(
+			export_pth=target_pth,
+			study_settings=self.settings.settings,
+			contingencies=self.settings.contingencies)
 		# Update the auto_exec command to contain details of all of these cases
 		pf_project.update_auto_exec()
 
@@ -923,6 +929,51 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Confirm number of results matches 1 for each convergent cases
 		self.assertEqual(num_convergent_cases, num_results)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_case_results_export(self):
+		"""
+			Test that the results returned match the expected values
+		:return:
+		"""
+		# Create random path for temporary files
+		target_pth = os.path.join(
+			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+		)
+		if os.path.isdir(target_pth):
+			raise SyntaxError('Random path {} already exists'.format(target_pth))
+		else:
+			os.mkdir(target_pth)
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get single project
+		pf_project = pf_projects[pf_test_project]
+
+		# Make sure relevant terminals for project have been found and created
+		_ = pf_project.find_terminals(terminals_to_include=self.settings.terminals, include_mutual=True)
+
+		# Carry out pre-case check using fault cases on what should be two different study_cases
+		_ = pf_project.pre_case_check(contingencies=self.settings.contingencies)
+
+		# Create cases
+		pf_project.create_cases(
+			export_pth=target_pth,
+			study_settings=self.settings.settings,
+			contingencies=self.settings.contingencies)
+		# Update the auto_exec command to contain details of all of these cases
+		pf_project.update_auto_exec()
+
+		# Execute command and confirm that the number of entries in the results folder is correct
+		pf_project.project_state()
+		pf_project.task_auto.Execute()
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
@@ -1102,8 +1153,6 @@ class TestPFProjectTerminals(unittest.TestCase):
 					print('### TEST TIDY ERROR:  Unable to delete folder {}'.format(folder))
 
 
-
-
 class TestPFSingleProjectUsingInputs(unittest.TestCase):
 	"""
 		This class contains tests that are carried out using the complete set of inputs as part of integration
@@ -1152,11 +1201,17 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		)
 
 		# Get DataFrame from pre_case check and also ask to create file
-		df_summary = pscharmonics.pf.run_pre_case_checks(
+		# Only interested in the pre_case check for the contingencies at this stage
+		df_summary, df_term = pscharmonics.pf.run_pre_case_checks(
 			pf_projects=pf_projects,
+			terminals=self.settings.terminals,
+			include_mutual=True,
 			export_pth=excel_pth,
 			contingencies=self.settings.contingencies
 		)
+
+		# Confirm the returned terminals match the expected length
+		self.assertEqual(len(df_term.index), 5)
 
 		# Confirm DataFrame is expected length and number of non_convergent cases is as expected
 		self.assertEqual(len(df_summary.index), 4)

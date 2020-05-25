@@ -315,6 +315,8 @@ class Contingencies:
 	col_number = 'b:number'
 	col_nonconvergent = 'b:inoconv'
 
+	# Name that is used for worksheet when exporting details of convergent contingencies
+	export_sheet_name = 'Contingencies'
 
 class Terminals:
 	""" Contains constants associated with processing of terminals used in export """
@@ -343,6 +345,8 @@ class Terminals:
 	# When trimming terminals this is the minimum length their name will be trimmed to
 	min_term_length = 4
 
+	# Name that is used for worksheet when exporting details of missing terminals
+	export_sheet_name = 'Terminals'
 
 class Results:
 	"""

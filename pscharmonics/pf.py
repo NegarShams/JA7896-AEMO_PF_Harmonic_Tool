@@ -1083,16 +1083,16 @@ class PFStudyCase:
 		# TODO: At this point want to clear all existing variables from results file
 
 		# Loop through all terminals and add
-		for term_name, term_handle in terminals.items():
+		for term_name, term in terminals.items():
 			add_vars_res(
 				elmres=self.fs_results,
-				element=term_handle,
+				element=term.pf_handle,
 				res_vars=self_variables
 			)
 			self.logger.debug(
 				(
 					'Terminal Named {}, relating to terminal {} added to results file {}'
-				).format(term_name, term_handle, self.fs_results)
+				).format(term_name, term.pf_handle, self.fs_results)
 			)
 
 		if study_settings.export_mutual:
@@ -1236,6 +1236,10 @@ class PFStudyCase:
 				prj=self.prj,
 				res_pth=res_pth
 			)
+
+			# TODO: Need to actually apply relevant contingency
+			#
+			#
 
 			# Update load flow and frequency sweep commands to reflect relevant locations
 			case.create_studies()
@@ -1591,13 +1595,13 @@ class PFProject:
 			)
 
 		# Create folder
-		new_folder = location.CreateObject(constants.PowerFactory.pf_folder_type, name)
+		new_folder = location.CreateObject(constants.PowerFactory.pf_folder_type, new_name)
 		if new_folder is None:
 			self.logger.error(
 				'Unable to create folder {} in location {}, the script is likely to now fail'.format(name, location)
 			)
 		else:
-			self.logger.debug('New folder {} created in location {}'.format(name, location))
+			self.logger.debug('New folder {} created in location {}'.format(new_name, location))
 
 		# If a temporary folder then add to list of temporary folders
 		if temp:
@@ -1818,7 +1822,7 @@ class PFProject:
 
 		return df
 
-	def create_cases(self, export_pth=str(), contingencies=None, contingencies_cmd=str()):
+	def create_cases(self, study_settings, export_pth=str(), contingencies=None, contingencies_cmd=str()):
 		"""
 			Function runs the pre_case_check for all of the base study_cases and then creates the study cases for each
 			contingency.
@@ -1848,6 +1852,10 @@ class PFProject:
 			# Loop through each study case to create new cases based on those and the relevant contingencies
 			self.cases_to_run = list()
 			for sc_name, sc in self.base_sc.items():
+				# Add the terminals to the results file for each of the base study cases before the new cases are
+				# created which uses them as a starting point
+				sc.add_variables(study_settings=study_settings, terminals=self.terminals, mutuals=self.mutuals)
+
 				# Create cases for all the convergent contingencies associated with this study case and then returns
 				# a list of references to the PFStudyCase class
 				new_cases = sc.create_cases(sc_folder=self.sc_folder, op_folder=self.op_folder, res_pth=export_pth)
@@ -2019,9 +2027,22 @@ class PFProject:
 			# TODO: Confirm if it matters which one
 			mutual_folder = self.create_folder(
 				name='{}_{}'.format(constants.PowerFactory.temp_mutual_folder, self.uid),
-				location=self.net_data_items[0],
+				location=self.net_data,
 				temp=True
 			)
+			# For some reason cannot directly create in the required location so have to move after creation
+			# object handle is updated automatically
+			if mutual_folder is not None:
+				self.net_data_items[0].Move(mutual_folder)
+			else:
+				self.logger.error(
+					(
+						'Unable to create a temporary folder for the mutual impedance elements in the location {} '
+						'and therefore no mutual elements can be created'
+					).format(self.net_data_items[0])
+				)
+				# Return eearly
+				return df
 
 			# Reset mutual elements dictionary which is populated for each mutual element created in the form
 			# of having the name (term1_term2) and then the reference to the powerfactory DataObject that is created
@@ -2063,21 +2084,9 @@ class PFProject:
 								)
 							)
 
-			# # Alert user of those terminals who have had to have their name reduced
-			# df_mutual_only = df[~df[c.planned_name].isna()]
-			# df_non_matching = df_mutual_only[df_mutual_only[c.planned_name] != df[df_mutual_only[c.name]]]
-			#
-			# if not df_non_matching.empty:
-			# 	# Provide user with list of entries which have been changed
-				self.logger.warning(
-					(
-						'For the following terminals the combined name exceeded the limit o'
-					)
-				)
-
-
-			# Return updated DataFrame with mutual elements
+		# Return updated DataFrame with mutual elements
 		return df
+
 
 class PowerFactory:
 	"""
@@ -2396,41 +2405,48 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid):
 
 	return pf_projects
 
-def run_pre_case_checks(pf_projects, export_pth=str(), contingencies=None, contingencies_cmd=str()):
+def run_pre_case_checks(
+		pf_projects, terminals, include_mutual=False, export_pth=str(), contingencies=None, contingencies_cmd=str(),
+
+):
 	"""
 		Loop through each project so that it returns a DataFrame of all the study case results.
 
 		If an export_pth is provided then these are also written to the target excel file
 	:param dict pf_projects:  Dictionary of references to all projects being studied as returned by
 							create_pf_project_instances
+	:param dict terminals:  Dictionary of the terminals for which results need to be run
 	:param str export_pth:  (optional) Export path to write results to if provided
 	:param dict contingencies:  (optional) Dictionary of the outages to be considered which will need to be
 									created into fault cases
 		:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
 	:return pd.DataFrame df_case_check: DataFrame showing contingencies which are convergent
 	"""
-	HERE: Add in processing of terminals to pre_case check
-
 	logger = logging.getLogger(constants.logger_name)
 	c = constants.Contingencies
 
 	# Loops through all projects and obtains DataFrame, these are then combined into a single DataFrame
 	# ready to be written to excel
-	dfs = list()
+	dfs_cont = list()
+	dfs_term = dict()
 	for project_name, prj in pf_projects.items():
 		# Activate project
 		prj.project_state()
 
 		# Obtain contingency analysis results for all relevant cases in this project
-		df = prj.pre_case_check(contingencies=contingencies, contingencies_cmd=contingencies_cmd)
+		df_cont = prj.pre_case_check(contingencies=contingencies, contingencies_cmd=contingencies_cmd)
+		dfs_cont.append(df_cont)
 
-		dfs.append(df)
+		# Look for terminals in project and get DataFrame of those which cannot be found
+		df_term = prj.find_terminals(terminals_to_include=terminals, include_mutual=include_mutual)
+		dfs_term[project_name] = df_term
 
 	# Combine returned DataFrames into a single DataFrame
-	df_case_check = pd.concat(dfs)
+	df_case_check_cont = pd.concat(dfs_cont)
+	df_case_check_term = pd.concat(dfs_term.values(), keys=dfs_term.keys())
 
 	# Loop through and detail those cases that are non-convergent
-	df_non_conv = df_case_check[df_case_check[c.status]==False]
+	df_non_conv = df_case_check_cont[df_case_check_cont[c.status]==False]
 	if df_non_conv.empty:
 		logger.info('All cases and contingencies convergent')
 	else:
@@ -2453,7 +2469,9 @@ def run_pre_case_checks(pf_projects, export_pth=str(), contingencies=None, conti
 
 	# If a path has been provided then write it to excel
 	if export_pth:
-		df_case_check.to_excel(export_pth)
+		with pd.ExcelWriter(export_pth) as xl:
+			df_case_check_cont.to_excel(xl, sheet_name=constants.Contingencies.export_sheet_name)
+			df_case_check_term.to_excel(xl, sheet_name=constants.Terminals.export_sheet_name)
 		logger.info(
 			'A summary status for all of the pre-case check results has been saved to the file: {}'.format(
 				export_pth
@@ -2461,7 +2479,7 @@ def run_pre_case_checks(pf_projects, export_pth=str(), contingencies=None, conti
 		)
 
 	# Return the summary DataFrame
-	return df_case_check
+	return df_case_check_cont, df_case_check_term
 
 
 
