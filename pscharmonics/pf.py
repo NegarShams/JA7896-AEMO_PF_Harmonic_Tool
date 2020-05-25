@@ -180,6 +180,21 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	return None
 
 
+def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the results file
+	"""
+		Adds the results variables to the results file
+	:param powerfactory.DataObject elmres: Results file to be updated
+	:param powerfactory.DataObject element: Element to be added
+	:param tuple res_vars: 
+	:return: None
+	"""
+	# Loop through adding each results variable to the results element
+	for x in res_vars:
+		elmres.AddVariable(element, x)
+
+	return None
+
+
 def set_max_processes(_app, logger):
 	"""
 
@@ -1032,12 +1047,70 @@ class PFStudyCase:
 		self.delete_sc_objects(pf_cmd=(self.fs_results, self.cont_results), pf_type=constants.PowerFactory.pf_results)
 		return None
 
-	def add_variables(self, study_settings, terminals):
+	def add_variables(self, study_settings, terminals, mutuals):
 		"""
-			Function adds the required variables to the results file based on the study settings
-		:return:
+			Function adds the required variables to the fs results file based on the study settings
+		:param file_io.StudySettings study_settings:  Input settings to determine which sort of results to export
+		:param dict terminals:  Dictionary with references to the terminals to be included
+		:param dict mutuals:  Dictionary with references to the mutuals to be included
+		:return None:
 		"""
-		raise SyntaxError('TBC')
+
+		# Confirm results variable exits and if not create
+		if not self.fs_results:
+			self.create_studies()
+
+		# Determine types of variables to be declaring
+		c = constants.PowerFactory
+		if study_settings.export_rx:
+			self_variables = (c.pf_z1, c.pf_r1, c.pf_x1)
+
+		else:
+			self_variables = (c.pf_z1, )
+		self.logger.debug('Self impedance results declared for: {}'.format(' - '.join(self_variables)))
+
+		# Mutual variables to export
+		if study_settings.export_mutual:
+			if study_settings.export_rx:
+				mutual_variables = (c.pf_z12, c.pf_r12, c.pf_x12)
+
+			else:
+				mutual_variables = (c.pf_z12, )
+			self.logger.debug('Mutual impedance results declared for: {}'.format(' - '.join(mutual_variables)))
+		else:
+			self.logger.debug('No mutual impedance results to be calculated')
+
+		# TODO: At this point want to clear all existing variables from results file
+
+		# Loop through all terminals and add
+		for term_name, term_handle in terminals.items():
+			add_vars_res(
+				elmres=self.fs_results,
+				element=term_handle,
+				res_vars=self_variables
+			)
+			self.logger.debug(
+				(
+					'Terminal Named {}, relating to terminal {} added to results file {}'
+				).format(term_name, term_handle, self.fs_results)
+			)
+
+		if study_settings.export_mutual:
+			# Add mutual impedance variables if they have been declared
+			for term_name, term_handle in mutuals.items():
+				add_vars_res(
+					elmres=self.fs_results,
+					element=term_handle,
+					res_vars=mutual_variables
+				)
+				self.logger.debug(
+					(
+						'Mutual Named {}, relating to terminal {} added to results file {}'
+					).format(term_name, term_handle, self.fs_results)
+				)
+
+		return None
+
 
 	def create_studies(self, lf_settings=None, fs_settings=None):
 		"""
@@ -1180,7 +1253,7 @@ class PFStudyCase:
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
 
-	def __init__(self, name, df_studycases, uid, lf_settings=None, fs_settings=None):
+	def __init__(self, name, df_studycases, uid, lf_settings=None, fs_settings=None, res_pth=str()):
 		"""
 			Initialise class
 		:param str name:  project name
@@ -1191,6 +1264,7 @@ class PFProject:
 															used and if not then default Frequency Sweep command will be used
 		:param pd.DataFrame df_studycases:  DataFrame containing all the base study cases associates with this project
 		:param str uid:  Unique identifier given for this study
+		:param str res_pth: (optional=str()) - This is the path that the processed results will be saved in
 		"""
 		self.logger = logging.getLogger(constants.logger_name)
 		self.logger.debug('New instance for project {} being initialised'.format(name))
@@ -1218,6 +1292,9 @@ class PFProject:
 		# Activate project to get power_factory instance
 		self.prj = self.pf.activate_project(project_name=name)
 		self.prj_active = True
+
+		# Path where all result exports will be saved to
+		self.res_pth =res_pth
 
 		if self.prj is None:
 			self.logger.warning(
@@ -1357,7 +1434,8 @@ class PFProject:
 			# Create a PFStudyCase instance
 			study_case_class = PFStudyCase(
 				name=name, sc=new_sc, op=new_os, prj=self.prj,
-				base_case=True
+				base_case=True,
+				res_pth=self.res_pth
 			)
 
 			study_case_class.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
@@ -1802,11 +1880,12 @@ class PFProject:
 		)
 		return task_auto
 
-	def find_terminals(self, terminals_to_include):
+	def find_terminals(self, terminals_to_include, include_mutual=False):
 		"""
 			Function finds all the terminals in the active project and returns details of those
 			which cannot be found
 		:param dict terminals_to_include:  List of terminals as defined in file_io.TerminalDetails
+		:param bool include_mutual:  Set to True when mutual impedance values are supposed to be exported
 		:return pd.DataFrame df_missing_terminal:  Returns details of all the terminals found in project
 		"""
 		self.logger.debug('Checking for relevant terminals in project:  {}'.format(self.prj))
@@ -1903,7 +1982,10 @@ class PFProject:
 			self.logger.info('All input terminals found in project: {}'.format(self.prj))
 
 		# Create mutual impedance elements and obtain updated DataFrame
-		df = self.create_mutual_impedance(df=df)
+		if include_mutual:
+			df = self.create_mutual_impedance(df=df)
+		else:
+			self.logger.debug('No mutual impedance values requested for project {}'.format(self.prj))
 
 		# Returns DataFrame with details of terminals that have been found and those which are missing
 		return df
@@ -2327,6 +2409,8 @@ def run_pre_case_checks(pf_projects, export_pth=str(), contingencies=None, conti
 		:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
 	:return pd.DataFrame df_case_check: DataFrame showing contingencies which are convergent
 	"""
+	HERE: Add in processing of terminals to pre_case check
+
 	logger = logging.getLogger(constants.logger_name)
 	c = constants.Contingencies
 

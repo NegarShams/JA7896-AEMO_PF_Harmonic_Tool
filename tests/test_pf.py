@@ -280,7 +280,7 @@ class TestPFProject(unittest.TestCase):
 		self.assertTrue(sc.active)
 
 		# Run load flow and should get error code 0 returned
-		self.assertTrue(pscharmonics.constants.General.cmd_leader in str(sc.ldf))
+		self.assertTrue(pscharmonics.constants.General.cmd_lf_leader in str(sc.ldf))
 		self.assertEqual(sc.ldf.Execute(), 0)
 
 		# Run load flow using in built class command
@@ -369,7 +369,7 @@ class TestPFProject(unittest.TestCase):
 		if os.path.isfile(test_export_file):
 			os.remove(test_export_file)
 		# Create results export command
-		export_cmd, res_pth = sc.set_results_export(result=sc.results)
+		export_cmd, res_pth = sc.set_results_export(result=sc.fs_results)
 
 		# Confirm returned path matches expected value
 		self.assertEqual(test_export_file, res_pth)
@@ -421,7 +421,8 @@ class TestPFProject(unittest.TestCase):
 		uid = 'TEST_CASE'
 		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
 		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
+			name=pf_test_project, df_studycases=df_test_project, uid=uid,
+			res_pth=test_export_pth
 		)
 
 		# Get handle for study case
@@ -538,10 +539,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Get handle to test study case
 		sc = pf_project.base_sc[self.test_name]
 
-		# Confirm no results files have been defined initially
-		self.assertTrue(sc.fs_results is None)
-		self.assertTrue(sc.cont_results is None)
-
 		# Create the results files and confirm they now reference a DataObject
 		sc.create_results_files()
 
@@ -647,6 +644,8 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		sc = pf_project.base_sc[self.test_name]
 
 		self.assertTrue(sc.cont_analysis is None)
+		# Clear load flow command
+		sc.ldf = None
 		# Create contingency based on no inputs but shouldn't raise an error since load flow command
 		# has not been defined yet
 		sc.create_cont_analysis()
@@ -974,7 +973,7 @@ class TestPFProjectTerminals(unittest.TestCase):
 		# Folders to delete
 		cls.folders = list()
 
-	def test_check_find_terminals(self):
+	def test_check_find_terminals_with_mutuals(self):
 		"""
 			Tests that fault cases can be created for a contingency command
 		"""
@@ -997,7 +996,7 @@ class TestPFProjectTerminals(unittest.TestCase):
 		)
 
 		# Check terminals
-		df_terminals = pf_project.find_terminals(terminals_to_include=self.settings.terminals)
+		df_terminals = pf_project.find_terminals(terminals_to_include=self.settings.terminals, include_mutual=True)
 
 		number_of_terminals = len(self.settings.terminals.keys())
 		number_of_mutual = sum([1 for x in self.settings.terminals.values() if x.include_mutual]) * number_of_terminals-1
@@ -1010,6 +1009,32 @@ class TestPFProjectTerminals(unittest.TestCase):
 
 		# Confirm file has been created
 		self.assertTrue(os.path.isfile(excel_output))
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_check_find_terminals_no_mutuals(self):
+		"""
+			Tests that terminals can be created without mutual impedance values being created
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+
+		# Deactivate study case to confirm get same results returns
+		sc = pscharmonics.pf.app.GetActiveStudyCase()
+		if sc is not None:
+			sc.Deactivate()
+
+		# Check terminals
+		df_terminals = pf_project.find_terminals(terminals_to_include=self.settings.terminals, include_mutual=False)
+
+		number_of_terminals = len(self.settings.terminals.keys())
+
+		self.assertEqual(len(df_terminals.index), number_of_terminals)
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
@@ -1031,7 +1056,7 @@ class TestPFProjectTerminals(unittest.TestCase):
 			sc.Deactivate()
 
 		# Check terminals
-		df_terminals = pf_project.find_terminals(terminals_to_include=self.settings.terminals)
+		df_terminals = pf_project.find_terminals(terminals_to_include=self.settings.terminals, include_mutual=True)
 
 		number_of_terminals = len(self.settings.terminals.keys())
 		number_of_mutual = sum([1 for x in self.settings.terminals.values() if x.include_mutual]) * number_of_terminals-1
