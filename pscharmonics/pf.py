@@ -12,7 +12,9 @@
 
 import os
 import sys
+import math
 import pscharmonics.constants as constants
+import pscharmonics.file_io as file_io
 import multiprocessing
 import time
 import logging
@@ -262,6 +264,54 @@ def check_if_object_exists(location, name):  # Check if the object exists
 	# _new_object used instead of new_object to avoid shadowing
 	new_object = location.GetContents(name)
 	return new_object[0]
+
+
+def create_mutual_name(term1, term2):
+	"""
+		Function creates a name for the mutual terminals ensuring does not exceed the maximum name length
+		and returns the selected name alongside the planned name
+	:param str term1:  Terminal 1 name
+	:param str term2:  Terminal 2 name
+	:return (str, str), planned_name, used_name:  The name that was planned and then what was actually used
+	"""
+
+	# Constants for terminal names
+	c = constants.Terminals
+
+	planned_name = '{}{}{}'.format(term1, c.join_char, term2)
+
+	# Overall length determination
+	if len(planned_name) > c.max_coupled_length:
+		# Name is too long so need to trim characters from each terminal
+		max_terminal_length = math.ceil(float(c.max_coupled_length - len(c.join_char)) / 2.0)
+
+		term1 = term1[:max_terminal_length]
+		term2 = term2[:max_terminal_length]
+	used_name = '{}{}{}'.format(term1, c.join_char, term2)
+
+	return planned_name, used_name
+
+
+def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance between two terminals
+	"""
+		Create mutual impedance between two terminals
+	:param powerfactory.DataObject location: Handle for location to save mutual impedance 
+	:param str name: Name for mutual impedance 
+	:param powerfactory.DataObject bus1: Terminal 1 of mutual impedance
+	:param powerfactory.DataObject bus2: Terminal 2 of mutual impedance
+	:return: powerfactory.DataObject  elmmut: Handle for mutual impedance
+	"""
+	# elmmut = app.GetFromStudyCase(name + )				# Get relevant object or create if it doesn't exist
+	elmmut, _ = create_object(
+		location=location,
+		pfclass=constants.PowerFactory.pf_mutual,
+		name=name
+	)
+	elmmut.loc_name = name
+	elmmut.bus1 = bus1
+	elmmut.bus2 = bus2
+	elmmut.outserv = 0
+	return elmmut
 
 
 class PFStudyCase:
@@ -982,6 +1032,13 @@ class PFStudyCase:
 		self.delete_sc_objects(pf_cmd=(self.fs_results, self.cont_results), pf_type=constants.PowerFactory.pf_results)
 		return None
 
+	def add_variables(self, study_settings, terminals):
+		"""
+			Function adds the required variables to the results file based on the study settings
+		:return:
+		"""
+		raise SyntaxError('TBC')
+
 	def create_studies(self, lf_settings=None, fs_settings=None):
 		"""
 			Function to either create a new command or change the reference of an existing command to results file
@@ -1153,6 +1210,11 @@ class PFProject:
 		# ones to create contingencies for
 		self.df_pre_case = pd.DataFrame()
 
+		# Dictionary of terminals that have been found in this project
+		self.terminals = dict()
+		# Dictionary of mutual elements
+		self.mutuals = dict()
+
 		# Activate project to get power_factory instance
 		self.prj = self.pf.activate_project(project_name=name)
 		self.prj_active = True
@@ -1175,6 +1237,8 @@ class PFProject:
 
 		# Get handle for all network data
 		self.net_data = app.GetProjectFolder(constants.PowerFactory.pf_netdata_folder_type)
+		# Get all folders which contain network elements
+		self.net_data_items = self.net_data.GetContents('*.{}'.format(constants.PowerFactory.pf_network_elements))
 
 		# Create temporary folders
 		self.temp_folders = list()
@@ -1480,6 +1544,40 @@ class PFProject:
 
 		return None
 
+	def find_substation(self, sub_name):
+		"""
+			Function searches relevant possible locations that a substation could be located and returns
+			the substation or an error message when multiple found
+		:param str sub_name:  Name of substation to be found
+		:return powerfactory.DataObject substation: Reference to the powerfactory substation element
+		"""
+		# Check ends with the substation element ending
+		if not sub_name.endswith(constants.PowerFactory.pf_substation):
+			sub_name = '{}.{}'.format(sub_name, constants.PowerFactory.pf_substation)
+
+		# Find substation using a recursive search of the network elements folders
+		substation = list()
+		for net_item in self.net_data_items:
+			# Loop through each net_item folder and extend substation
+			substation.extend(net_item.GetContents(sub_name))
+
+		# Check that only a single substation is found
+		if len(substation) == 0:
+			substation = None
+		elif len(substation) > 1:
+			self.logger.error(
+				(
+					'Multiple substations with the name {} have been found across multiple network data folders.'
+					'The following substations where found: \n\t'
+					'{}\n'
+				).format(sub_name, '\n\t'.join([str(x) for x in substation]))
+			)
+			substation = None
+		else:
+			substation = substation[0]
+
+		return substation
+
 	def create_fault_cases(self, contingencies):
 		"""
 			Function will loop through all of the contingencies and create a fault case for each which are
@@ -1528,41 +1626,20 @@ class PFProject:
 			# Assign as a contingency case
 			fault_event.mod_cnt = 1
 
-			# Get all folders which contain network elements
-			net_data_items = self.net_data.GetContents('*.{}'.format(constants.PowerFactory.pf_network_elements))
-
 			# Loop through each coupler and add switch event to fault case
 			for coupler in cont.couplers:
 				# Find substation using a recursive search of the network elements folders
-				substation = list()
-				for net_item in net_data_items:
-					# Loop through each net_item folder and extend substation
-					substation.extend(net_item.GetContents(coupler.substation))
-				# substation = self.net_data.GetContents(coupler.substation, recursive=1)
+				substation = self.find_substation(sub_name=coupler.substation)
 
-				# Check that only a single substation is found
-				if len(substation) == 0:
+				if substation is None:
+					# Not able to find substation and therefore contingency cannot be found
 					self.logger.error(
 						(
-							'For contingency {} the substation named {} cannot be found and therefore this '
-							'contingency will not be studied'
-						).format(cont.name, coupler.substation)
+							'For contingency {} the substation named {} cannot be found within the project '
+							'{} and therefore the contingency will not be studied.'
+						).format(cont.name, coupler.substation, self.prj)
 					)
-					cont.not_included = True
 					break
-				elif len(substation) > 1:
-					self.logger.error(
-						(
-							'For contingency {} the substation named {} has been found in multiple locations '
-							'and therefore the specific substation to be included cannot be identified.  This'
-							'contingency will not be studied.  The following substations where found: \n\t'
-							'{}\n'
-						).format(cont.name, coupler.substation, '\n\t'.join([str(x) for x in substation]))
-					)
-					cont.not_included = True
-					break
-				else:
-					substation = substation[0]
 
 				# Find the switch within this substation
 				breaker = substation.GetContents(coupler.breaker)
@@ -1725,7 +1802,200 @@ class PFProject:
 		)
 		return task_auto
 
+	def find_terminals(self, terminals_to_include):
+		"""
+			Function finds all the terminals in the active project and returns details of those
+			which cannot be found
+		:param dict terminals_to_include:  List of terminals as defined in file_io.TerminalDetails
+		:return pd.DataFrame df_missing_terminal:  Returns details of all the terminals found in project
+		"""
+		self.logger.debug('Checking for relevant terminals in project:  {}'.format(self.prj))
 
+		# Empty DataFrame which will be populated with the status of this terminal for this project
+		c = constants.Terminals
+		df = pd.DataFrame(columns=c.columns)
+
+		# Confirm project is active
+		# TODO: What happens if try to find a terminal that exists in project but not study case
+		# TODO: What happens if no study case active
+		self.project_state()
+
+		# Input dictionary is duplicated since the pf_reference is project specific
+		self.terminals = dict()
+		# Loop through each terminal provided as an input and check if it can be found, if it can update the
+		# terminal with the PowerFactory handle
+		for term_name, terminal in terminals_to_include.items():
+			self.logger.debug(
+				(
+					'Looking for terminal {}, associated with substation {} and busbar {} in project {}'
+				).format(term_name, terminal.substation, terminal.terminal, self.prj)
+			)
+			# Populate DataFrame with details for this terminal
+			df.loc[term_name, c.name] = terminal.name
+			df.loc[term_name, c.sub1] = terminal.substation
+			df.loc[term_name, c.bus1] = terminal.terminal
+			df.loc[term_name, c.include_mutual] = terminal.include_mutual
+
+			# Find substation which contains this terminal
+			pf_sub = self.find_substation(sub_name=terminal.substation)
+
+			if pf_sub is None:
+				# Error message displayed at end for all terminals that cannot be found
+				found = False
+
+			else:
+				# Check if terminal is contained within substation
+				# Get list of all terminals that match this name
+				terminals_in_substation = pf_sub.GetContents(terminal.terminal)
+
+				# Confirm that at least 1 terminal with the required named exists in the substation
+
+				if len(terminals_in_substation) == 0:
+					# Error message displayed at end for all terminals that cannot be found
+					found = False
+
+
+				else:
+					if len(terminals_in_substation) > 1:
+						# If multiple terminals with the same name exist then alert User.  This should not be possible in the current
+						# version of PowerFactory
+						self.logger.warning(
+							(
+								'More than 1 terminal with the name {} found in substation {} for PowerFactory Project {} '
+								'and this relates to Terminal Input {}.\n Results will only be returned for the 1st one of'
+								'the following list of terminals found: \n\t {}'
+							).format(terminal.terminal, terminal.substation, self.prj, terminal.name,
+									 '\n\t'.join([str(x) for x in terminals_in_substation])
+									 )
+						)
+
+					# Terminal found so create a reference t it
+					found = True
+					pf_terminal = terminals_in_substation[0]
+
+					# Only those which exist are now available in this project
+					new_term_object = file_io.TerminalDetails(
+						name=term_name,
+						substation=terminal.substation,
+						terminal=terminal.terminal,
+						include_mutual=terminal.include_mutual,
+					) # type: file_io.TerminalDetails
+					new_term_object.found = found
+					new_term_object.pf_handle = pf_terminal
+					# Create reference to terminal and then add to dictionary
+					self.terminals[term_name] = new_term_object
+
+			# Update terminals dictionary and DataFrame of status
+			df.loc[term_name, c.status] = found
+
+		# All terminals have been added so print list of terminals which couldn't be found as warning to user
+		missing_terms = df[df[c.status]==True].index
+		if len(missing_terms) != len(terminals_to_include):
+			# Number of terminals expected does not match with number found
+			self.logger.warning(
+				(
+					'The following terminals details in the inputs cannot be found in the project {}, no results'
+					'will be returned for these terminals and so you may wish to check the inputs:\n\t{}'
+				).format(self.prj, missing_terms)
+			)
+		else:
+			# All terminals found
+			self.logger.info('All input terminals found in project: {}'.format(self.prj))
+
+		# Create mutual impedance elements and obtain updated DataFrame
+		df = self.create_mutual_impedance(df=df)
+
+		# Returns DataFrame with details of terminals that have been found and those which are missing
+		return df
+
+	def create_mutual_impedance(self, df):
+		"""
+			Based on the terminals that have been found within the project the mutual impedance elements are
+			created and are located in the Network data folders.
+			Mutual impedance elements have to be stored in the network data for the active project
+
+		:param pd.DataFrame df:  DataFrame of terminals that have been found already, this is popualted further and
+								returned
+		:return pd.DataFrame, df:  Returns a DataFrame with the referencing for the mutual elements created
+		"""
+
+		self.logger.debug('Creating: Mutual Impedance Elements for project {}'.format(self.prj))
+		c = constants.Terminals
+
+		if not self.terminals:
+			# If no terminals exist then no mutual impedance elements to create
+			self.logger.warning(
+				(
+					'No terminals could be found for the project {} and therefore no mutual impedance elements '
+					'could be created.'
+				).format(self.prj)
+			)
+		else:
+
+			# Create temporary folder to store the mutual impedance elements
+			# Folder has to be in one of the network element folders for results to be calculated
+			# TODO: Confirm if it matters which one
+			mutual_folder = self.create_folder(
+				name='{}_{}'.format(constants.PowerFactory.temp_mutual_folder, self.uid),
+				location=self.net_data_items[0],
+				temp=True
+			)
+
+			# Reset mutual elements dictionary which is populated for each mutual element created in the form
+			# of having the name (term1_term2) and then the reference to the powerfactory DataObject that is created
+			self.mutuals = dict()
+
+			# Loop through all terminals that have already been found
+			for name, term in self.terminals.items():
+				if term.include_mutual:
+					# Element is set to include mutual and therefore need to create a new mutual element
+					# for every link from this terminal to another terminal
+					for other_name, other_term in self.terminals.items():
+						# Don't create mutual impedance to own terminal
+						if other_name != name:
+							planned_name, used_name = create_mutual_name(term1=name, term2=other_name)
+
+							# Update dataframe
+							df.loc[used_name, c.name] = used_name
+							df.loc[used_name, c.sub1] = term.substation
+							df.loc[used_name, c.bus1] = term.terminal
+							df.loc[used_name, c.include_mutual] = term.include_mutual
+							df.loc[used_name, c.planned_name] = planned_name
+							df.loc[used_name, c.sub2] = other_term.substation
+							df.loc[used_name, c.bus2] = other_term.terminal
+							df.loc[used_name, c.status] = True
+
+							# Create mutual element in the mutual folder
+							elmmut = create_mutual_elm(
+								location=mutual_folder,
+								name=used_name,
+								bus1=term.pf_handle,
+								bus2=other_term.pf_handle
+							)
+
+							self.mutuals[used_name] = elmmut
+
+							self.logger.debug(
+								'Mutual impedance element {}, created between terminal {} and {}'.format(
+									elmmut, term.pf_handle, other_term.pf_handle
+								)
+							)
+
+			# # Alert user of those terminals who have had to have their name reduced
+			# df_mutual_only = df[~df[c.planned_name].isna()]
+			# df_non_matching = df_mutual_only[df_mutual_only[c.planned_name] != df[df_mutual_only[c.name]]]
+			#
+			# if not df_non_matching.empty:
+			# 	# Provide user with list of entries which have been changed
+				self.logger.warning(
+					(
+						'For the following terminals the combined name exceeded the limit o'
+					)
+				)
+
+
+			# Return updated DataFrame with mutual elements
+		return df
 
 class PowerFactory:
 	"""

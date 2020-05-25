@@ -1118,12 +1118,23 @@ class TerminalDetails:
 			terminal = str(list_of_parameters[2])
 			include_mutual = bool(list_of_parameters[3])
 
-		# TODO: Add in processing of terminals and substation elements here?
+		# Add in the relevant endings if they do not already exist
+		c = constants.PowerFactory
+		if not substation.endswith(c.pf_substation):
+			substation = '{}.{}'.format(substation, c.pf_substation)
+
+		if not terminal.endswith(c.pf_terminal):
+			terminal = '{}.{}'.format(terminal, c.pf_terminal)
+
 		self.name = name
 		self.substation = substation
 		self.terminal = terminal
 		self.include_mutual = include_mutual
+
+		# The following are populated once looked for in the specific PowerFactory project
 		self.pf_handle = None
+		self.found = None
+
 
 class FilterDetails:
 	"""

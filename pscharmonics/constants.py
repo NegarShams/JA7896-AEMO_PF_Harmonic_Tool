@@ -44,6 +44,11 @@ class General:
 	cmd_contres_leader = 'PSC_Cont_Res'
 	cmd_autotasks_leader = 'PSC_Auto'
 
+	# Names to use for export columns
+	prj = 'Project'
+	sc = 'Study Case'
+	op = 'Operating Scenario'
+
 
 class PowerFactory:
 	"""
@@ -134,8 +139,8 @@ class PowerFactory:
 	# Folder names for temporary folders
 	temp_sc_folder = 'temp_sc'
 	temp_os_folder = 'temp_os'
-	# temp_var_folder = 'temp_var'
 	temp_faults_folder = 'temp_faults'
+	temp_mutual_folder = 'mutual_elements'
 
 	# Constants associated with the handling of PowerFactory initialisation and
 	# potential intermittent errors
@@ -290,9 +295,9 @@ class Contingencies:
 	# Name to give for base_case / intact system condition
 	intact = 'Intact'
 
-	prj = 'Project'
-	sc = 'Study Case'
-	op = 'Operating Scenario'
+	prj = General.prj
+	sc = General.sc
+	op = General.op
 	cont = 'Contingency'
 	idx = 'Contingency Number'
 	status = 'Convergent'
@@ -311,10 +316,32 @@ class Contingencies:
 	col_nonconvergent = 'b:inoconv'
 
 
+class Terminals:
+	""" Contains constants associated with processing of terminals used in export """
+	prj = General.prj
+	name = 'Terminal / Mutual Name'
+	sub1 = 'Substation 1 Name'
+	sub2 = 'Substation 2 Name'
+	bus1 = 'Busbar 1 Name'
+	bus2 = 'Busbar 2 Name'
+	include_mutual = 'Include Mutual'
+	status = 'Found'
+	planned_name = 'Planned Mutual Impedance Name'
 
+	# Columns that are used for the contingency headers
+	columns = (
+		name, sub1, bus1, include_mutual, status, planned_name, sub2, bus2,
+	)
 
+	# Character used to join terminals together
+	join_char = '_'
 
+	# In PowerFactory 2016 (and potentially others) there is a max terminal name length of 40 characters and therefore
+	# this is the name that is used for the terminal couplings
+	max_coupled_length = 40
 
+	# When trimming terminals this is the minimum length their name will be trimmed to
+	min_term_length = 4
 
 
 class Results:

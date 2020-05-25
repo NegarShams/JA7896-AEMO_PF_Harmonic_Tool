@@ -936,6 +936,148 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		cls.pf.deactivate_project()
 		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
+@unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+class TestPFProjectTerminals(unittest.TestCase):
+	"""
+		Tests checking and creation of terminals within the PFProject class
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		""" Initialise PowerFactory and then check if model already exists """
+		cls.pf = pscharmonics.pf.PowerFactory()
+		cls.pf.initialise_power_factory()
+
+		# Try to activate the test project and if it doesn't work then load power factory case in
+		if not cls.pf.activate_project(project_name=pf_test_project):
+			pf_test_file = os.path.join(TESTS_DIR, '{}.pfd'.format(pf_test_project))
+
+			# Import the project
+			cls.pf.import_project(project_pth=pf_test_file)
+			cls.pf.activate_project(project_name=pf_test_project)
+
+		cls.pf_test_project = cls.pf.get_active_project()
+
+		# Create DataFrame for project tests
+		cls.test_name = 'TEST'
+		data = [cls.test_name, pf_test_project, pf_test_sc, pf_test_os]
+		columns = pscharmonics.constants.StudySettings.studycase_columns
+		cls.df = pd.DataFrame(data=data).transpose()
+		cls.df.columns = columns
+		# Set the index to be based on the unique name
+		cls.df.set_index(pscharmonics.constants.StudySettings.name, inplace=True, drop=False)
+
+		# Import all settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		cls.settings = pscharmonics.file_io.StudyInputsDev(pth_file=def_inputs_file)
+
+		# Folders to delete
+		cls.folders = list()
+
+	def test_check_find_terminals(self):
+		"""
+			Tests that fault cases can be created for a contingency command
+		"""
+		# Create random path for temporary files
+		target_pth = os.path.join(
+			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+		)
+		if os.path.isdir(target_pth):
+			raise SyntaxError('Random path {} already exists'.format(target_pth))
+		else:
+			os.mkdir(target_pth)
+			self.folders.append(target_pth)
+
+
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+
+		# Check terminals
+		df_terminals = pf_project.find_terminals(terminals_to_include=self.settings.terminals)
+
+		number_of_terminals = len(self.settings.terminals.keys())
+		number_of_mutual = sum([1 for x in self.settings.terminals.values() if x.include_mutual]) * number_of_terminals-1
+
+		self.assertEqual(len(df_terminals.index), number_of_terminals+number_of_mutual)
+
+		# Write the returned DataFrame to excel
+		excel_output = os.path.join(target_pth, 'terminals.xlsx')
+		df_terminals.to_excel(excel_output)
+
+		# Confirm file has been created
+		self.assertTrue(os.path.isfile(excel_output))
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_check_find_terminals_no_active_case(self):
+		"""
+			Tests that terminals can be created even when there is no active study case
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+
+		# Deactivate study case to confirm get same results returns
+		sc = pscharmonics.pf.app.GetActiveStudyCase()
+		if sc is not None:
+			sc.Deactivate()
+
+		# Check terminals
+		df_terminals = pf_project.find_terminals(terminals_to_include=self.settings.terminals)
+
+		number_of_terminals = len(self.settings.terminals.keys())
+		number_of_mutual = sum([1 for x in self.settings.terminals.values() if x.include_mutual]) * number_of_terminals-1
+
+		self.assertEqual(len(df_terminals.index), number_of_terminals+number_of_mutual)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_check_find_terminals_no_terminals(self):
+		"""
+			Tests that if empty dictionary provided as an input then returns empty DataFrame with no terminals created
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
+		)
+
+		# Check terminals
+		df_terminals = pf_project.find_terminals(terminals_to_include=dict())
+
+		# Expect empty DataFrame
+		self.assertTrue(df_terminals.empty)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	@classmethod
+	def tearDownClass(cls):
+		""" Function ensures the deletion of the PowerFactory project """
+		# Deactivate and then delete the project
+		cls.pf.deactivate_project()
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)
+
+		# If not blocked then delete folders that have been created
+		if test_delete_excel_outputs:
+			for folder in cls.folders:
+				try:
+					os.remove(folder)
+				except OSError:
+					print('### TEST TIDY ERROR:  Unable to delete folder {}'.format(folder))
+
+
+
 
 class TestPFSingleProjectUsingInputs(unittest.TestCase):
 	"""
