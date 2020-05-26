@@ -621,7 +621,7 @@ class StudySettings:
 		# Process results_folder
 		self.export_folder = self.process_export_folder()
 		self.results_name = self.process_result_name()
-		self.pf_network_elm = self.process_net_elements()
+		# self.pf_network_elm = self.process_net_elements()
 
 		self.pre_case_check = self.process_booleans(key=self.c.pre_case_check)
 		self.delete_created_folders = self.process_booleans(key=self.c.delete_created_folders)
@@ -644,7 +644,7 @@ class StudySettings:
 		# Get folder from DataFrame, if empty or invalid path then use default folder
 		folder = self.df.loc[self.c.export_folder]
 		# Normalise path
-		def_value = os.path.normpath(def_value)
+		def_value = os.path.join(os.path.normpath(def_value), constants.uid)
 
 		if not folder:
 			# If no folder provided then use default value
@@ -1450,7 +1450,7 @@ class FSSettings:
 		# Advanced
 		self.errmax = float() # Setting for step size adaption maximum prediction error
 		self.errinc = float() # Setting for step size minimum prediction error
-		self.ninc = float() # Step size increase delay
+		self.ninc = int() # Step size increase delay
 		self.ioutall = bool() # Calculate R, X at output frequency for all nodes (False = No, True = Yes)
 
 		# Value set to True if error occurs when processing settings
@@ -1489,17 +1489,17 @@ class FSSettings:
 		self.frnom = fs_settings[0]
 
 		# Basic
-		self.iopt_net = fs_settings[1]
+		self.iopt_net = int(fs_settings[1])
 		self.fstart = fs_settings[2]
 		self.fstop = fs_settings[3]
 		self.fstep = fs_settings[4]
-		self.i_adapt = fs_settings[5]
+		self.i_adapt = bool(fs_settings[5])
 
 		# Advanced
 		self.errmax = fs_settings[6]
 		self.errinc = fs_settings[7]
-		self.ninc = fs_settings[8]
-		self.ioutall = fs_settings[9]
+		self.ninc = int(fs_settings[8])
+		self.ioutall = bool(fs_settings[9])
 
 class ResultsExport:
 	"""

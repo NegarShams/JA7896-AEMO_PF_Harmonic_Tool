@@ -964,27 +964,32 @@ class PFStudyCase:
 		"""
 		c = constants.Contingencies
 		df = retrieve_results(elmres=self.cont_results, res_type=0, write_as_df=True)
-		# Set columns to be based on first index
-		df.columns = df.loc[0, :]
 
-		# Drop non-relevant rows
-		df.drop(labels=[0, 1], axis=0, inplace=True)
-		# Drop last row which also isn't needed
-		df.drop(df.tail(1).index, inplace=True)
+		# If an empty DataFrame is returned then means all contingencies failed so set status to False
+		if df.empty:
+			self.df.loc[:, c.status] = False
+		else:
+			# Set columns to be based on first index
+			df.columns = df.loc[0, :]
 
-		# Set the index for the DataFrame based on the object number
-		df.set_index(c.col_number, inplace=True)
+			# Drop non-relevant rows
+			df.drop(labels=[0, 1], axis=0, inplace=True)
+			# Drop last row which also isn't needed
+			df.drop(df.tail(1).index, inplace=True)
 
-		# Get list of contingencies which were not convergent
-		for cont_number, series in df.iterrows():
-			# Populate the status of the convergence
-			self.df.loc[self.df[c.idx]==cont_number, c.status] = not bool(series[c.col_nonconvergent])
+			# Set the index for the DataFrame based on the object number
+			df.set_index(c.col_number, inplace=True)
 
-		self.logger.debug(
-			'Processing contingency analysis results for case {}, consisting of sc {} and op {}'.format(
-				self.name, self.sc, self.op
+			# Get list of contingencies which were not convergent
+			for cont_number, series in df.iterrows():
+				# Populate the status of the convergence
+				self.df.loc[self.df[c.idx]==cont_number, c.status] = not bool(series[c.col_nonconvergent])
+
+			self.logger.debug(
+				'Processing contingency analysis results for case {}, consisting of sc {} and op {}'.format(
+					self.name, self.sc, self.op
+				)
 			)
-		)
 
 		return None
 
@@ -2473,7 +2478,7 @@ class PowerFactory:
 	# 	return None
 
 
-def create_pf_project_instances(df_study_cases, uid=constants.uid):
+def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=None, fs_settings=None, export_pth=str()):
 	"""
 		Loops through each of the projects in the DataFrame of study cases and activates them to check they work
 	:param pd.DataFrame df_study_cases:
@@ -2483,7 +2488,10 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid):
 	pf_projects = dict()
 	for project, df in df_study_cases.groupby(by=constants.StudySettings.project, axis=0):
 
-		pf_project = PFProject(name=project, df_studycases=df, uid=uid)
+		pf_project = PFProject(
+			name=project, df_studycases=df, uid=uid, lf_settings=lf_settings, fs_settings=fs_settings,
+			res_pth=export_pth
+		)
 		pf_projects[pf_project.name] = pf_project
 
 	return pf_projects

@@ -9,15 +9,15 @@
 #######################################################################################################################
 """
 
-import pscharmonics.logger
-import pscharmonics.file_io
-import pscharmonics.pf
-import pscharmonics.constants
-import pscharmonics.gui
+# import pscharmonics.logger as logger
+import pscharmonics.file_io as file_io
+import pscharmonics.pf as pf
+import pscharmonics.constants as constants
+# import pscharmonics.gui as gui
 
 # Meta Data
 __author__ = 'David Mills'
-__version__ = '1.3a'
+__version__ = '1.0.0'
 __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
-__status__ = 'In Development - Alpha'
+__status__ = 'In Development - Beta'
