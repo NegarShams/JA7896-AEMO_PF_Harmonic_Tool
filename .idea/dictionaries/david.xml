@@ -12,14 +12,22 @@
       <w>endcol</w>
       <w>endrow</w>
       <w>erreq</w>
+      <w>errinc</w>
       <w>errlf</w>
+      <w>errmax</w>
       <w>filelocation</w>
+      <w>frnom</w>
+      <w>fstart</w>
+      <w>fstep</w>
+      <w>fstop</w>
+      <w>getcwd</w>
       <w>ginf</w>
       <w>hldf</w>
       <w>hrmb</w>
       <w>ictrlx</w>
       <w>igntow</w>
       <w>iopt</w>
+      <w>ioutall</w>
       <w>itapopt</w>
       <w>itrlx</w>
       <w>krelax</w>
@@ -27,8 +35,10 @@
       <w>loadmax</w>
       <w>messagebox</w>
       <w>mutelm</w>
+      <w>mutuals</w>
       <w>netelm</w>
       <w>newcol</w>
+      <w>ninc</w>
       <w>noinit</w>
       <w>noofgraphrows</w>
       <w>noofgraphrowsrange</w>
@@ -45,6 +55,7 @@
       <w>powerfactory</w>
       <w>precase</w>
       <w>prot</w>
+      <w>pscharmonics</w>
       <w>pspf</w>
       <w>rembar</w>
       <w>resfolder</w>

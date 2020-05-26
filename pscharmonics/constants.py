@@ -560,6 +560,7 @@ class StudySettings:
 	export_to_excel = 'Export_to_Excel'
 	export_rx = 'Excel_Export_RX'
 	export_mutual = 'Excel_Export_Z12'
+	include_intact = 'Include_Intact'
 
 	# Base_Scenario columns
 	name = 'NAME'

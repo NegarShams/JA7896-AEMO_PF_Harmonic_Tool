@@ -9,7 +9,6 @@
 #######################################################################################################################
 """
 
-import unittest
 import os
 import time
 import numpy as np
@@ -263,310 +262,310 @@ class Excel:
 		# #wb.Close()  # Close Workbook
 		return analysis_dict
 
-class StudyInputs:
-	"""
-		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
-	"""
-	def __init__(self, hast_inputs=None, uid_time=constants.uid, filename=''):
-		"""
-			Initialises the settings based on the HAST Study Settings spreadsheet
-		:param dict hast_inputs:  Dictionary of input data returned from file_io.Excel.import_excel_harmonic_inputs
-		:param str uid_time:  Time string to use as the uid for these files
-		:param str filename:  Filename of the HAST Inputs file used from which this data is extracted
-		"""
-		c = constants.PowerFactory
-		# General constants
-		self.filename=filename
-
-		self.uid = uid_time
-
-		# Attribute definitions (study settings)
-		self.pth_results_folder = str()
-		self.results_name = str()
-		self.progress_log_name = str()
-		self.error_log_name = str()
-		self.debug_log_name = str()
-		self.pth_results_folder_temp = str()
-		self.pf_netelm = str()
-		self.pf_mutelm = str()
-		self.pf_resfolder = str()
-		self.pf_opscen_folder = str()
-		self.pre_case_check = bool()
-		self.fs_sim = bool()
-		self.hrm_sim = bool()
-		self.skip_failed_lf = bool()
-		self.del_created_folders = bool()
-		self.export_to_excel = bool()
-		self.excel_visible = bool()
-		self.include_rx = bool()
-		self.include_convex_hull = bool()
-		self.export_z = bool()
-		self.export_z12 = bool()
-		self.export_hrm = bool()
-
-		# Attribute definitions (study_case_details)
-		self.sc_details = dict()
-		self.sc_names = list()
-
-		# Attribute definitions (contingency_details)
-		self.cont_details = dict()
-		self.cont_names = list()
-
-		# Attribute definitions (terminals)
-		self.list_of_terms = list()
-		self.dict_of_terms = dict()
-
-		# Attribute definitions (filters)
-		self.list_of_filters = list()
-
-		# Load Flow Settings
-		# Will contain full string to load flow command to be used
-		self.pf_loadflow_command = str()
-		# Will contain reference to LFSettings which contains all settings
-		self.lf = LFSettings()
-
-		# Process study settings
-		self.study_settings(hast_inputs[c.sht_Study])
-
-		# Process load flow settings
-		self.load_flow_settings(hast_inputs[c.sht_LF])
-
-		# Process List of Terminals
-		self.process_terminals(hast_inputs[c.sht_Terminals])
-		self.process_filters(hast_inputs[c.sht_Filters])
-
-		# Process study case details
-		self.sc_names = self.get_study_cases(hast_inputs[c.sht_Scenarios])
-		self.cont_names = self.get_contingencies(hast_inputs[c.sht_Contingencies])
-
-	def study_settings(self, list_study_settings=None, df_settings=None):
-		"""
-			Populate study settings
-		:param list list_study_settings:
-		:param pd.DataFrame df_settings:  DataFrame of study settings for processing
-		:return None:
-		"""
-		# Since this is settings, convert DataFrame to list and extract based on position
-		if df_settings is not None:
-			l = df_settings[1].tolist()
-		else:
-			l = list_study_settings
-
-		# Folder to store logs (progress/error) and the excel results if empty will use current working directory
-		if not l[0]:
-			self.pth_results_folder = os.getcwd() + "\\"
-		else:
-			self.pth_results_folder = l[0]
-
-		# Leading names to use for exported excel result file (python adds on the unique time and date).
-		self.results_name = '{}{}{}.'.format(self.pth_results_folder, l[1], self.uid)
-		self.progress_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[2], self.uid)
-		self.error_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[3], self.uid)
-		self.debug_log_name = '{}{}{}.txt'.format(self.pth_results_folder, constants.DEBUG, self.uid)
-
-		# Temporary folder to use to store results exported during script run
-		self.pth_results_folder_temp = os.path.join(self.pth_results_folder, self.uid)
-
-		# Constants for power factory
-		self.pf_netelm = l[4]
-		self.pf_mutelm = '{}{}'.format(l[5], self.uid)
-		self.pf_resfolder = '{}{}'.format(l[6], self.uid)
-		self.pf_opscen_folder = '{}{}'.format(l[7], self.uid)
-
-		# Constants to control study running
-		self.pre_case_check = l[8]
-		self.fs_sim = l[9]
-		self.hrm_sim = l[10]
-		self.skip_failed_lf = l[11]
-		self.del_created_folders = l[12]
-		self.export_to_excel = l[13]
-		self.excel_visible = l[14]
-		self.include_rx = l[15]
-		self.include_convex_hull = l[16]
-		self.export_z = l[17]
-		self.export_z12 = l[18]
-		self.export_hrm = l[19]
-
-		return None
-
-	def load_flow_settings(self, list_lf_settings):
-		"""
-			Populate load flow settings
-		:param list list_lf_settings:
-		:return None:
-		"""
-		# If there is no value provided then assume
-		if not list_lf_settings[0]:
-			self.lf.populate_data(load_flow_settings=list_lf_settings[1:])
-			self.pf_loadflow_command = None
-		else:
-			# Settings file for existing load flow settings in PowerFactory
-			self.pf_loadflow_command = '{}.{}'.format(list_lf_settings[0], constants.PowerFactory.ldf_command)
-			self.lf = None
-		return None
-
-	def process_terminals(self, list_of_terminals):
-		"""
-			Processes the terminals from the HAST input into a dictionary so can lookup the name to use based on
-			substation and terminal
-		:param list list_of_terminals: List of terminals from HAST inputs, expected in the form
-			[name, substation, terminal, include mutual]
-		:return None
-		"""
-		# Get handle for logger
-		logger = logging.getLogger(constants.logger_name)
-		self.list_of_terms = [TerminalDetails(k[0], k[1], k[2], k[3]) for k in list_of_terminals]
-		self.dict_of_terms = {(k.substation, k.terminal): k.name for k in self.list_of_terms}
-
-		# Confirm that none of the terminal names are greater than the maximum allowed character length
-		terminal_names = [k.name for k in self.list_of_terms]
-		long_names = [x for x in terminal_names if len(x) > constants.HASTInputs.max_terminal_name_length]
-		if long_names:
-
-			logger.critical('The following terminal names are greater than the maximum allowed length of {} characters'
-							.format(constants.HASTInputs.max_terminal_name_length))
-			for x in long_names:
-				logger.critical('Terminal name: {}'.format(x))
-			raise ValueError(('The terminal names in the HAST inputs {} are too long! Reduce them to less than {} '
-							 'characters.').format(self.filename, constants.HASTInputs.max_terminal_name_length))
-
-		# Check all terminal names are unique
-		# Get duplicated terminals and report to user then exit
-		duplicates = [x for n, x in enumerate(terminal_names) if x in terminal_names[:n]]
-		if duplicates:
-			msg = ('The user defined Terminal names given in the HAST Inputs workbook {} are not unique for '
-				  'each entry.  Please check rename some of the terminals').format(self.filename)
-			# Get duplicated entries
-			logger.critical(msg)
-			logger.critical('The following terminal names have been duplicated:')
-			for name in duplicates:
-				logger.critical('\t - User Defined Terminal Name: {}'.format(name))
-			raise ValueError(msg)
-
-		return None
-
-	def process_filters(self, list_of_filters):
-		"""
-			Processes the filters from the HAST input into a list of all filters
-		:param list list_of_filters: List of handles to type file_io.FilterDetails
-		:return None
-		"""
-		# Get handle for logger
-		logger = logging.getLogger(constants.logger_name)
-		# Filters already converted to the correct type on initial import so just reference list
-		# TODO: Move processing of filters to here rather than initial import
-		self.list_of_filters = list_of_filters
-
-		# Check no filter names are duplicated
-		filter_names = [k.name for k in self.list_of_filters]
-		# Check all filter names are unique
-		# Duplicated filter names
-		duplicates = [x for n,x in enumerate(filter_names) if x not in filter_names[:n]]
-		if duplicates:
-			msg = ('The user defined Filter names given in the HAST Inputs workbook {} are not unique for '
-				  'each entry.  Please check rename some of the terminals').format(self.filename)
-			logger.critical(msg)
-			logger.critical('The following names are duplicated:')
-			for name in duplicates:
-				logger.critical('\t - User Defined Filter Name: {}'.format(name))
-			raise ValueError(msg)
-		return None
-
-	def vars_to_export(self):
-		"""
-			Determines the variables that will be exported from PowerFactory and they will be exported in this order
-		:return list pf_vars:  Returns list of variables in the format they are defined in PowerFactory
-		"""
-		c = constants.PowerFactory
-		pf_vars = []
-
-		# The order variables are added here determines the order they appear in the export
-		# If self impedance data should be exported
-		if self.export_z:
-			# Whether to include RX data as well
-			if self.include_rx:
-				pf_vars.append(c.pf_r1)
-				pf_vars.append(c.pf_x1)
-			pf_vars.append(c.pf_z1)
-
-		# If mutual impedance data should be exported
-		if self.export_z12:
-			# If RX data should be exported
-			if self.include_rx:
-				pf_vars.append(c.pf_r12)
-				pf_vars.append(c.pf_x12)
-			pf_vars.append(c.pf_z12)
-
-		return pf_vars
-
-	def get_study_cases(self, list_of_studycases):
-		"""
-			Populates dictionary which references all the relevant HAST study case details and then returns a list
-			of the names of all the StudyCases that have been considered.
-		:return list sc_details:  Returns list of study case names and there corresponding technical details
-		"""
-		# Get handle for logger
-		logger = logging.getLogger(constants.logger_name)
-
-		# If has already been populated then just return the list
-		if not self.sc_details:
-			# Loop through each row of the imported data
-			sc_names = list()
-			for sc in list_of_studycases:
-				# Transfer row of inputs to class <StudyCaseDetails>
-				new_sc = StudyCaseDetails(sc)
-				sc_names.append(new_sc.name)
-				# Add to dictionary
-				self.sc_details[new_sc.name] = new_sc
-
-			# Get list of study_case names and confirm they are all unique
-			# Get duplicated study case names
-			duplicates = [x for n,x in enumerate(sc_names) if x in sc_names[:n]]
-			if duplicates:
-				msg = ('The user defined Study Case names given in the HAST Inputs workbook {} are not unique for '
-					   'each entry.  Please check rename some of the user defined names').format(self.filename)
-				logger.critical(msg)
-				logger.critical('The following SC names have been duplicated:')
-				for name in duplicates:
-					logger.critical('\t - Study Case Name: {}'.format(name))
-				raise ValueError(msg)
-
-		return list(self.sc_details.keys())
-
-	def get_contingencies(self, list_of_contingencies):
-		"""
-			Populates dictionary which references all the relevant HAST study case details and then returns a list
-			of the names of all the StudyCases that have been considered.
-		:return list sc_details:  Returns list of study case names and there corresponding technical details
-		"""
-		# Get handle for logger
-		logger = logging.getLogger(constants.logger_name)
-
-		# If has already been populated then just return the list
-		if not self.cont_details:
-			# Loop through each row of the imported data
-			cont_names = list()
-			for sc in list_of_contingencies:
-				# Transfer row of inputs to class <StudyCaseDetails>
-				new_cont = ContingencyDetails(sc)
-				cont_names.append(new_cont.name)
-				# Add to dictionary
-				self.cont_details[new_cont.name] = new_cont
-
-			# Get list of contingency names and confirm they are all unique
-			# Get duplicated contingency names
-			duplicates = [x for n,x in enumerate(cont_names) if x in cont_names[:n]]
-			if duplicates:
-				msg = ('The user defined Contingency names given in the HAST Inputs workbook {} are not unique for '
-					   'each entry.  Please check and rename some of the user defined names').format(self.filename)
-				logger.critical(msg)
-				logger.critical('The following names that have been provided are duplicated:')
-				for name in duplicates:
-					logger.critical('\t - Contingency Name: {}'.format(name))
-				raise ValueError(msg)
-
-
-		return list(self.cont_details.keys())
+# class StudyInputs:
+# 	"""
+# 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
+# 	"""
+# 	def __init__(self, hast_inputs=None, uid_time=constants.uid, filename=''):
+# 		"""
+# 			Initialises the settings based on the HAST Study Settings spreadsheet
+# 		:param dict hast_inputs:  Dictionary of input data returned from file_io.Excel.import_excel_harmonic_inputs
+# 		:param str uid_time:  Time string to use as the uid for these files
+# 		:param str filename:  Filename of the HAST Inputs file used from which this data is extracted
+# 		"""
+# 		c = constants.PowerFactory
+# 		# General constants
+# 		self.filename=filename
+#
+# 		self.uid = uid_time
+#
+# 		# Attribute definitions (study settings)
+# 		self.pth_results_folder = str()
+# 		self.results_name = str()
+# 		self.progress_log_name = str()
+# 		self.error_log_name = str()
+# 		self.debug_log_name = str()
+# 		self.pth_results_folder_temp = str()
+# 		self.pf_netelm = str()
+# 		self.pf_mutelm = str()
+# 		self.pf_resfolder = str()
+# 		self.pf_opscen_folder = str()
+# 		self.pre_case_check = bool()
+# 		self.fs_sim = bool()
+# 		self.hrm_sim = bool()
+# 		self.skip_failed_lf = bool()
+# 		self.del_created_folders = bool()
+# 		self.export_to_excel = bool()
+# 		self.excel_visible = bool()
+# 		self.include_rx = bool()
+# 		self.include_convex_hull = bool()
+# 		self.export_z = bool()
+# 		self.export_z12 = bool()
+# 		self.export_hrm = bool()
+#
+# 		# Attribute definitions (study_case_details)
+# 		self.sc_details = dict()
+# 		self.sc_names = list()
+#
+# 		# Attribute definitions (contingency_details)
+# 		self.cont_details = dict()
+# 		self.cont_names = list()
+#
+# 		# Attribute definitions (terminals)
+# 		self.list_of_terms = list()
+# 		self.dict_of_terms = dict()
+#
+# 		# Attribute definitions (filters)
+# 		self.list_of_filters = list()
+#
+# 		# Load Flow Settings
+# 		# Will contain full string to load flow command to be used
+# 		self.pf_loadflow_command = str()
+# 		# Will contain reference to LFSettings which contains all settings
+# 		self.lf = LFSettings()
+#
+# 		# Process study settings
+# 		self.study_settings(hast_inputs[c.sht_Study])
+#
+# 		# Process load flow settings
+# 		self.load_flow_settings(hast_inputs[c.sht_LF])
+#
+# 		# Process List of Terminals
+# 		self.process_terminals(hast_inputs[c.sht_Terminals])
+# 		self.process_filters(hast_inputs[c.sht_Filters])
+#
+# 		# Process study case details
+# 		self.sc_names = self.get_study_cases(hast_inputs[c.sht_Scenarios])
+# 		self.cont_names = self.get_contingencies(hast_inputs[c.sht_Contingencies])
+#
+# 	def study_settings(self, list_study_settings=None, df_settings=None):
+# 		"""
+# 			Populate study settings
+# 		:param list list_study_settings:
+# 		:param pd.DataFrame df_settings:  DataFrame of study settings for processing
+# 		:return None:
+# 		"""
+# 		# Since this is settings, convert DataFrame to list and extract based on position
+# 		if df_settings is not None:
+# 			l = df_settings[1].tolist()
+# 		else:
+# 			l = list_study_settings
+#
+# 		# Folder to store logs (progress/error) and the excel results if empty will use current working directory
+# 		if not l[0]:
+# 			self.pth_results_folder = os.getcwd() + "\\"
+# 		else:
+# 			self.pth_results_folder = l[0]
+#
+# 		# Leading names to use for exported excel result file (python adds on the unique time and date).
+# 		self.results_name = '{}{}{}.'.format(self.pth_results_folder, l[1], self.uid)
+# 		self.progress_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[2], self.uid)
+# 		self.error_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[3], self.uid)
+# 		self.debug_log_name = '{}{}{}.txt'.format(self.pth_results_folder, constants.DEBUG, self.uid)
+#
+# 		# Temporary folder to use to store results exported during script run
+# 		self.pth_results_folder_temp = os.path.join(self.pth_results_folder, self.uid)
+#
+# 		# Constants for power factory
+# 		self.pf_netelm = l[4]
+# 		self.pf_mutelm = '{}{}'.format(l[5], self.uid)
+# 		self.pf_resfolder = '{}{}'.format(l[6], self.uid)
+# 		self.pf_opscen_folder = '{}{}'.format(l[7], self.uid)
+#
+# 		# Constants to control study running
+# 		self.pre_case_check = l[8]
+# 		self.fs_sim = l[9]
+# 		self.hrm_sim = l[10]
+# 		self.skip_failed_lf = l[11]
+# 		self.del_created_folders = l[12]
+# 		self.export_to_excel = l[13]
+# 		self.excel_visible = l[14]
+# 		self.include_rx = l[15]
+# 		self.include_convex_hull = l[16]
+# 		self.export_z = l[17]
+# 		self.export_z12 = l[18]
+# 		self.export_hrm = l[19]
+#
+# 		return None
+#
+# 	def load_flow_settings(self, list_lf_settings):
+# 		"""
+# 			Populate load flow settings
+# 		:param list list_lf_settings:
+# 		:return None:
+# 		"""
+# 		# If there is no value provided then assume
+# 		if not list_lf_settings[0]:
+# 			self.lf.populate_data(load_flow_settings=list_lf_settings[1:])
+# 			self.pf_loadflow_command = None
+# 		else:
+# 			# Settings file for existing load flow settings in PowerFactory
+# 			self.pf_loadflow_command = '{}.{}'.format(list_lf_settings[0], constants.PowerFactory.ldf_command)
+# 			self.lf = None
+# 		return None
+#
+# 	def process_terminals(self, list_of_terminals):
+# 		"""
+# 			Processes the terminals from the HAST input into a dictionary so can lookup the name to use based on
+# 			substation and terminal
+# 		:param list list_of_terminals: List of terminals from HAST inputs, expected in the form
+# 			[name, substation, terminal, include mutual]
+# 		:return None
+# 		"""
+# 		# Get handle for logger
+# 		logger = logging.getLogger(constants.logger_name)
+# 		self.list_of_terms = [TerminalDetails(k[0], k[1], k[2], k[3]) for k in list_of_terminals]
+# 		self.dict_of_terms = {(k.substation, k.terminal): k.name for k in self.list_of_terms}
+#
+# 		# Confirm that none of the terminal names are greater than the maximum allowed character length
+# 		terminal_names = [k.name for k in self.list_of_terms]
+# 		long_names = [x for x in terminal_names if len(x) > constants.HASTInputs.max_terminal_name_length]
+# 		if long_names:
+#
+# 			logger.critical('The following terminal names are greater than the maximum allowed length of {} characters'
+# 							.format(constants.HASTInputs.max_terminal_name_length))
+# 			for x in long_names:
+# 				logger.critical('Terminal name: {}'.format(x))
+# 			raise ValueError(('The terminal names in the HAST inputs {} are too long! Reduce them to less than {} '
+# 							 'characters.').format(self.filename, constants.HASTInputs.max_terminal_name_length))
+#
+# 		# Check all terminal names are unique
+# 		# Get duplicated terminals and report to user then exit
+# 		duplicates = [x for n, x in enumerate(terminal_names) if x in terminal_names[:n]]
+# 		if duplicates:
+# 			msg = ('The user defined Terminal names given in the HAST Inputs workbook {} are not unique for '
+# 				  'each entry.  Please check rename some of the terminals').format(self.filename)
+# 			# Get duplicated entries
+# 			logger.critical(msg)
+# 			logger.critical('The following terminal names have been duplicated:')
+# 			for name in duplicates:
+# 				logger.critical('\t - User Defined Terminal Name: {}'.format(name))
+# 			raise ValueError(msg)
+#
+# 		return None
+#
+# 	def process_filters(self, list_of_filters):
+# 		"""
+# 			Processes the filters from the HAST input into a list of all filters
+# 		:param list list_of_filters: List of handles to type file_io.FilterDetails
+# 		:return None
+# 		"""
+# 		# Get handle for logger
+# 		logger = logging.getLogger(constants.logger_name)
+# 		# Filters already converted to the correct type on initial import so just reference list
+# 		# TODO: Move processing of filters to here rather than initial import
+# 		self.list_of_filters = list_of_filters
+#
+# 		# Check no filter names are duplicated
+# 		filter_names = [k.name for k in self.list_of_filters]
+# 		# Check all filter names are unique
+# 		# Duplicated filter names
+# 		duplicates = [x for n,x in enumerate(filter_names) if x not in filter_names[:n]]
+# 		if duplicates:
+# 			msg = ('The user defined Filter names given in the HAST Inputs workbook {} are not unique for '
+# 				  'each entry.  Please check rename some of the terminals').format(self.filename)
+# 			logger.critical(msg)
+# 			logger.critical('The following names are duplicated:')
+# 			for name in duplicates:
+# 				logger.critical('\t - User Defined Filter Name: {}'.format(name))
+# 			raise ValueError(msg)
+# 		return None
+#
+# 	def vars_to_export(self):
+# 		"""
+# 			Determines the variables that will be exported from PowerFactory and they will be exported in this order
+# 		:return list pf_vars:  Returns list of variables in the format they are defined in PowerFactory
+# 		"""
+# 		c = constants.PowerFactory
+# 		pf_vars = []
+#
+# 		# The order variables are added here determines the order they appear in the export
+# 		# If self impedance data should be exported
+# 		if self.export_z:
+# 			# Whether to include RX data as well
+# 			if self.include_rx:
+# 				pf_vars.append(c.pf_r1)
+# 				pf_vars.append(c.pf_x1)
+# 			pf_vars.append(c.pf_z1)
+#
+# 		# If mutual impedance data should be exported
+# 		if self.export_z12:
+# 			# If RX data should be exported
+# 			if self.include_rx:
+# 				pf_vars.append(c.pf_r12)
+# 				pf_vars.append(c.pf_x12)
+# 			pf_vars.append(c.pf_z12)
+#
+# 		return pf_vars
+#
+# 	def get_study_cases(self, list_of_studycases):
+# 		"""
+# 			Populates dictionary which references all the relevant HAST study case details and then returns a list
+# 			of the names of all the StudyCases that have been considered.
+# 		:return list sc_details:  Returns list of study case names and there corresponding technical details
+# 		"""
+# 		# Get handle for logger
+# 		logger = logging.getLogger(constants.logger_name)
+#
+# 		# If has already been populated then just return the list
+# 		if not self.sc_details:
+# 			# Loop through each row of the imported data
+# 			sc_names = list()
+# 			for sc in list_of_studycases:
+# 				# Transfer row of inputs to class <StudyCaseDetails>
+# 				new_sc = StudyCaseDetails(sc)
+# 				sc_names.append(new_sc.name)
+# 				# Add to dictionary
+# 				self.sc_details[new_sc.name] = new_sc
+#
+# 			# Get list of study_case names and confirm they are all unique
+# 			# Get duplicated study case names
+# 			duplicates = [x for n,x in enumerate(sc_names) if x in sc_names[:n]]
+# 			if duplicates:
+# 				msg = ('The user defined Study Case names given in the HAST Inputs workbook {} are not unique for '
+# 					   'each entry.  Please check rename some of the user defined names').format(self.filename)
+# 				logger.critical(msg)
+# 				logger.critical('The following SC names have been duplicated:')
+# 				for name in duplicates:
+# 					logger.critical('\t - Study Case Name: {}'.format(name))
+# 				raise ValueError(msg)
+#
+# 		return list(self.sc_details.keys())
+#
+# 	def get_contingencies(self, list_of_contingencies):
+# 		"""
+# 			Populates dictionary which references all the relevant HAST study case details and then returns a list
+# 			of the names of all the StudyCases that have been considered.
+# 		:return list sc_details:  Returns list of study case names and there corresponding technical details
+# 		"""
+# 		# Get handle for logger
+# 		logger = logging.getLogger(constants.logger_name)
+#
+# 		# If has already been populated then just return the list
+# 		if not self.cont_details:
+# 			# Loop through each row of the imported data
+# 			cont_names = list()
+# 			for sc in list_of_contingencies:
+# 				# Transfer row of inputs to class <StudyCaseDetails>
+# 				new_cont = ContingencyDetails(sc)
+# 				cont_names.append(new_cont.name)
+# 				# Add to dictionary
+# 				self.cont_details[new_cont.name] = new_cont
+#
+# 			# Get list of contingency names and confirm they are all unique
+# 			# Get duplicated contingency names
+# 			duplicates = [x for n,x in enumerate(cont_names) if x in cont_names[:n]]
+# 			if duplicates:
+# 				msg = ('The user defined Contingency names given in the HAST Inputs workbook {} are not unique for '
+# 					   'each entry.  Please check and rename some of the user defined names').format(self.filename)
+# 				logger.critical(msg)
+# 				logger.critical('The following names that have been provided are duplicated:')
+# 				for name in duplicates:
+# 					logger.critical('\t - Contingency Name: {}'.format(name))
+# 				raise ValueError(msg)
+#
+#
+# 		return list(self.cont_details.keys())
 
 
 class StudySettings:
@@ -589,6 +588,7 @@ class StudySettings:
 		self.export_to_excel = bool()
 		self.export_rx = bool()
 		self.export_mutual = bool()
+		self.include_intact = bool()
 
 		self.c = constants.StudySettings
 		self.logger = logging.getLogger(constants.logger_name)
@@ -628,6 +628,7 @@ class StudySettings:
 		self.export_to_excel = self.process_booleans(key=self.c.export_to_excel)
 		self.export_rx = self.process_booleans(key=self.c.export_rx)
 		self.export_mutual = self.process_booleans(key=self.c.export_mutual)
+		self.include_intact = self.process_booleans(key=self.c.include_intact)
 
 		# Sanity check for Boolean values
 		self.boolean_sanity_check()
@@ -752,7 +753,7 @@ class StudySettings:
 		if not self.pre_case_check:
 			self.logger.warning((
 				'You have opted not to run a pre-case check with the input {} = {}, this means that if there are any '
-				'issues with an individual contingency the entire studyset may fail'
+				'issues with an individual contingency the entire study set may fail'
 			).format(self.c.pre_case_check, self.pre_case_check))
 
 		return None
@@ -765,7 +766,7 @@ class StudyInputsDev:
 	def __init__(self, pth_file=None):
 		"""
 			Initialises the settings based on the Study Settings spreadsheet
-		:param str file_name:  Path to input settings file
+		:param str pth_file:  Path to input settings file
 		"""
 		# General constants
 		self.pth = pth_file
@@ -1051,7 +1052,8 @@ class ContingencyDetails:
 				new_coupler = CouplerDetails(substation, breaker, status)
 				self.couplers.append(new_coupler)
 
-		# Check if this contingency relates to the intact system in which case it will be skipped
+		# If contingency has been defined then needs to be included in results
+		# # Check if this contingency relates to the intact system in which case it will be skipped
 		if len(self.couplers) == 0 or self.name == constants.HASTInputs.base_case:
 			self.skip = True
 		else:
@@ -1299,7 +1301,7 @@ class LFSettings:
 			else:
 				self.logger.warning(
 					(
-						'The load flow settings provided are incorrect / missng some values and no input for an existing '
+						'The load flow settings provided are incorrect / missing some values and no input for an existing '
 						'load flow command (.{}) has been provided.  The study will just use the default load flow '
 						'command associated with each study case but results may be inconsistent!'
 					).format(constants.PowerFactory.ldf_command)

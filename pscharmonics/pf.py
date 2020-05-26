@@ -347,7 +347,7 @@ class PFStudyCase:
 		self.logger = logging.getLogger(constants.logger_name)
 
 		# Status checker on whether this is the base_case study case.  If true then certain functions and additional
-		# datasets are populated
+		# data sets are populated
 		self.base_case = base_case
 
 		# Unique name for this studycase
@@ -431,16 +431,24 @@ class PFStudyCase:
 		:return None:
 		"""
 
-		if deactivate:
-			# Deactivate study case
-			err = self.sc.Deactivate()
-			self.active = False
-		else:
+		if deactivate and self.active:
+			# Confirm this study case is the active study case before trying to deactivate
+			active_sc = app.GetActiveStudyCase()
+			if active_sc == self.sc:
+				# Deactivate study case
+				err = self.sc.Deactivate()
+				self.active = False
+			else:
+				err = 0
+		elif not deactivate and not self.active:
 			# Activate both study case and operating scenario
 			err = self.sc.Activate()
 			# TODO: Confirm correct operating scenario is actually being activated
 			err = self.op.Activate() + err
 			self.active = True
+		else:
+			err = 0
+			self.logger.debug('Study case {} already either deactivated / activated'.format(self.name))
 
 		if err > 0 and deactivate:
 			self.logger.error('Unable to deactivate the study case: {}'.format(self.sc))
@@ -912,41 +920,41 @@ class PFStudyCase:
 		# Return an index showing the number of objects deleted
 		return len(deleted_objects)
 
-	def process_fs_results(self, logger=None):
-		"""
-			Function extracts and processes the load flow results for this study case
-		:param logger:  (optional=None) handle for logger to allow message reporting
-		:return list fs_res
-		"""
-		c = constants.Results
-
-		# Insert data labels into frequency data to act as row labels for data
-		fs_scale, fs_res = retrieve_results(self.fs_results, 0)
-		fs_scale[0:2] = [
-			c.lbl_StudyCase,
-			c.lbl_Contingency,
-			c.lbl_Filter_ID,
-			c.lbl_FullName,
-			c.lbl_Frequency]
-		self.fs_scale = fs_scale
-
-		# fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
-		# fs_scale.insert(1,"Scale")
-		# fs_scale.pop(3)
-
-		# Insert additional details for each result
-		for res in fs_res:
-			# Results inserted to align with labels above
-			res[0:1] = [self.base_name,
-						self.cont_name,
-						self.filter_name,
-						self.name,
-						res[0]]
-
-		logger.debug('Frequency scan results for study <{}> extracted from PowerFactory'
-					 .format(self.name))
-
-		return fs_res
+	# def process_fs_results(self, logger=None):
+	# 	"""
+	# 		Function extracts and processes the load flow results for this study case
+	# 	:param logger:  (optional=None) handle for logger to allow message reporting
+	# 	:return list fs_res
+	# 	"""
+	# 	c = constants.Results
+	#
+	# 	# Insert data labels into frequency data to act as row labels for data
+	# 	fs_scale, fs_res = retrieve_results(self.fs_results, 0)
+	# 	fs_scale[0:2] = [
+	# 		c.lbl_StudyCase,
+	# 		c.lbl_Contingency,
+	# 		c.lbl_Filter_ID,
+	# 		c.lbl_FullName,
+	# 		c.lbl_Frequency]
+	# 	self.fs_scale = fs_scale
+	#
+	# 	# fs_scale.insert(1,"Frequency in Hz")										# Arranges the Frequency Scale
+	# 	# fs_scale.insert(1,"Scale")
+	# 	# fs_scale.pop(3)
+	#
+	# 	# Insert additional details for each result
+	# 	for res in fs_res:
+	# 		# Results inserted to align with labels above
+	# 		res[0:1] = [self.base_name,
+	# 					self.cont_name,
+	# 					self.filter_name,
+	# 					self.name,
+	# 					res[0]]
+	#
+	# 	logger.debug('Frequency scan results for study <{}> extracted from PowerFactory'
+	# 				 .format(self.name))
+	#
+	# 	return fs_res
 
 	def process_cont_results(self):
 		"""
@@ -1070,6 +1078,7 @@ class PFStudyCase:
 		self.logger.debug('Self impedance results declared for: {}'.format(' - '.join(self_variables)))
 
 		# Mutual variables to export
+		mutual_variables = tuple()
 		if study_settings.export_mutual:
 			if study_settings.export_rx:
 				mutual_variables = (c.pf_z12, c.pf_r12, c.pf_x12)
@@ -1237,14 +1246,23 @@ class PFStudyCase:
 				res_pth=res_pth
 			)
 
-			# TODO: Need to actually apply relevant contingency
-			#
-			#
+			# Get the contingency specific to this case and apply the outage which is a PowerFactory Cont Outage element
+			cont_outage = self.cont_analysis.GetContents('{}.{}'.format(cont_name, constants.PowerFactory.pf_outage))
+
+			if len(cont_outage) == 0:
+				self.logger.error(
+					(
+						'Unable to find outage {} in contingency analysis {} and therefore study_case {} cannot be run'
+					).format(cont_name, self.cont_analysis, new_name)
+				)
+				continue
+			else:
+				# Apply the outage detailed in this Cont Outage element
+				case.apply_outage(cont_outage[0])
 
 			# Update load flow and frequency sweep commands to reflect relevant locations
 			case.create_studies()
 
-			#
 			self.logger.debug(
 				(
 					'New case {} created for Study Case {}, Operating Scenario {} with Contingency {}'
@@ -1253,6 +1271,52 @@ class PFStudyCase:
 			new_cases.append(case)
 
 		return new_cases
+
+	def apply_outage(self, cont_outage):
+		"""
+			Function will carry out the switching operations detailed in the cont_outage and set all interrupted
+			components to out of service.  Also ensures the relevant study case and outage scenario are
+			associated together
+		:param powerfactory.DataObject cont_outage:  Handle to the powerfactory DataObject
+		:return None:
+		"""
+		# Active study case and operating scenario (also ensures these are combined together for a future activation)
+		self.toggle_state()
+
+		# Get details of all switches considered as part of contingency to Open
+		for switch in cont_outage.Couplers:
+			# Open switch
+			switch.on_off = False
+
+		# Close all couplers that should be closed
+		for switch in cont_outage.CouplersClose:
+			# Open switch
+			switch.on_off = False
+
+		# Set all interrupted elements to out of service
+		# TODO: Confirm if this is necessary
+		for element in cont_outage.Elms:
+			element.outserv = True
+
+		# Save operating scenario so that it is remembered in this state and if errors then raise error to user
+		err = self.op.Save()
+		if err == 1:
+			self.logger.error(
+				(
+					'Unable to save the operating scenario {} after applying the outage {}, this means the results for '
+					'the contingency named {} as part of study case {} will not produce reliable results'
+				).format(self.op, cont_outage, cont_outage.loc_name, self.name)
+			)
+		else:
+			self.logger.debug(
+				'Successfully applied outage {} for study case {}'.format(
+					cont_outage, self.sc
+				)
+			)
+
+		return None
+
+
 
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
@@ -1500,23 +1564,23 @@ class PFProject:
 				)
 		return None
 
-	def process_fs_results(self, logger=None):
-		""" Loop through each study case cls and process results files
-		:return list fs_res
-		"""
-		fs_res = []
-		for sc_cls in self.sc_cases:
-			fs_res.extend(sc_cls.process_fs_results(logger=logger))
-		return fs_res
+	# def process_fs_results(self, logger=None):
+	# 	""" Loop through each study case cls and process results files
+	# 	:return list fs_res
+	# 	"""
+	# 	fs_res = []
+	# 	for sc_cls in self.sc_cases:
+	# 		fs_res.extend(sc_cls.process_fs_results(logger=logger))
+	# 	return fs_res
 
-	def process_hrlf_results(self, logger):
-		""" Loop through each study case cls and process results files
-		:return list hrlf_res:
-		"""
-		hrlf_res = []
-		for sc_cls in self.sc_cases:
-			hrlf_res.extend(sc_cls.process_hrlf_results(logger))
-		return hrlf_res
+	# def process_hrlf_results(self, logger):
+	# 	""" Loop through each study case cls and process results files
+	# 	:return list hrlf_res:
+	# 	"""
+	# 	hrlf_res = []
+	# 	for sc_cls in self.sc_cases:
+	# 		hrlf_res.extend(sc_cls.process_hrlf_results(logger))
+	# 	return hrlf_res
 
 	def update_auto_exec(self):
 		"""
@@ -1839,18 +1903,37 @@ class PFProject:
 
 		df_convegent = self.df_pre_case[self.df_pre_case[constants.Contingencies.status]==True]
 
-		if df_convegent.empty:
-			self.logger.warning(
-				(
-					'No convergent contingencies found for cases in the project {} and therefore no further studies '
-					'can be run on this project'
-				).format(self.prj)
-			)
+		# Check if the intact case should be included and then if so add to cases
+		self.cases_to_run = list()
+		if study_settings.include_intact:
+			# TODO: Produce test routine to confirm this works
+			# Update export path and results files and then add study case to results
+			for _, sc in self.base_sc.items():
+				sc.res_pth = export_pth
+				sc.create_studies()
+				self.cases_to_run.append(sc)
+		else:
 			self.cases_to_run = list()
-			return None
+
+
+		if df_convegent.empty:
+			msg = 'No convergent contingencies found for cases in the project {}.\n'.format(self.prj)
+			if study_settings.include_intact:
+				self.logger.warning(
+					'{} Results will be run for the following intact study cases only:\n\t{}'.format(
+						msg, '\n\t'.join([sc.name for sc in self.cases_to_run])
+					)
+				)
+			else:
+				self.logger.warning(
+					(
+						'{} The user has decided not to include the intact system and therefore no results will be '
+						'returned.'
+					).format(msg)
+				)
+
 		else:
 			# Loop through each study case to create new cases based on those and the relevant contingencies
-			self.cases_to_run = list()
 			for sc_name, sc in self.base_sc.items():
 				# Add the terminals to the results file for each of the base study cases before the new cases are
 				# created which uses them as a starting point
