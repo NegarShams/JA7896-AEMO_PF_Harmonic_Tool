@@ -152,6 +152,42 @@ def add_study_settings(row_data):
 
 	return combined_entry
 
+def update_duplicates(key, df):
+	"""
+		Function will look for any duplicates in a particular column and then append a number to everything after
+		the first one
+	:param str key:  Column to lookup
+	:param pd.DataFrame df: DataFrame to be processed
+	:return pd.DataFrame, bool df_updated, updated: Updated DataFrame and status flag to show updated for log messages
+	"""
+	# Empty list and initialised value to show no changes
+	dfs = list()
+	updated = False
+
+	# Group data frame by key value
+	# TODO: Do we need to ensure the order of the overall DataFrame remains unchanged
+	for _, df_group in df.groupby(key):
+		# Extract all key values into list and then loop through to append new value
+		names = list(df_group.loc[:, key])
+		if len(names) > 1:
+			updated = True
+			# Check if number of entries is greater than 1, i.e. duplicated
+			for i in range(1, len(names)):
+				names[i] = '{}({})'.format(names[i], i)
+
+		# Produce new DataFrame with updated names and add to list
+		# (copy statement to avoid updating original dataframe during loop)
+		df_updated = df_group.copy()
+		df_updated.loc[:, key] = names
+		dfs.append(df_updated)
+
+	# Combine returned DataFrames
+	df_updated = pd.concat(dfs)
+	# Ensure order remains as originally
+	df_updated.sort_index(axis=0, inplace=True)
+
+	return df_updated, updated
+
 
 class Excel:
 	""" Class to deal with the writing and reading from excel and therefore allowing unittesting of the
@@ -582,7 +618,6 @@ class StudySettings:
 		# Constants used as part of this
 		self.export_folder = str()
 		self.results_name = str()
-		self.pf_network_elm = str()
 		self.pre_case_check = bool()
 		self.delete_created_folders = bool()
 		self.export_to_excel = bool()
@@ -686,25 +721,6 @@ class StudySettings:
 
 		return results_name
 
-	def process_net_elements(self):
-		"""
-			Processes the details of the folder that contains all the network elements with the appropriate extension
-		:return str net_elements:
-		"""
-		network_folder = str(self.df.loc[self.c.pf_network_elm])
-
-		# TODO: Check if there is an alternative way to handle these network element folders
-		if network_folder == '':
-			raise ValueError(
-				'No value has been provided for the network element folder and it is therefore not possible to identify '
-				'the relevant components in PowerFactory'
-			)
-
-		if not network_folder.endswith(constants.PowerFactory.pf_network_elements):
-			network_folder = '{}.{}'.format(network_folder, constants.PowerFactory.pf_network_elements)
-
-		return network_folder
-
 	def process_booleans(self, key):
 		"""
 			Function imports the relevant boolean value and confirms it is either True / False, if empty then just
@@ -757,7 +773,6 @@ class StudySettings:
 			).format(self.c.pre_case_check, self.pre_case_check))
 
 		return None
-
 
 class StudyInputsDev:
 	"""
@@ -846,15 +861,18 @@ class StudyInputsDev:
 
 	def process_contingencies(self, sht=constants.HASTInputs.contingencies, wkbk=None, pth_file=None):
 		"""
-			Function imports the DataFrame of study cases and then separates each one into it's own study case.  These
-			are then returned as a dictionary with the name being used as the key.
+			Function imports the DataFrame of contingencies and then each into its own contingency under a single
+			dictionary key.  Each dictionary item contains the relevant outages to be taken in the form
+			ContingencyDetails.
 
-			These inputs are based on the Scenarios detailed in the Inputs spreadsheet
+			Also returns a string detailing the name of a Contingency file if one is provided
 
 		:param str sht:  (optional) Name of worksheet to use
 		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
 		:param str pth_file: (optional) File path to workbook
-		:return dict study_cases:
+		:return (str, dict) (contingency_cmd, contingencies):  Returns both:
+																The command for all contingencies
+																A dictionary with each of the outages
 		"""
 
 		# Import workbook as dataframe
@@ -988,43 +1006,6 @@ class StudyInputsDev:
 		settings = FSSettings(existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
 		return settings
 
-
-def update_duplicates(key, df):
-	"""
-		Function will look for any duplicates in a particular column and then append a number to everything after
-		the first one
-	:param str key:  Column to lookup
-	:param pd.DataFrame df: DataFrame to be processed
-	:return pd.DataFrame, bool df_updated, updated: Updated DataFrame and status flag to show updated for log messages
-	"""
-	# Empty list and initialised value to show no changes
-	dfs = list()
-	updated = False
-
-	# Group data frame by key value
-	# TODO: Do we need to ensure the order of the overall DataFrame remains unchanged
-	for _, df_group in df.groupby(key):
-		# Extract all key values into list and then loop through to append new value
-		names = list(df_group.loc[:, key])
-		if len(names) > 1:
-			updated = True
-			# Check if number of entries is greater than 1, i.e. duplicated
-			for i in range(1, len(names)):
-				names[i] = '{}({})'.format(names[i], i)
-
-		# Produce new DataFrame with updated names and add to list
-		# (copy statement to avoid updating original dataframe during loop)
-		df_updated = df_group.copy()
-		df_updated.loc[:, key] = names
-		dfs.append(df_updated)
-
-	# Combine returned DataFrames
-	df_updated = pd.concat(dfs)
-	# Ensure order remains as originally
-	df_updated.sort_index(axis=0, inplace=True)
-
-	return df_updated, updated
-
 class StudyCaseDetails:
 	def __init__(self, list_of_parameters):
 		"""
@@ -1136,7 +1117,6 @@ class TerminalDetails:
 		# The following are populated once looked for in the specific PowerFactory project
 		self.pf_handle = None
 		self.found = None
-
 
 class FilterDetails:
 	"""

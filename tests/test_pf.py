@@ -875,7 +875,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
-
 	def test_case_auto_exec_creation(self):
 		"""
 			Test that the task_auto that is created can be populated with the relevant commands
@@ -980,7 +979,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
-
 
 	@classmethod
 	def tearDownClass(cls):

@@ -13,8 +13,29 @@ from tests.context import pscharmonics
 TESTS_DIR = os.path.join(os.path.dirname(__file__), 'test_files')
 def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 
+# Some folders are created during running and these will be deleted
+delete_created_folders = True
+
+def mock_process_export_folder(*args, **kwargs):
+	"""
+		Mock function to deal with processing of the export folder without creating a
+		new folder every time the settings are imported
+	:param args:
+	:param kwargs:
+	:return:
+	"""
+
+	# Rather than creating a new folder just return reference to the tests directory
+	return TESTS_DIR
+
+
+# ----- MOCKS ------
+# Mocks to replace normal functionality
+pscharmonics.file_io.StudySettings.process_export_folder = mock_process_export_folder
+
 # ----- UNIT TESTS -----
 class TestInputs(unittest.TestCase):
+	""" Test the input processing """
 	@classmethod
 	def setUpClass(cls):
 		"""
@@ -38,12 +59,12 @@ class TestInputs(unittest.TestCase):
 		self.assertEqual(len(dict_cases), 2)
 
 		# Confirm keys as expected and in correct order
-		self.assertEqual(list(dict_cases.keys())[1], 'BASE(1)')
+		self.assertEqual(list(dict_cases.index)[1], 'BASE(1)')
 
 	def test_overall_import(self):
 		""" Spot check some of the values are as expected """
 
-		self.assertEqual(self.inputs.cases['BASE'].name, 'BASE')
+		self.assertEqual(self.inputs.cases.loc['BASE', pscharmonics.constants.StudySettings.name], 'BASE')
 
 class GeneralTests(unittest.TestCase):
 	"""
@@ -120,7 +141,7 @@ class TestStudySettings(unittest.TestCase):
 		folder = study_settings.process_export_folder()
 
 		# Expected result is the parent folder of this test file
-		expected_folder = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
+		expected_folder = TESTS_DIR
 		self.assertEqual(folder, expected_folder)
 
 	def test_dataframe_process_results_name(self):
@@ -138,35 +159,6 @@ class TestStudySettings(unittest.TestCase):
 
 		# Expected result is the name below
 		expected_result = '{}_TEST.xlsx'.format(c.StudySettings.def_results_name)
-		self.assertEqual(result, expected_result)
-
-	def test_blank_network_folder(self):
-		""" Confirm that if no network folder is provided raise an Error """
-		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-
-		with pd.ExcelFile(pth_inputs) as wkbk:
-			study_settings = self.test_cls(wkbk=wkbk)
-
-		study_settings.df.loc[study_settings.c.pf_network_elm] = ''
-
-		self.assertRaises(ValueError, study_settings.process_net_elements)
-
-	def test_get_expected_network_folder(self):
-		""" Confirm that if no network folder is provided raise an Error """
-		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		expected_result = 'NSW.ElmNet'
-
-		with pd.ExcelFile(pth_inputs) as wkbk:
-			study_settings = self.test_cls(wkbk=wkbk)
-
-		# Confirm get the value that is in the Inputs sheet without addition value
-		result = study_settings.process_net_elements()
-		self.assertEqual(result, expected_result)
-
-		# Remove '.ElmNet' and confirm it gets added back in
-		study_settings.df.loc[study_settings.c.pf_network_elm] = 'NSW'
-
-		result = study_settings.process_net_elements()
 		self.assertEqual(result, expected_result)
 
 	def test_boolean_sanity_check(self):
@@ -223,15 +215,15 @@ class TestContingencies(unittest.TestCase):
 
 	def test_dataframe_import_from_file(self):
 		""" Confirm DataFrame imported when loaded using a file """
-		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs_cmds.xlsx')
 
-		contingencies = self.test_cls.process_contingencies(pth_file=pth_inputs)
+		contingency_cmd, contingencies = self.test_cls.process_contingencies(pth_file=pth_inputs)
 
 		# Confirm command for contingency analysis is imported correctly
-		self.assertEqual(self.test_cls.contingency_cmd, 'Contingency Analysis')
+		self.assertEqual(contingency_cmd, 'Contingency Analysis')
 
 		# Confirm contingencies are all base case
-		self.assertTrue('Base_Case(1)' in contingencies.keys())
+		self.assertTrue('TEST Cont' in contingencies.keys())
 
 		couplers = contingencies['Base_Case'].couplers
 		for coupler in couplers:
@@ -249,7 +241,7 @@ class TestTerminals(unittest.TestCase):
 	def test_dataframe_import_from_file(self):
 		""" Confirm DataFrame imported when loaded using a file """
 		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		test_term = 'Dunstown'
+		test_term = 'CRANBOURNE 220KV'
 
 		terminals = self.test_cls.process_terminals(pth_file=pth_inputs)
 
@@ -258,9 +250,9 @@ class TestTerminals(unittest.TestCase):
 
 		terminal = terminals[test_term]
 		self.assertEqual(terminal.name, test_term)
-		self.assertEqual(terminal.substation, test_term)
-		self.assertEqual(terminal.terminal, '220 kV A1')
-		self.assertFalse(terminal.include_mutual, '220 kV A1')
+		self.assertEqual(terminal.substation, '{}.{}'.format(test_term, pscharmonics.constants.PowerFactory.pf_substation))
+		self.assertEqual(terminal.terminal, '2958760_CBTS_7MN2.{}'.format(pscharmonics.constants.PowerFactory.pf_terminal))
+		self.assertFalse(terminal.include_mutual)
 
 class TestResultsExport(unittest.TestCase):
 	""" Testing that the routines associated with exporting the results works correctly """
@@ -282,7 +274,7 @@ class TestResultsExport(unittest.TestCase):
 		res_export.create_results_folder()
 
 		# Confirm exists
-		self.assertTrue(os.path.exists(target_pth))
+		self.assertTrue(os.path.isdir(target_pth))
 
 		# Delete folder and confirm deleted
 		shutil.rmtree(target_pth)
