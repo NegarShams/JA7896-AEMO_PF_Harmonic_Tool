@@ -54,22 +54,7 @@ if __name__ == '__main__':
 
 	# Iterate through each project and create the various cases, the includes running a pre-case check but no
 	# output is saved at this point
-	for project_name, project in pf_projects.items():
-		project.create_cases(
-			study_settings=inputs.settings,
-			export_pth=inputs.settings.export_folder,
-			contingencies=inputs.contingencies,
-			contingencies_cmd=inputs.contingency_cmd
-		)
-
-		# Update the auto executable for this project
-		project.update_auto_exec()
-
-		# Batch run the results
-		project.task_auto.Execute()
-
-		# Delete temporary folders created for this project
-		project.delete_temp_folders()
+	pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
 	# Capture final time and report complete
 	t_end = time.time()

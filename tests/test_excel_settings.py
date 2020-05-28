@@ -16,6 +16,7 @@ def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 # Some folders are created during running and these will be deleted
 delete_created_folders = True
 
+# noinspection PyUnusedLocal
 def mock_process_export_folder(*args, **kwargs):
 	"""
 		Mock function to deal with processing of the export folder without creating a
@@ -42,7 +43,6 @@ class TestInputs(unittest.TestCase):
 			Load the SAV case into PSSE for further testing
 		"""
 		# Initialise logger
-		uid = 'Test_Default_Inputs'
 		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		cls.inputs = pscharmonics.file_io.StudyInputsDev(pth_file=pth_inputs)
 
@@ -144,22 +144,22 @@ class TestStudySettings(unittest.TestCase):
 		expected_folder = TESTS_DIR
 		self.assertEqual(folder, expected_folder)
 
-	def test_dataframe_process_results_name(self):
-		""" Confirm the results name is correct """
-		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		c = pscharmonics.constants
-
-		with pd.ExcelFile(pth_inputs) as wkbk:
-			study_settings = self.test_cls(wkbk=wkbk)
-
-		# Prove with an empty string and fixed UID
-		study_settings.df.loc[study_settings.c.results_name] = ''
-		study_settings.uid = 'TEST'
-		result = study_settings.process_result_name()
-
-		# Expected result is the name below
-		expected_result = '{}_TEST.xlsx'.format(c.StudySettings.def_results_name)
-		self.assertEqual(result, expected_result)
+	# def test_dataframe_process_results_name(self):
+	# 	""" Confirm the results name is correct """
+	# 	pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+	# 	c = pscharmonics.constants
+	#
+	# 	with pd.ExcelFile(pth_inputs) as wkbk:
+	# 		study_settings = self.test_cls(wkbk=wkbk)
+	#
+	# 	# Prove with an empty string and fixed UID
+	# 	study_settings.df.loc[study_settings.c.results_name] = ''
+	# 	study_settings.uid = 'TEST'
+	# 	result = study_settings.process_result_name()
+	#
+	# 	# Expected result is the name below
+	# 	expected_result = '{}_TEST.xlsx'.format(c.StudySettings.def_results_name)
+	# 	self.assertEqual(result, expected_result)
 
 	def test_boolean_sanity_check(self):
 		""" Function to confirm that you get correct error messages """

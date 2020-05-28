@@ -158,6 +158,11 @@ class PowerFactory:
 	def_results_fs = 9		# Frequency sweep
 	def_results_cont = 13#
 
+	# User default settings
+	user_default_settings = 'Set\Def\Settings.SetUser'
+
+	# Number of seconds to allow when waiting for parallel processor response
+	parallel_time_out = 100
 
 	class ComRes:
 		# Power Factory class name

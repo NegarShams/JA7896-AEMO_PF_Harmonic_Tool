@@ -51,7 +51,6 @@ def create_object(location, pfclass, name):  # Creates a database object in a sp
 		already_existed = False
 	return _new_object, already_existed
 
-
 def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into python lists from results file
 	"""
 		Reads results into python lists from results file for processing to add to Excel
@@ -95,7 +94,6 @@ def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into
 	else:
 		return scale[0], results
 
-
 def remove_string_endings(astring, trailing):
 	"""
 		Function to strip the end from a string if it exists, used to remove .IntCase
@@ -106,7 +104,6 @@ def remove_string_endings(astring, trailing):
 	if astring.endswith(trailing):
 		return astring[:-len(trailing)]
 	return astring
-
 
 def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 	"""
@@ -179,7 +176,6 @@ def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
 
 	return None
 
-
 def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the results file
 	"""
 		Adds the results variables to the results file
@@ -194,92 +190,10 @@ def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the
 
 	return None
 
-
-def set_max_processes(_app, logger):
-	"""
-
-		DOESN'T WORK - Requires PowerFactory to run in Administrator to change settings
-		TODO: To fix would need to close and reopen PowerFactory as Admin, make changes
-		TODO: then close and reopen with correct user
-
-		Function will limit the number of processes to ensure that the maximum available
-		RAM on the machine is not used up.
-
-		Approach is to determine the amount of RAM that is being used up and then assume
-		that if the current process is multiplied to keep some RAM available.  This is a
-		pessimistic assumption but should ensure stability.
-
-		Requires the wmi module, if not available then will limit to maximum of either:
-			- 3 processes
-			- no. of cores - 1 process
-		<https://stackoverflow.com/questions/2017545/get-memory-usage-of-computer-in-windows-with-python>
-
-	:param handle _app:  reference to the powerfactory application
-	:param logger.LOGGER logger:  handle for the logging engine
-	:return int new_slave_num:  Max processes that have been set to run, if 0 then error
-	"""
-
-	# Determine number of cores available
-	max_cpu = multiprocessing.cpu_count() - constants.cpu_keep_free
-	logger.debug('There are {} CPUs available for parallel processing'.format(max_cpu))
-
-	# Obtain wmi module
-	try:
-		import wmi
-		wmi_available = True
-	except ImportError:
-		logger.error('python module, wmi has not been installed and so have to limit cores'
-					 'based on assumed maximum')
-		wmi_available = False
-
-	# Determine maximum available RAM
-	if wmi_available:
-		# Connect to computer
-		comp = wmi.WMI()
-
-		# Determine maximum physical memory in bytes
-		for i in comp.Win32_ComputerSystem():
-			memory_total = float(i.TotalPhysicalMemory)
-
-		# Determine maximum free memory
-		for os in comp.Win32_OperatingSystem():
-			memory_free = float(os.FreePhysicalMemory)
-
-		logger.debug('Total memory = {} bytes'.format(memory_total))
-		logger.debug('Free memory = {} bytes'.format(memory_free))
-		# Calculate max number of processes
-		max_processes = int(memory_total / memory_free)
-		logger.debug('Max processes = {}'.format(max_processes))
-
-	else:
-		# If not able to determine how much ram is available will limit the maximum number of
-		# processes to a constant
-		max_processes = constants.default_max_processes
-		logger.debug('Not able to calculate available memory so max processes = {}'.format(max_processes))
-
-	num_processes_to_set = max(max_cpu, max_processes)
-	logger.debug('Max of processes / cores to use in PowerFactory is {}'.format(num_processes_to_set))
-
-	# Set parallel processing restriction in powerfactory
-	current_slave_num = _app.GetNumSlave()
-	logger.info('Currently set to use {} slaves'.format(current_slave_num))
-	_app.SetNumSlave(num_processes_to_set)
-	logger.info('Set to use {} slaves'.format(num_processes_to_set))
-	new_slave_num = _app.GetNumSlave()
-	logger.info('Validating that has bene set to use {} slaves'.format(new_slave_num))
-
-	# Return new_slave_number if a success
-	if current_slave_num == new_slave_num:
-		return new_slave_num
-	else:
-		return 0
-
-
 def check_if_object_exists(location, name):  # Check if the object exists
 	# _new_object used instead of new_object to avoid shadowing
 	new_object = location.GetContents(name)
 	return new_object[0]
-
 
 def create_mutual_name(term1, term2):
 	"""
@@ -305,7 +219,6 @@ def create_mutual_name(term1, term2):
 	used_name = '{}{}{}'.format(term1, c.join_char, term2)
 
 	return planned_name, used_name
-
 
 def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance between two terminals
 	"""
@@ -1322,7 +1235,6 @@ class PFStudyCase:
 		return None
 
 
-
 class PFProject:
 	""" Class contains reference to a project, results folder and associated task automation file"""
 
@@ -1691,7 +1603,7 @@ class PFProject:
 				self.logger.debug('Temporary folder {} deleted'.format(folder))
 			# folder = None
 
-		self.logger.info('Temporary folders created in project {} have all been deleted'.format(self.prj))
+		self.logger.debug('Temporary folders created in project {} have all been deleted'.format(self.prj))
 
 		return None
 
@@ -1891,11 +1803,12 @@ class PFProject:
 
 		return df
 
-	def create_cases(self, study_settings, export_pth=str(), contingencies=None, contingencies_cmd=str()):
+	def create_cases(self, study_settings, terminals=None, contingencies=None, contingencies_cmd=str()):
 		"""
 			Function runs the pre_case_check for all of the base study_cases and then creates the study cases for each
 			contingency.
-		:param str export_pth: Folder used for the high level export of all study results
+		:param file_io.StudySettings study_settings: User selected settings for this input
+		:param dict terminals: Dictionary of the terminals which need to be calculated
 		:param dict contingencies:  (optional) Dictionary of the outages to be considered which will need to be
 									created into fault cases
 		:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
@@ -1906,7 +1819,11 @@ class PFProject:
 			self.logger.debug('Running pre-case check')
 			_ = self.pre_case_check(contingencies=contingencies, contingencies_cmd=contingencies_cmd)
 
-		df_convegent = self.df_pre_case[self.df_pre_case[constants.Contingencies.status]==True]
+		# Check terminals have been defined otherwise do that now
+		if not self.terminals:
+			_ = self.find_terminals(terminals_to_include=terminals, include_mutual=study_settings.export_mutual)
+
+		df_convergent = self.df_pre_case[self.df_pre_case[constants.Contingencies.status]==True]
 
 		# Check if the intact case should be included and then if so add to cases
 		self.cases_to_run = list()
@@ -1914,14 +1831,14 @@ class PFProject:
 			# TODO: Produce test routine to confirm this works
 			# Update export path and results files and then add study case to results
 			for _, sc in self.base_sc.items():
-				sc.res_pth = export_pth
+				sc.res_pth = study_settings.export_folder
 				sc.create_studies()
 				self.cases_to_run.append(sc)
 		else:
 			self.cases_to_run = list()
 
 
-		if df_convegent.empty:
+		if df_convergent.empty:
 			msg = 'No convergent contingencies found for cases in the project {}.\n'.format(self.prj)
 			if study_settings.include_intact:
 				self.logger.warning(
@@ -1946,7 +1863,9 @@ class PFProject:
 
 				# Create cases for all the convergent contingencies associated with this study case and then returns
 				# a list of references to the PFStudyCase class
-				new_cases = sc.create_cases(sc_folder=self.sc_folder, op_folder=self.op_folder, res_pth=export_pth)
+				new_cases = sc.create_cases(
+					sc_folder=self.sc_folder, op_folder=self.op_folder, res_pth=study_settings.export_folder
+				)
 
 				# Add details of newly created cases to the overall list
 				self.cases_to_run.extend(new_cases)
@@ -2175,6 +2094,47 @@ class PFProject:
 		# Return updated DataFrame with mutual elements
 		return df
 
+	def run_parallel_tasks(self):
+		"""
+			Function to run parallel tasks and then detects if an error has occured.
+			If an error occurs will run in non-parallel mode with a warning message to user
+		:return None:
+		"""
+		self.logger.info(
+			'Starting parallel running of studies for project {} using command {}'.format(
+				self.prj, self.task_auto
+			)
+		)
+
+		# Execute command
+		ierr = self.task_auto.Execute()
+
+		if ierr > 0:
+			self.logger.warning(
+				(
+					'An error occurred trying to run the command {} on parallel processors, this could be'
+					'either a licensing issue or a PowerFactory response delay.  The study will be attempted using'
+					'non parallel processes'
+				).format(self.task_auto)
+			)
+			# Change task_auto settings to disable use of parallel processing
+			self.task_auto.iEnableParal = 0
+
+			# Execute
+			ierr = self.task_auto.Execute()
+
+		if ierr > 0:
+			self.logger.critical(
+				(
+					'Unable to run results for project {}, there may be a license issue that the user should look into. '
+					'The script will now fail and all the following temporary folders will remain so that the user can '
+					'investigate the issue more closely.\n\t{}'
+				).format(self.prj, '\n\t'.join([str(x) for x in self.temp_folders]))
+			)
+			raise RuntimeError('Not able to run studies after multiple attempts')
+		else:
+			self.logger.info('Studies completed for project {}'.format(self.prj))
+
 
 class PowerFactory:
 	"""
@@ -2186,6 +2146,9 @@ class PowerFactory:
 		""" Gets the relevant powerfactory version and initialises """
 		self.c = constants.PowerFactory
 		self.logger = logging.getLogger(constants.logger_name)
+
+		# Constants
+		self.settings = None
 
 	def add_python_paths(self):
 		"""
@@ -2477,6 +2440,72 @@ class PowerFactory:
 	#
 	# 	return None
 
+	def change_parallel_settings(self, delay=constants.PowerFactory.parallel_time_out, reduce=False):
+		"""
+			Function will change some of the parallel processing settings to increase the time allowed
+			before a response is necessary
+		:param int delay: Maximum delay when waiting for parallel processor response
+		:param bool reduce: (optional) If set to True then will reduce as well as increase
+		:return int existing_delay: Returns the original delay value incase needs restoring
+		"""
+		# Before trying to activate a project confirm that PowerFactory has been initialised
+		if not app:
+			self.initialise_power_factory()
+
+		# Get reference to current user
+		current_user = app.GetCurrentUser()
+
+		# Get the default settings folder
+		settings = current_user.GetContents(constants.PowerFactory.user_default_settings)
+
+		if len(settings) == 0:
+			self.logger.critical(
+				(
+					'Not able to find the default settings named {} in the current user {} and therefore not able to '
+					'change the user settings'
+				).format(constants.PowerFactory.user_default_settings, current_user)
+			)
+			raise EnvironmentError('Not able to find user default settings for which change is requested')
+		else:
+			# Get first element
+			self.settings = settings[0]
+
+		existing_delay = self.settings.procTimeOut
+
+		if existing_delay < delay:
+			self.logger.warning(
+				(
+					'The existing delay while waiting for parallel processes to return is {:.0f} seconds when the '
+					'recommended value is at least {:.0f} seconds.  The settings value stored in {} has therefore '
+					'been increased.'
+				).format(existing_delay, delay, self.settings)
+			)
+
+			# Change delay value
+			self.settings.procTimeOut = delay
+		else:
+			if reduce:
+				self.logger.info(
+					(
+						'The existing delay to wait for parallel processes to return is {:.0f} seconds and the '
+						'desired delay value is {:.0f} seconds.  Therefore the delay has been changed in the '
+						'settings file {}'
+					).format(existing_delay, delay, self.settings)
+				)
+
+				# Change delay value
+				self.settings.procTimeOut = delay
+			else:
+				self.logger.debug(
+					'The existing parallel processing delay is {:.0f} seconds and no changes have been made'.format(
+						existing_delay
+					)
+				)
+
+
+
+		return existing_delay
+
 
 def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=None, fs_settings=None, export_pth=str()):
 	"""
@@ -2507,10 +2536,11 @@ def run_pre_case_checks(
 	:param dict pf_projects:  Dictionary of references to all projects being studied as returned by
 							create_pf_project_instances
 	:param dict terminals:  Dictionary of the terminals for which results need to be run
+	:param bool include_mutual:  (optional) Set to True if mutual impedance data is to be exported
 	:param str export_pth:  (optional) Export path to write results to if provided
 	:param dict contingencies:  (optional) Dictionary of the outages to be considered which will need to be
 									created into fault cases
-		:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
+	:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
 	:return pd.DataFrame df_case_check: DataFrame showing contingencies which are convergent
 	"""
 	logger = logging.getLogger(constants.logger_name)
@@ -2572,7 +2602,52 @@ def run_pre_case_checks(
 	# Return the summary DataFrame
 	return df_case_check_cont, df_case_check_term
 
+def run_studies(pf_projects, inputs):
+	"""
+		Function runs the studies to create the cases and run all studies based on
+		the provided dictionary of projects and input settings
+	:param dict pf_projects:  Dictionary of projects for which all studies will be run
+	:param file_io.StudyInputsDev inputs:  Input settings
+	:return None
+	"""
+	t0 = time.time()
+	logger = logging.getLogger(constants.logger_name)
+	# Iterate through each project and create the various cases, the includes running a pre-case check but no
+	# output is saved at this point
+	for project_name, project in pf_projects.items():
+		logger.debug('Studies being run for project {}:\t{}'.format(project_name, project.prj))
+		project.create_cases(
+			study_settings=inputs.settings,
+			terminals=inputs.terminals,
+			contingencies=inputs.contingencies,
+			contingencies_cmd=inputs.contingency_cmd
+		)
 
+		logger.debug('Cases created for project: {}:\t{}'.format(project_name, project.prj))
+
+		# Update the auto executable for this project
+		project.update_auto_exec()
+
+		# Batch run the results
+		logger.info('Running of studies associated with project {} started'.format(project_name))
+		project.run_parallel_tasks()
+		t1 = time.time()
+		logger.info('Running of studies associated with project {} completed in {:.0f} seconds'.format(
+			project_name, t1-t0)
+		)
+
+		# Delete temporary folders created for this project
+		if inputs.settings.delete_created_folders:
+			project.delete_temp_folders()
+		else:
+			logger.info(
+				(
+					'As per user inputs, temporary folders associated with project {} have not been deleted and so will '
+					'need tidying within PowerFactory directly'
+				).format(project_name)
+			)
+
+	return None
 
 
 

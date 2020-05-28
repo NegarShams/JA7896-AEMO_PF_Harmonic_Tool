@@ -5,6 +5,7 @@ import pandas as pd
 import math
 import random
 import string
+import glob
 
 from tests.context import pscharmonics
 
@@ -21,8 +22,8 @@ pf_test_inputs = 'Inputs.xlsx'
 # When this is set to True tests which require initialising PowerFactory are skipped
 include_slow_tests = True
 
-# OLD tests are being skipped
-include_old_tests = False
+# Running detailed tests will overwrite previous test output that may be used by other test routines.
+include_detailed_tests = True
 
 # Set to True and created excel outputs will be deleted during test run
 test_delete_excel_outputs = False
@@ -55,6 +56,25 @@ class TestPFInitialisation(unittest.TestCase):
 		pf_directory = pscharmonics.pf.app.GetInstallationDirectory()
 
 		self.assertEqual(os.path.abspath(pf_directory), os.path.abspath(self.pf.c.dig_path))
+
+	@unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
+	def test_pf_change_settings(self):
+		""" Function tests that powerfactory can be initialised """
+		target_delay = 5
+
+		original_setting = self.pf.change_parallel_settings(delay=target_delay, reduce=True)
+
+		# Confirm setting changed correctly
+		self.assertNotEqual(original_setting, target_delay)
+		self.assertEqual(self.pf.settings.procTimeOut, target_delay)
+
+		# Set value based on constants
+		_ = self.pf.change_parallel_settings()
+		self.assertEqual(self.pf.settings.procTimeOut, pscharmonics.constants.PowerFactory.parallel_time_out)
+
+		# Restore value back to original
+		_ = self.pf.change_parallel_settings(delay=original_setting, reduce=True)
+		self.assertEqual(self.pf.settings.procTimeOut, original_setting)
 
 @unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
 class TestsOnPFCase(unittest.TestCase):
@@ -102,7 +122,6 @@ class TestsOnPFCase(unittest.TestCase):
 		# Deactivate and then delete the project
 		cls.pf.deactivate_project()
 		cls.pf.delete_object(pf_obj=cls.pf_test_project)
-
 
 @unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
 class TestPFProject(unittest.TestCase):
@@ -243,7 +262,7 @@ class TestPFProject(unittest.TestCase):
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
-	def test_studycase_lf_assignment(self):
+	def test_studycase_lf_assignment_existing_cmd(self):
 		""" Tests that new study cases can be created with appropriate load flow settings """
 		# Load flow settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
@@ -277,6 +296,44 @@ class TestPFProject(unittest.TestCase):
 		# Run load flow and should get error code 0 returned
 		self.assertTrue(pscharmonics.constants.General.cmd_lf_leader in str(sc.ldf))
 		self.assertEqual(sc.ldf.Execute(), 0)
+
+		# Run load flow using in built class command
+		self.assertTrue(sc.run_load_flow())
+		self.assertTrue(sc.ldf_convergent)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_studycase_lf_assignment_existing_settings(self):
+		""" Tests that new study cases can be created with appropriate load flow settings """
+		# Load flow settings
+		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		with pd.ExcelFile(def_inputs_file) as wkbk:
+			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			df = pd.read_excel(
+				wkbk,
+				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				usecols=(3,), skiprows=3, header=None, squeeze=True
+			)
+
+		# Create instance with detaield settings rather than existing command
+		lf_settings = pscharmonics.file_io.LFSettings(
+			existing_command=str(), detailed_settings=df.iloc[1:]
+		)
+
+		# Create new project instances
+		uid = 'TEST_CASE'
+		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
+		pf_project = pscharmonics.pf.PFProject(
+			name=pf_test_project, df_studycases=df_test_project, uid=uid,
+			lf_settings=lf_settings
+		)
+
+		# Confirm can activate study case
+		sc = pf_project.base_sc[self.test_name]
+
+		# Activate study case
+		sc.toggle_state()
 
 		# Run load flow using in built class command
 		self.assertTrue(sc.run_load_flow())
@@ -455,7 +512,6 @@ class TestPFProject(unittest.TestCase):
 		# Deactivate and then delete the project
 		cls.pf.deactivate_project()
 		cls.pf.delete_object(pf_obj=cls.pf_test_project)
-
 
 @unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
 class TestPFProjectContingencyCases(unittest.TestCase):
@@ -866,7 +922,8 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Create cases
 		pf_project.create_cases(
-			export_pth=target_pth, study_settings=self.settings.settings,
+			study_settings=self.settings.settings,
+			terminals=self.settings.terminals,
 			contingencies=self.settings.contingencies
 		)
 
@@ -893,7 +950,10 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		uid = 'TEST_CASE'
 		pf_projects = pscharmonics.pf.create_pf_project_instances(
 			df_study_cases=self.settings.cases,
-			uid=uid
+			uid=uid,
+			lf_settings=self.settings.lf_settings,
+			fs_settings=self.settings.fs_settings,
+			export_pth=target_pth
 		)
 
 		# Get single project
@@ -910,8 +970,8 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Create cases
 		pf_project.create_cases(
-			export_pth=target_pth,
 			study_settings=self.settings.settings,
+			terminals=self.settings.terminals,
 			contingencies=self.settings.contingencies)
 		# Update the auto_exec command to contain details of all of these cases
 		pf_project.update_auto_exec()
@@ -922,7 +982,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Execute command and confirm that the number of entries in the results folder is correct
 		pf_project.project_state()
-		pf_project.task_auto.Execute()
+		pf_project.run_parallel_tasks()
 
 		# Find out how many results have been created
 		num_results = len([name for name in os.listdir(target_pth) if os.path.isfile(os.path.join(target_pth, name))])
@@ -967,7 +1027,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Create cases
 		pf_project.create_cases(
-			export_pth=target_pth,
 			study_settings=self.settings.settings,
 			contingencies=self.settings.contingencies)
 		# Update the auto_exec command to contain details of all of these cases
@@ -975,7 +1034,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Execute command and confirm that the number of entries in the results folder is correct
 		pf_project.project_state()
-		pf_project.task_auto.Execute()
+		pf_project.run_parallel_tasks()
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
@@ -1153,7 +1212,7 @@ class TestPFProjectTerminals(unittest.TestCase):
 				except OSError:
 					print('### TEST TIDY ERROR:  Unable to delete folder {}'.format(folder))
 
-
+@unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
 class TestPFSingleProjectUsingInputs(unittest.TestCase):
 	"""
 		This class contains tests that are carried out using the complete set of inputs as part of integration
@@ -1218,13 +1277,50 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		self.assertEqual(len(df_term.index), 7)
 
 		# Confirm DataFrame is expected length and number of non_convergent cases is as expected
-		self.assertEqual(len(df_summary.index), 6)
+		self.assertEqual(len(df_summary.index), 4)
 		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 2)
 
 		# Confirm that excel spreadsheet has been created (and delete if necessary)
 		self.assertTrue(os.path.isfile(excel_pth))
 		if test_delete_excel_outputs:
 			os.remove(excel_pth)
+
+	def test_produce_outputs(self):
+		"""
+			Function tests that running pre_case check for all projects correctly reports non-convergent cases
+			and produces a suitable excel export
+		:return:
+		"""
+		# Create random path for temporary files
+		target_pth = os.path.join(
+			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+		)
+		if os.path.isdir(target_pth):
+			raise SyntaxError('Random path {} already exists'.format(target_pth))
+		else:
+			os.mkdir(target_pth)
+		self.settings.settings.export_folder = target_pth
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid,
+			lf_settings=self.settings.lf_settings,
+			fs_settings=self.settings.fs_settings,
+			export_pth=target_pth
+		)
+
+		# Iterate through each project and create the various cases, the includes running a pre-case check but no
+		# output is saved at this point
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=self.settings)
+
+		# Find out how many results produced and then confirm that matches with expected number
+		num_results = len([name for name in os.listdir(target_pth) if os.path.isfile(os.path.join(target_pth, name))])
+		self.assertEqual(num_results, 4)
+
+		if test_delete_excel_outputs:
+			os.remove(target_pth)
 
 	@classmethod
 	def tearDownClass(cls):
@@ -1233,4 +1329,73 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		cls.pf.deactivate_project()
 		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
-# TODO: Create pre-case check for multiple projects
+@unittest.skipUnless(
+	include_detailed_tests, 'Tests that take longer to run and produce more detailed output have been skipped'
+)
+class TestPFDetailedInputs(unittest.TestCase):
+	"""
+		Function runs tests using detailed outputs to produce a set of results that can be used elsewhere
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		""" Initialise PowerFactory and then check if model already exists """
+		cls.pf = pscharmonics.pf.PowerFactory()
+		cls.pf.initialise_power_factory()
+
+		# Try to activate the test project and if it doesn't work then load power factory case in
+		if not cls.pf.activate_project(project_name=pf_test_project):
+			pf_test_file = os.path.join(TESTS_DIR, '{}.pfd'.format(pf_test_project))
+
+			# Import the project
+			cls.pf.import_project(project_pth=pf_test_file)
+			cls.pf.activate_project(project_name=pf_test_project)
+
+		cls.pf_test_project = cls.pf.get_active_project()
+
+	def test_complete_test_produce_outputs_1(self):
+		"""
+			Function runs tests using detailed outputs to produce a set of results that can be used elsewhere
+		:return:
+		"""
+		# Create path for results from detailed tests
+		target_pth = os.path.join(TESTS_DIR, 'Detailed_1')
+		if os.path.isdir(target_pth):
+			print('Existing contents in path: {} will be deleted'.format(target_pth))
+			files = glob.glob(target_pth + '\\*')
+			for f in files:
+				os.remove(f)
+		else:
+			os.mkdir(target_pth)
+
+		# Import settings for Detailed Study
+		settings_file = os.path.join(TESTS_DIR, 'Inputs_Detailed.xlsx')
+		inputs = pscharmonics.file_io.StudyInputsDev(pth_file=settings_file)
+
+		inputs.settings.export_folder = target_pth
+
+		# Create projects
+		uid = 'DETAILED_1'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=inputs.cases,
+			uid=uid,
+			lf_settings=inputs.lf_settings,
+			fs_settings=inputs.fs_settings,
+			export_pth=target_pth
+		)
+
+		# Iterate through each project and create the various cases, the includes running a pre-case check but no
+		# output is saved at this point
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
+
+		# TODO: Confirm results as expected
+
+		if test_delete_excel_outputs:
+			os.remove(target_pth)
+
+	@classmethod
+	def tearDownClass(cls):
+		""" Function ensures the deletion of the PowerFactory project """
+		# Deactivate and then delete the project
+		cls.pf.deactivate_project()
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)

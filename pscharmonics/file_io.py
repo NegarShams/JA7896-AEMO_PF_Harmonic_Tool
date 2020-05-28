@@ -10,7 +10,6 @@
 """
 
 import os
-import time
 import numpy as np
 import itertools
 import pscharmonics.constants as constants
@@ -608,12 +607,14 @@ class StudySettings:
 	"""
 		Class contains the processing of each of the DataFrame items passed as part of the
 	"""
-	def __init__(self, sht=constants.HASTInputs.study_settings, wkbk=None, pth_file=None):
+	def __init__(self, sht=constants.HASTInputs.study_settings, wkbk=None, pth_file=None, gui_mode=False):
 		"""
 			Process the worksheet to extract the relevant StudyCase details
 		:param str sht:  (optional) Name of worksheet to use
 		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
 		:param str pth_file: (optional) Handle to workbook
+		:param bool gui_mode: (optional) When set to True this will prevent the creation of a new
+							folder since the user will provide the folder when running the studies
 		"""
 		# Constants used as part of this
 		self.export_folder = str()
@@ -628,11 +629,11 @@ class StudySettings:
 		self.c = constants.StudySettings
 		self.logger = logging.getLogger(constants.logger_name)
 
-		# Unique identifier created from the filename
-		self.uid = time.strftime('%y%m%d_%H%M%S')
-
 		# Sheet name
 		self.sht = sht
+
+		# GUI Mode - Prevents creation of folders that are defined later
+		self.gui_mode = gui_mode
 
 		# Import workbook as dataframe
 		if wkbk is None:
@@ -654,8 +655,11 @@ class StudySettings:
 	def process_inputs(self):
 		""" Process all of the inputs into attributes of the class """
 		# Process results_folder
-		self.export_folder = self.process_export_folder()
-		self.results_name = self.process_result_name()
+		if not self.gui_mode:
+			self.export_folder = self.process_export_folder()
+		else:
+			self.logger.debug('Running in GUI mode and therefore export_folder is defined later')
+		# self.results_name = self.process_result_name()
 		# self.pf_network_elm = self.process_net_elements()
 
 		self.pre_case_check = self.process_booleans(key=self.c.pre_case_check)
@@ -699,27 +703,27 @@ class StudySettings:
 
 		return folder
 
-	def process_result_name(self, def_value=constants.StudySettings.def_results_name):
-		"""
-			Processes the results file name
-		:param str def_value:  (optional) Default value to use
-		:return str results_name:
-		"""
-		results_name = self.df.loc[self.c.results_name]
-
-		if not results_name:
-			# If no value provided then use default value
-			self.logger.warning((
-				'No value provided in the Input Settings for the results name and so the default value of {} will be '
-				'used instead'
-			).format(def_value)
-			)
-			results_name = def_value
-
-		# Add study_time to end of results name
-		results_name = '{}_{}{}'.format(results_name, self.uid, constants.Extensions.excel)
-
-		return results_name
+	# def process_result_name(self, def_value=constants.StudySettings.def_results_name):
+	# 	"""
+	# 		Processes the results file name
+	# 	:param str def_value:  (optional) Default value to use
+	# 	:return str results_name:
+	# 	"""
+	# 	results_name = self.df.loc[self.c.results_name]
+	#
+	# 	if not results_name:
+	# 		# If no value provided then use default value
+	# 		self.logger.warning((
+	# 			'No value provided in the Input Settings for the results name and so the default value of {} will be '
+	# 			'used instead'
+	# 		).format(def_value)
+	# 		)
+	# 		results_name = def_value
+	#
+	# 	# Add study_time to end of results name
+	# 	results_name = '{}_{}{}'.format(results_name, self.uid, constants.Extensions.excel)
+	#
+	# 	return results_name
 
 	def process_booleans(self, key):
 		"""
@@ -778,10 +782,12 @@ class StudyInputsDev:
 	"""
 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
 	"""
-	def __init__(self, pth_file=None):
+	def __init__(self, pth_file=None, gui_mode=False):
 		"""
 			Initialises the settings based on the Study Settings spreadsheet
 		:param str pth_file:  Path to input settings file
+		:param bool gui_mode: (optional) when set to True this will creating the export folder since that
+							will be processed later
 		"""
 		# General constants
 		self.pth = pth_file
@@ -790,7 +796,7 @@ class StudyInputsDev:
 
 		with pd.ExcelFile(io=self.pth) as wkbk:
 			# Import StudySettings
-			self.settings = StudySettings(wkbk=wkbk)
+			self.settings = StudySettings(wkbk=wkbk, gui_mode=gui_mode)
 			self.cases = self.process_study_cases(wkbk=wkbk)
 			self.contingency_cmd, self.contingencies = self.process_contingencies(wkbk=wkbk)
 			self.terminals = self.process_terminals(wkbk=wkbk)
@@ -1180,9 +1186,6 @@ class LFSettings:
 			existing_command = None
 		self.cmd = existing_command
 
-		# Target busbar reference found during runtime
-		self.rembar = str()
-
 		# Basic
 		self.iopt_net = int()  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
 		self.iopt_at = int()  # Automatic Tap Adjustment
@@ -1366,26 +1369,24 @@ class LFSettings:
 		self.loadmax = load_flow_settings[39]  # Max Loading of Edge Element
 		self.vlmin = load_flow_settings[40]  # Lower Limit of Allowed Voltage
 		self.vlmax = load_flow_settings[41]  # Upper Limit of Allowed Voltage
-		# ldf.outcmd =  load_flow_settings[42-offset]          		# Output
-		self.iopt_chctr = load_flow_settings[43]  # Check Control Conditions
-		# ldf.chkcmd = load_flow_settings[44-offset]            	# Command
+		self.iopt_chctr = load_flow_settings[42]  # Check Control Conditions
 
 		# Load Generation Scaling
-		self.scLoadFac = load_flow_settings[45]  # Load Scaling Factor
-		self.scGenFac = load_flow_settings[46]  # Generation Scaling Factor
-		self.scMotFac = load_flow_settings[47]  # Motor Scaling Factor
+		self.scLoadFac = load_flow_settings[43]  # Load Scaling Factor
+		self.scGenFac = load_flow_settings[44]  # Generation Scaling Factor
+		self.scMotFac = load_flow_settings[45]  # Motor Scaling Factor
 
 		# Low Voltage Analysis
-		self.Sfix = load_flow_settings[48]  # Fixed Load kVA
-		self.cosfix = load_flow_settings[49]  # Power Factor of Fixed Load
-		self.Svar = load_flow_settings[50]  # Max Power Per Customer kVA
-		self.cosvar = load_flow_settings[51]  # Power Factor of Variable Part
-		self.ginf = load_flow_settings[52]  # Coincidence Factor
-		self.i_volt = load_flow_settings[53]  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
+		self.Sfix = load_flow_settings[46]  # Fixed Load kVA
+		self.cosfix = load_flow_settings[47]  # Power Factor of Fixed Load
+		self.Svar = load_flow_settings[48]  # Max Power Per Customer kVA
+		self.cosvar = load_flow_settings[49]  # Power Factor of Variable Part
+		self.ginf = load_flow_settings[50]  # Coincidence Factor
+		self.i_volt = load_flow_settings[51]  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
 
 		# Advanced Simulation Options
-		self.iopt_prot = load_flow_settings[54]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
-		self.ign_comp = load_flow_settings[55]  # Ignore Composite Elements
+		self.iopt_prot = load_flow_settings[52]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
+		self.ign_comp = load_flow_settings[53]  # Ignore Composite Elements
 
 	def find_reference_terminal(self, app):
 		"""
@@ -1394,10 +1395,23 @@ class LFSettings:
 		:return None:
 		"""
 		pf_sub = app.GetCalcRelevantObjects(self.substation)
-		pf_term = pf_sub[0].GetContents(self.terminal)[0]
-		self.rembar = pf_term
 
-		return None
+		if len(pf_sub) == 0:
+			pf_term = None
+		else:
+			pf_term = pf_sub[0].GetContents(self.terminal)
+			if len(pf_term) == 0:
+				pf_term = None
+
+		if pf_term is None:
+			self.logger.warning(
+				(
+					'Either the substation {} or terminal {} detailed as being the reference busbar cannot be '
+					'found and therefore no reference busbar will be defined in the PowerFactory load flow'
+				).format(self.substation, self.terminal)
+			)
+
+		return pf_term
 
 class FSSettings:
 	""" Class contains the frequency scan settings """
