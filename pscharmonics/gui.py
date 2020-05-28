@@ -16,6 +16,10 @@ import tkinter.ttk as ttk
 import sys
 import os
 import logging
+import webbrowser
+from PIL import Image, ImageTk
+
+import pscharmonics
 import pscharmonics.constants as constants
 import pscharmonics.file_io as file_io
 import inspect
@@ -84,6 +88,73 @@ def file_selector(initial_pth='', open_file=False, save_dir=False,
 		file_paths = [_file]
 
 	return file_paths
+
+
+class CustomStyles:
+	""" Class used to customize the layout of the GUI """
+	def __init__(self):
+		"""
+			Initialise the reference to the style names
+		"""
+				# Constants for styles
+		# Style for Loading the SAV Button
+		self.cmd_buttons = 'General.TButton'
+		self.label_general = 'TLabel'
+		self.label_mainheading = 'MainHeading.TLabel'
+		self.label_version_number = 'Version.TLabel'
+		self.label_psc_info = 'PSCInfo.TLabel'
+		self.label_psc_phone = 'PSCPhone.TLabel'
+		self.label_hyperlink = 'Hyperlink.TLabel'
+
+		self.configure_styles()
+
+	def configure_styles(self):
+		"""
+			Function configures all the ttk styles used within the GUI
+			Further details here:  https://anzeljg.github.io/rin2/book2/2405/docs/tkinter/ttk-style-layer.html
+		:return:
+		"""
+		# Tidy up the repeat ttk.Style() calls
+		# Switch to a different theme
+		styles = ttk.Style()
+		styles.theme_use('clam')
+
+		# Configure the same font in all labels
+		standard_font = constants.GuiDefaults.font_family
+		bg_color = constants.GuiDefaults.color_main_window
+
+		s = ttk.Style()
+		s.configure('.', font=(standard_font, '8'))
+
+		# General style for all buttons and active color changes
+		s.configure(self.cmd_buttons, height=2, width=25)
+
+		s.configure(self.label_general, background=bg_color)
+		s.configure(self.label_mainheading, font=(standard_font, '10', 'bold'), background=bg_color,
+					foreground=constants.GuiDefaults.font_heading_color)
+		s.configure(self.label_version_number, font=(standard_font, '7'), background=bg_color, justify=tk.CENTER)
+		s.configure(self.label_hyperlink, foreground='Blue', font=(standard_font, '7'), justify=tk.CENTER)
+
+		s.configure(
+			self.label_psc_info, font=constants.GuiDefaults.psc_font,
+			color=constants.GuiDefaults.psc_color_web_blue, justify='center', background=bg_color
+		)
+
+		s.configure(
+			self.label_psc_phone, font=(constants.GuiDefaults.psc_font, '8'),
+			color=constants.GuiDefaults.psc_color_grey, background=bg_color
+		)
+
+		return None
+
+	def command_button_color_change(self, color):
+		"""
+			Force change in command button color to highlight error
+		"""
+		s = ttk.Style()
+		s.configure(self.cmd_buttons, background=color)
+
+		return None
 
 
 class MainGUI:
@@ -223,7 +294,12 @@ class MainGui:
 	"""
 		Main class to produce the GUI for user interaction
 		Allows the user to set up the parameters and define the cases to run the studies
+
 	"""
+	inputs = None # type: file_io.StudyInputsDev
+	pf = None # type: pf.PowerFactory
+	pf_projects = None # type: dict
+
 
 	def __init__(
 			self, title=constants.GuiDefaults.gui_title, start_directory=os.path.dirname(os.path.realpath(__file__))
@@ -231,9 +307,15 @@ class MainGui:
 		"""
 		Initialise GUI
 		:param title: (optional) - Title to be used for main window
+
 		"""
-		# TODO: How to deal with logger handles
-		self.logger = logger
+		self.logger = logging.getLogger(constants.logger_name)
+
+		# Constants defined later
+		self.pre_case_file = str()
+		self.results_file = str()
+
+
 		# Initial directory that will be used whenever a file selection is necessary
 		self.init_dir = start_directory
 		# Status set to True if user aborts rather than running studies
@@ -253,31 +335,8 @@ class MainGui:
 		self._row = 0
 		self._col = 0
 
-		# Specific constants that are populated during Main Gui running
-		self.study_settings = list()
-
-		# Constants for styles
-		# Style for Loading the SAV Button
-		# TODO: Review list, most may not be required
-		self.style_load_sav = 'LoadSav.TButton'
-		self.style_cmd_buttons = 'General.TButton'
-		self.style_cmd_run = 'Run.TButton'
-		self.style_rating_options = 'TMenubutton'
-		self.style_label_general = 'TLabel'
-		self.style_label_res = 'Result.TLabel'
-		self.style_label_numgens = 'Gens.TLabel'
-		self.style_label_mainheading = 'MainHeading.TLabel'
-		self.style_label_subheading = 'SubHeading.TLabel'
-		self.style_label_subnames = 'SubstationNames.TLabel'
-		self.style_label_version_number = 'Version.TLabel'
-		self.style_label_notes = 'Notes.TLabel'
-		self.style_label_psc_info = 'PSCInfo.TLabel'
-		self.style_label_psc_phone = 'PSCPhone.TLabel'
-		self.style_radio_buttons = 'TRadiobutton'
-		self.style_check_buttons = 'TCheckbutton'
-
 		# Configure styles
-		self.configure_styles()
+		self.styles = CustomStyles()
 
 		# Initialisation
 		# Add GUI title
@@ -288,13 +347,9 @@ class MainGui:
 			label=constants.GuiDefaults.button_select_settings_label,
 			cmd=self.load_settings_file, tooltip='Click to select the file which contains the study settings to be run'
 		)
+		self.lbl_settings_file = self.add_minor_label(row=self.row(), col=self.col()+1, label='No settings file selected')
 
-		# Add button for review / editing settings
-		self.button_review_settings = self.add_cmd(
-			label='Review / Edit Settings',	cmd=self.review_edit_settings,
-			tooltip='Click to review / edit the loaded settings', state=tk.DISABLED
-		)
-
+		self.lbl_status = self.add_minor_label(row=self.row(1), col=self.col(), label='')
 
 		# Add button to run a pre-case check
 		self.button_precase_check = self.add_cmd(
@@ -304,81 +359,72 @@ class MainGui:
 
 		# Add button for pre_case check results
 		self.button_precase_results = self.add_cmd(
-			label='Review Pre-Case Check Results',	cmd=self.load_results,
-			tooltip='Click to review the pre-case check results', state=tk.DISABLED,
+			label='Review Pre-Case Check Results',	cmd=lambda results='pre': self.load_results(results=results),
+			tooltip='Click to review the pre-case results in excel', state=tk.DISABLED,
 			# Row and column numbers declared, aligns with run pre-case check but offset but 1
 			row=self.row(), col=self.col()+1
 		)
 
-		# Add button to run studies
+		# Add button to run and review studies
 		self.button_run_studies = self.add_cmd(
 			label='Run Studies',	cmd=self.run_studies,
 			tooltip='Click to run studies', state=tk.DISABLED
 		)
-
 		# Add button for pre_case check results
 		self.button_study_results = self.add_cmd(
-			label='Review Study Results',	cmd=self.load_results,
+			label='Review Study Results',	cmd=lambda results='post': self.load_results(results=results),
 			tooltip='Click to review the study results', state=tk.DISABLED,
 			# Row and column numbers declared, aligns with run pre-case check but offset but 1
 			row=self.row(), col=self.col()+1
 		)
 
-		# Will be populated with buttons that need enabling once the study settings have been imported
+		# Separator
+		self.add_sep(row=self.row(1), col_span=2)
+		_ = self.add_main_label(row=self.row(1), col=self.col(), label='Combine Previous Results')
+
+		# Add button to combine previous sets of results and produce loci
+		self.button_run_previous_results = self.add_cmd(
+			label='Combine Previous Results',	cmd=self.combine_results,
+			tooltip='Combine previously run results into a single excel spreadsheet', state=tk.NORMAL
+		)
+
+		# Add button for pre_case check results
+		self.previous_results = self.add_cmd(
+			label='Review Combined Study Results',	cmd=lambda results='post': self.load_results(results=results),
+			tooltip='Click to open excel with the combined study results', state=tk.DISABLED,
+			row=self.row(), col=self.col()+1
+		)
+
+		# Separator before PSC details
+		self.add_sep(row=self.row(1), col_span=2)
+
+		# Add PSC logo in Windows Manager
+		self.add_psc_logo_wm()
+
+		# Add PSC logo with hyperlink to the website
+		self.add_logo(
+			row=self.row(1), col=self.col(),
+			img_pth=constants.GuiDefaults.img_pth_psc_main,
+			hyperlink=constants.GuiDefaults.hyperlink_psc_website,
+			tooltip='Clicking will open PSC website',
+			size=constants.GuiDefaults.img_size_psc
+		)
+
+		# Add link to the user manual and reference to the tool version
+		self.add_hyp_user_manual(row=self.row(1), col=self.col())
+
+		# Buttons that should be enabled once the inputs are loaded
 		self.buttons_to_enable_level1 = (
-			self.button_review_settings, self.button_precase_check, self.button_run_studies
+			self.button_precase_check,
+			self.button_run_studies
 		)
 
 		self.logger.debug('GUI window created')
 
-		# to make sure GUI open infront of PSSE gui
-		self.master.deiconify()
+		# to make sure GUI open in front of PSSE gui
+		# self.master.deiconify()
 		# Produce GUI window
 		self.master.mainloop()
-
-
-	def configure_styles(self):
-		"""
-			Function configures all the ttk styles used within the GUI
-			Further details here:  https://anzeljg.github.io/rin2/book2/2405/docs/tkinter/ttk-style-layer.html
-		:return:
-		"""
-		# TODO: Add more detailed commentary
-		# Configure the same font in all labels
-		standard_font = constants.GuiDefaults.font_family
-		bg_color = constants.GuiDefaults.color_main_window
-		_ = ttk.Style().configure('.', font=(standard_font, '8'), background=bg_color)
-
-		# Style for Loading the SAV Button
-		_ = ttk.Style().configure(self.style_load_sav, height=2, width=30, color=bg_color)
-
-		# Style for all other buttons
-		_ = ttk.Style().configure(self.style_load_sav, height=2, color=bg_color)
-
-		# Style for all other buttons
-		_ = ttk.Style().configure(self.style_cmd_run, height=2, width=50, color=bg_color)
-
-		_ = ttk.Style().configure(self.style_rating_options, height=2, width=50, background=bg_color)
-
-		_ = ttk.Style().configure(self.style_label_general, background=bg_color)
-		_ = ttk.Style().configure(self.style_label_mainheading, font=(standard_font, '10', 'bold'), background=bg_color)
-		_ = ttk.Style().configure(self.style_label_subheading, font=(standard_font, '9'), background=bg_color)
-		_ = ttk.Style().configure(self.style_label_version_number, font=(standard_font, '7'), background=bg_color)
-		_ = ttk.Style().configure(self.style_label_notes, font=(standard_font, '7'), background=bg_color)
-
-		_ = ttk.Style().configure(
-			self.style_label_psc_info, font=constants.GuiDefaults.psc_font,
-			color=constants.GuiDefaults.psc_color_web_blue, justify='center', background=bg_color
-		)
-
-		_ = ttk.Style().configure(
-			self.style_label_psc_phone, font=constants.GuiDefaults.psc_font,
-			color=constants.GuiDefaults.psc_color_grey, justify='center', background=bg_color
-		)
-
-		_ = ttk.Style().configure(self.style_radio_buttons, background=bg_color)
-
-		_ = ttk.Style().configure(self.style_check_buttons, background=bg_color)
 
 	def row(self, i=0):
 		"""
@@ -398,6 +444,90 @@ class MainGui:
 		self._col += i
 		return self._col
 
+	def add_sep(self, row, col_span):
+		"""
+			Function just adds a horizontal separator
+		:param row: Row number to use
+		:param col_span: Column span number to use
+		:return None:
+		"""
+		# Add separator
+		sep = ttk.Separator(self.master, orient="horizontal")
+		sep.grid(row=row, sticky=tk.W + tk.E, columnspan=col_span, pady=10)
+		return None
+
+	def add_psc_logo_wm(self):
+		"""
+			Function just adds the PSC logo to the windows manager in GUI
+		:return: None
+		"""
+		# Create the PSC logo for including in the windows manager
+		logo = tk.PhotoImage(file=constants.GuiDefaults.img_pth_psc_window)
+		# noinspection PyProtectedMember
+		self.master.tk.call('wm', 'iconphoto', self.master._w, logo)
+		return None
+
+	def add_logo(self, row, col, img_pth, hyperlink=None, tooltip=None, size=constants.GuiDefaults.img_size_psc):
+		"""
+			Function to add an image which when clicked is a hyperlink to the companies logo.
+			Image is added using a label and changing the it to be an image and binding a hyperlink to it
+		:param int row:  Row number to use
+		:param int col:  Column number to use
+		:param str img_pth:  Path to image to use
+		:param str hyperlink:  (optional=None) Website hyperlink to use
+		:param str tooltip:  (Optional=None) Popup message to use for mouse over
+		:param tuple size: (optional) - Size to make image when inserting
+		:return ttk.Label logo:  Reference to the newly created logo
+		"""
+		# Load the image and convert into a suitable size for displaying on the GUI
+		img = Image.open(img_pth)
+		img.thumbnail(size)
+		# Convert to a photo image for inclusion on the GUI
+		img_to_include = ImageTk.PhotoImage(img)
+
+		# Add image to GUI
+		logo = tk.Label(self.master, image=img_to_include, cursor='hand2', justify=tk.CENTER, compound=tk.TOP, bg='white')
+		logo.photo = img_to_include
+		logo.grid(row=row, column=col, columnspan=2, pady=10)
+
+		# Associate clicking of the button as opening a web browser with the provided hyperlink
+		if hyperlink:
+			logo.bind(
+				constants.GuiDefaults.mouse_button_1,
+				lambda e: webbrowser.open_new(hyperlink)
+			)
+
+		# Add tooltip for hovering over button
+		CreateToolTip(widget=logo, text=tooltip)
+
+		return logo
+
+	def add_hyp_user_manual(self, row, col):
+		"""
+			Function just adds the version and hyperlink to the user manual to the GUI
+		:param row: Row Number to use
+		:param col: Column number to use
+		:return None:
+		"""
+		version_tool = ttk.Label(
+			self.master, text='Version: {}'.format(constants.__version__),
+			style=self.styles.label_version_number
+		)
+		version_tool.grid(row=row, column=col, padx=5, pady=5)
+
+		# Create user manual link and reference to the version of the tool
+		hyp_user_manual = ttk.Label(
+			self.master, text="User Guide", cursor="hand2", style=self.styles.label_hyperlink
+		)
+		hyp_user_manual.grid(row=row, column=col + 1, padx=5, pady=5)
+		hyp_user_manual.bind(constants.GuiDefaults.mouse_button_1, lambda e: webbrowser.open_new(
+			os.path.join(constants.local_directory, constants.user_guide_reference)))
+
+		CreateToolTip(widget=hyp_user_manual, text=(
+			"Open the GUI user guide"
+		))
+		return None
+
 	def add_main_label(self, row, col, label=constants.GuiDefaults.gui_title):
 		"""
 			Function to add the name to the GUI
@@ -407,7 +537,20 @@ class MainGui:
 		:return ttk.Label lbl:  Reference to the newly created label
 		"""
 		# Add label with the name to the GUI
-		lbl = ttk.Label(self.master, text=label, style=self.style_label_mainheading)
+		lbl = ttk.Label(self.master, text=label, style=self.styles.label_mainheading)
+		lbl.grid(row=row, column=col, columnspan=2, pady=5, padx=10)
+		return lbl
+
+	def add_minor_label(self, row, col, label):
+		"""
+			Function to add the name to the GUI
+		:param row: Row number to use
+		:param col: Column number to use
+		:param str label: (optional) = Label to use for header
+		:return ttk.Label lbl:  Reference to the newly created label
+		"""
+		# Add label with the name to the GUI
+		lbl = ttk.Label(self.master, text=label, style=self.styles.label_general)
 		lbl.grid(row=row, column=col, columnspan=2, pady=5)
 		return lbl
 
@@ -429,8 +572,8 @@ class MainGui:
 			col = self.col()
 
 		button = ttk.Button(
-			self.master, text=label, command=cmd, style=self.style_load_sav, state=state)
-		button.grid(row=row, column=col, padx=5)
+			self.master, text=label, command=cmd, style=self.styles.cmd_buttons, state=state)
+		button.grid(row=row, column=col, padx=5, pady=5, sticky=tk.W+tk.E)
 		CreateToolTip(widget=button, text=tooltip)
 
 		return button
@@ -451,36 +594,136 @@ class MainGui:
 			view any issues with the loaded study cases
 		:return:
 		"""
-		# Warning message until function fully implemented
-		frame = inspect.currentframe()
-		self.logger.warning('Function <{}> not yet implemented'.format(inspect.getframeinfo(frame).function))
 
-		# TODO: Function for pre-case check results review needs to be updates with file path of results
+		# Ask user for file to save results of pre_case check into
+		pth_precase = tk.filedialog.asksaveasfilename(
+			initialdir=self.init_dir,
+			initialfile='Pre Case Check_{}.xlsx'.format(constants.uid),
+			filetypes=constants.GuiDefaults.xlsx_types,
+			title='Select the file to save the results of the pre-case check into'
+		)
 
-		# Needs to enable the precase check button
-		self.button_precase_results.configure(state=tk.NORMAL)
+		if pth_precase:
+			self.pre_case_file = pth_precase
 
-	def load_results(self, results_file):
+			# Run the pre-case check
+			_ = pscharmonics.pf.run_pre_case_checks(
+				pf_projects=self.pf_projects,
+				terminals=self.inputs.terminals,
+				include_mutual=self.inputs.settings.export_mutual,
+				export_pth=self.pre_case_file,
+				contingencies=self.inputs.contingencies,
+				contingencies_cmd=self.inputs.contingency_cmd
+			)
+
+			# Needs to enable the precase check button
+			self.button_precase_results.configure(state=tk.NORMAL)
+		else:
+			self.logger.warning('No pre-case results file selected')
+
+		return None
+
+	def combine_results(self):
 		"""
-			Loads a spreadsheet with the pre-case check results
+			Function to ask the user to select previous results and combine into a single results file
 		:return:
 		"""
-		# Warning message until function fully implemented
-		frame = inspect.currentframe()
-		self.logger.warning('Function <{}> not yet implemented'.format(inspect.getframeinfo(frame).function))
+		raise SyntaxError('Not developed yet')
+
+		# # Ask user for file to save results of pre_case check into
+		# pth_precase = tk.filedialog.asksaveasfilename(
+		# 	initialdir=self.init_dir,
+		# 	initialfile='Pre Case Check_{}.xlsx'.format(constants.uid),
+		# 	filetypes=constants.GuiDefaults.xlsx_types,
+		# 	title='Select the file to save the results of the pre-case check into'
+		# )
+		#
+		# if pth_precase:
+		# 	self.pre_case_file = pth_precase
+		#
+		# 	# Run the pre-case check
+		# 	_ = pscharmonics.pf.run_pre_case_checks(
+		# 		pf_projects=self.pf_projects,
+		# 		terminals=self.inputs.terminals,
+		# 		include_mutual=self.inputs.settings.export_mutual,
+		# 		export_pth=self.pre_case_file,
+		# 		contingencies=self.inputs.contingencies,
+		# 		contingencies_cmd=self.inputs.contingency_cmd
+		# 	)
+		#
+		# 	# Needs to enable the precase check button
+		# 	self.button_precase_results.configure(state=tk.NORMAL)
+		# else:
+		# 	self.logger.warning('No pre-case results file selected')
+		#
+		# return None
+
+	def load_results(self, results):
+		"""
+			Loads a spreadsheet with the pre-case check results
+		:param str results: ('pre' = Pre-case, 'post' = Final)
+		:return None:
+		"""
+
+		if results=='pre':
+			if os.path.isfile(self.pre_case_file):
+				# Launch excel with the pre_case file open
+				os.system('start excel.exe "%s"' % (self.pre_case_file, ))
+			else:
+				self.logger.critical('No file has been created at the target path {}'.format(self.pre_case_file))
+				raise RuntimeError('Error running the pre-case checks')
+
+		elif results=='post':
+			if os.path.isfile(self.pre_case_file):
+				# Launch excel with the pre_case file open
+				os.system('start excel.exe "%s"' % (self.results_file, ))
+			else:
+				self.logger.critical('No file has been created at the target path {}'.format(self.results_file))
+				raise RuntimeError('Error running the pre-case checks')
+
+		else:
+			raise SyntaxError('An error occurred and the load_results method has been passed the wrong sort of input')
+
+		return None
 
 	def run_studies(self):
 		"""
 			Runs the full studies
 		:return:
 		"""
-		# Warning message until function fully implemented
-		frame = inspect.currentframe()
-		self.logger.warning('Function <{}> not yet implemented'.format(inspect.getframeinfo(frame).function))
+		# Ask user for file to save results of pre_case check into
+		pth_results = tk.filedialog.asksaveasfilename(
+			initialdir=self.init_dir,
+			initialfile='Results_{}.xlsx'.format(constants.uid),
+			filetypes=constants.GuiDefaults.xlsx_types,
+			title='Select the file to save the overall results to'
+		)
 
-		# TODO: Function for post study results needs to be updates with file path of results
-		# Needs to enable the precase check button
-		self.button_study_results.configure(state=tk.NORMAL)
+		if pth_results:
+			self.results_file = pth_results
+
+			# Run the pre-case check
+			try:
+				_ = pscharmonics.pf.run_studies(
+					pf_projects=self.pf_projects,
+					inputs=self.inputs
+				)
+
+				# Needs to enable the precase check button
+				self.button_study_results.configure(state=tk.NORMAL)
+
+			except RuntimeError:
+				self.lbl_status.configure(
+					text='ERROR: Unable to run studies, could be a license issue, check the error messages!'
+				)
+
+				self.styles.command_button_color_change(color=constants.GuiDefaults.error_color)
+
+
+		else:
+			self.logger.warning('No results file selected')
+
+		return None
 
 	def load_settings_file(self):
 		"""
@@ -489,15 +732,13 @@ class MainGui:
 		:return None:
 		"""
 		# Minimise main window until settings file is loaded
-		self.master.iconify()
-
-		self.button_select_settings.configure(constants.GuiDefaults.button_select_settings_label)
+		# self.master.iconify()
 
 		# Ask user to select file(s) or folders
 		pth_settings = tk.filedialog.askopenfilename(
 			initialdir=self.init_dir,
 			filetypes=constants.GuiDefaults.xlsx_types,
-			title="Select the SAV case to be loaded for the studies"
+			title='Select the PSC Harmonics input spreadsheet to use for this study'
 		)
 
 		if not os.path.isfile(pth_settings):
@@ -505,31 +746,80 @@ class MainGui:
 			self.logger.warning('File {} not found, please select a different file'.format(pth_settings))
 		else:
 			# Import the settings file and check if import successful
-			file_inputs = file_io.Excel()
-			# TODO: Need to configure settings to return collection of classes that are better to reference / pandas DataFrames
-			self.study_settings = file_inputs.import_excel_harmonic_inputs(pth_workbook=pth_settings)
+			self.lbl_status.configure(text='Loading settings file')
+			self.master.update()
+			self.inputs = file_io.StudyInputsDev(pth_file=pth_settings, gui_mode=True)
 
-			if not file_inputs.import_success:
+			if self.inputs.error:
 				# If there is an error when importing workbook
-				# TODO: UNITTEST - To be created for testing setting import failure
-				self.logger.warning(
+				self.logger.error(
 					(
 						'Error when trying to import workbook: {}, see messages above and either select a different '
 						'workbook or correct this one'
 					).format(pth_settings)
 				)
+				self.lbl_settings_file.configure(text='Settings file error')
 
 			else:
-				# If importing workbook was a success then change the state of the other buttons and coninues
-				for button in self.buttons_to_enable_level1:
-					button.configure(state=tk.NORMAL)
+				# Update the path and name of the file
+				self.init_dir, file_name = os.path.split(pth_settings)
 
-				# Change label for button to reference the study settings
-				file_name = os.path.basename(pth_settings)
-				self.button_select_settings.configure(label='Settings file: {} loaded'.format(file_name))
+				# Initialise PowerFactory and associated projects
+				self.intialise_pf_and_load_projects()
+
+				if self.pf_projects:
+					# If importing workbook was a success then change the state of the other buttons and continues
+					for button in self.buttons_to_enable_level1:
+						button.configure(state=tk.NORMAL)
+
+					# Change label for button to reference the study settings
+					self.lbl_settings_file.configure(text='Settings file: {} loaded'.format(file_name))
+				else:
+					self.lbl_settings_file.configure(
+						text='Settings file: {} loaded but unable to initialise projects'.format(file_name)
+					)
 
 		# Return the parent window
-		self.master.deiconify()
+		# self.master.deiconify()
+
+		return None
+
+	def intialise_pf_and_load_projects(self):
+		"""
+			Function will carry out the initial loading of PowerFactory and then create references to all the projects
+		:return None:
+		"""
+		self.logger.info('Initialising PowerFactory')
+
+		# Initialise PowerFactory
+		self.lbl_status.configure(text='Initialising PowerFactory and projects...')
+		self.master.update()
+		self.pf = pscharmonics.pf.PowerFactory()
+		self.pf.initialise_power_factory()
+
+		if self.pf.pf_initialised:
+			msg = 'PowerFactory Initialised, loading cases'
+			self.logger.info(msg)
+		else:
+			msg = 'ERROR: Failed to initialise PowerFactory'
+			self.logger.error(msg)
+		self.lbl_status.configure(text=msg)
+
+
+		self.logger.debug('Initialising PowerFactory project instances')
+		self.pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.inputs.cases,
+			lf_settings=self.inputs.lf_settings,
+			fs_settings=self.inputs.fs_settings
+		)
+
+		if self.pf_projects:
+			msg = 'PowerFactory projects initialised'
+			self.logger.info(msg)
+		else:
+			msg = 'ERROR: Failed to initialise PowerFactory projects'
+			self.logger.error(msg)
+		self.lbl_status.configure(text=msg)
 
 		return None
 
@@ -547,9 +837,19 @@ class MainGui:
 
 		# Test what option the user provided
 		if result == 'yes':
+			if self.pf_projects:
+				# Delete the temporary folders created for each project if required as part of the input settings
+				if self.inputs.settings.delete_created_folders:
+					self.logger.debug('Early closure of GUI so deleting temporarily created folders')
+					for project_name, pf_project in self.pf_projects:
+						pf_project.delete_temp_folders()
+				else:
+					self.logger.debug('Early closure of GUI but no folders created')
+
 			# Close window
-			self.master.destroy()
 			self.abort = True
+			self.master.destroy()
+			return None
 		else:
 			return None
 

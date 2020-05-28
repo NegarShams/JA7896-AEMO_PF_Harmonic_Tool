@@ -15,7 +15,6 @@ import sys
 import math
 import pscharmonics.constants as constants
 import pscharmonics.file_io as file_io
-import multiprocessing
 import time
 import logging
 import distutils.version
@@ -1252,7 +1251,7 @@ class PFProject:
 		:param str res_pth: (optional=str()) - This is the path that the processed results will be saved in
 		"""
 		self.logger = logging.getLogger(constants.logger_name)
-		self.logger.debug('New instance for project {} being initialised'.format(name))
+		self.logger.info('Study cases associated with PowerFactory project {} being initialised'.format(name))
 		# self.prj_active = False
 
 		self.name = name
@@ -1282,13 +1281,14 @@ class PFProject:
 		self.res_pth =res_pth
 
 		if self.prj is None:
-			self.logger.warning(
+			self.logger.error(
 				(
 					'Not possible to activate project named "{}" and therefore no studies will be carried out for '
 					'study cases associated with this project'
 				).format(self.name)
 			)
 			self.exists = False
+			return
 		else:
 			self.exists = True
 
@@ -1414,7 +1414,7 @@ class PFProject:
 				pf_os = pf_os[0]
 
 			# Create a copy of these study_cases and scenarios
-			new_sc, new_os = self.copy_study_case(name=name, sc=pf_sc, os=pf_os)
+			new_sc, new_os = self.copy_study_case(name=name, sc=pf_sc, op=pf_os)
 
 			# Create a PFStudyCase instance
 			study_case_class = PFStudyCase(
@@ -1434,19 +1434,19 @@ class PFProject:
 
 		return base_study_cases
 
-	def copy_study_case(self, name, sc, os):
+	def copy_study_case(self, name, sc, op):
 		"""
 			Copy the study case and operating scenario to the temporary folders
 		:param str name:  Name to use for new study case
 		:param powerfactory.DataObject sc: Study case to be copied
-		:param powerfactory.DataObject os: Scenario to be copied
+		:param powerfactory.DataObject op: Scenario to be copied
 		:return (powerfactory.DataObject, powerfactory.DataObject) (new_sc, new_op):  Handles to the newly created
 																					study cases and operating scenarios
 		"""
 		# Ensure study case is deactivated before trying to copy
 		self.deactivate_study_case()
 		new_sc = self.sc_folder.AddCopy(sc, name)
-		new_os = self.op_folder.AddCopy(os, name)
+		new_os = self.op_folder.AddCopy(op, name)
 
 		if new_sc is None or new_os is None:
 			self.logger.error(
@@ -1455,7 +1455,7 @@ class PFProject:
 					' - Study case {} to folder: {}\n\t'
 					' - Operating Scenario {} to folder: {}\n'
 					'Therefore no studies will be carried out on this case'
-				).format(sc, self.sc_folder, os, self.op_folder)
+				).format(sc, self.sc_folder, op, self.op_folder)
 			)
 			self.df_sc.loc[name, constants.Results.skipped] = True
 
@@ -2147,6 +2147,8 @@ class PowerFactory:
 		self.c = constants.PowerFactory
 		self.logger = logging.getLogger(constants.logger_name)
 
+		self.pf_initialised = False
+
 		# Constants
 		self.settings = None
 
@@ -2155,6 +2157,7 @@ class PowerFactory:
 			Function retrieves the relevant python paths, adds them and then imports the powerfactory module
 			Importing of the powerfactory module has to happen here due to the location
 		"""
+		self.logger.debug('Searching of paths to PowerFactory and adding the Python search path')
 		# Get the python paths if not already populated
 		if not (self.c.dig_path and self.c.dig_python_path):
 			# Initialise so that the paths are looked for
@@ -2165,10 +2168,18 @@ class PowerFactory:
 		sys.path.append(self.c.dig_python_path)
 		os.environ['PATH'] = '{};{}'.format(os.environ['PATH'], self.c.dig_path)
 
+		self.logger.debug(
+			'The following paths have been added to the Python modules search path:\n\t{}\n\t{}'.format(
+				self.c.dig_path, self.c.dig_python_path
+			)
+		)
+
 		# Try and import the powerfactory module
 		try:
+			self.logger.debug('Importing the powerfactory module')
 			global powerfactory
 			import powerfactory
+			self.logger.debug('Imported successfully')
 		except ImportError:
 			self.logger.critical(
 				(
@@ -2198,6 +2209,7 @@ class PowerFactory:
 		global app
 		# Only initialise PowerFactory if not already initialised
 		if app is None:
+			self.logger.info('Initialising PowerFactory')
 			if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
 				# Error sometimes in getting access to a license which returns certain error codes and therefore
 				# script will now make a few attempts for those cases
@@ -2251,6 +2263,10 @@ class PowerFactory:
 							)
 							raise ImportError('Power Factory Load Error - Unable to run')
 
+				# Add status update
+				self.logger.debug('PowerFactory initialised successfully')
+				self.pf_initialised = True
+
 			else:
 				# In case of an older version of PowerFactory being run
 				app = powerfactory.GetApplication()
@@ -2261,6 +2277,8 @@ class PowerFactory:
 					)
 					raise ImportError('Power Factory Load Error - Unable to run')
 
+				self.logger.debug('PowerFactory initialised successfully')
+				self.pf_initialised = True
 				# Clear the powerfactory output window
 				app.ClearOutputWindow()  # Clear Output Window
 
@@ -2300,6 +2318,7 @@ class PowerFactory:
 		"""
 		# Get reference to the currently activated project
 		pf_prj = app.GetActiveProject()
+		self.logger.debug('Active project reference retrieved: {}'.format(pf_prj))
 
 		return pf_prj
 
@@ -2513,6 +2532,8 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 	:param pd.DataFrame df_study_cases:
 	:return dict pf_projects:  Returns a dictionary of PF project instances
 	"""
+	logger = logging.getLogger(constants.logger_name)
+
 	# Loop through each project and create a PFProject instance, then check can activate
 	pf_projects = dict()
 	for project, df in df_study_cases.groupby(by=constants.StudySettings.project, axis=0):
@@ -2521,7 +2542,17 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 			name=project, df_studycases=df, uid=uid, lf_settings=lf_settings, fs_settings=fs_settings,
 			res_pth=export_pth
 		)
-		pf_projects[pf_project.name] = pf_project
+
+		# Check that project exists
+		if pf_project.exists:
+			pf_projects[pf_project.name] = pf_project
+			logger.debug('StudyCases associated with powerfactory project {} created'.format(pf_project.name))
+		else:
+			logger.error(
+				'PowerFactory project {} cannot be found in selected PowerFactory version: {}'.format(
+					project, constants.PowerFactory.pf_year
+				)
+			)
 
 	return pf_projects
 
@@ -2590,6 +2621,10 @@ def run_pre_case_checks(
 
 	# If a path has been provided then write it to excel
 	if export_pth:
+		# Confirm has a '.xlsx' extenion before continuing
+		if not export_pth.endswith(constants.Results.extension):
+			export_pth = '{}{}'.format(export_pth, constants.Results.extension)
+
 		with pd.ExcelWriter(export_pth) as xl:
 			df_case_check_cont.to_excel(xl, sheet_name=constants.Contingencies.export_sheet_name)
 			df_case_check_term.to_excel(xl, sheet_name=constants.Terminals.export_sheet_name)

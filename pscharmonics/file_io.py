@@ -794,6 +794,11 @@ class StudyInputsDev:
 		self.filename = os.path.basename(pth_file)
 		self.logger = logging.getLogger(constants.logger_name)
 
+		# TODO: Adjust to update if an Import Error occurs
+		self.error = False
+
+		self.logger.info('Importing settings from file: {}'.format(self.pth))
+
 		with pd.ExcelFile(io=self.pth) as wkbk:
 			# Import StudySettings
 			self.settings = StudySettings(wkbk=wkbk, gui_mode=gui_mode)
@@ -802,6 +807,11 @@ class StudyInputsDev:
 			self.terminals = self.process_terminals(wkbk=wkbk)
 			self.lf_settings = self.process_lf_settings(wkbk=wkbk)
 			self.fs_settings = self.process_fs_settings(wkbk=wkbk)
+
+		if not self.error:
+			self.logger.info('Importing settings from file: {} completed'.format(self.pth))
+		else:
+			self.logger.warning('Error during import of settings from file: {}'.format(self.pth))
 
 	def load_workbook(self, pth_file=None):
 		"""

@@ -26,6 +26,7 @@
       <w>hrmb</w>
       <w>ictrlx</w>
       <w>igntow</w>
+      <w>intialise</w>
       <w>iopt</w>
       <w>ioutall</w>
       <w>itapopt</w>
@@ -33,6 +34,7 @@
       <w>krelax</w>
       <w>loadflow</w>
       <w>loadmax</w>
+      <w>mainheading</w>
       <w>messagebox</w>
       <w>mutelm</w>
       <w>mutuals</w>

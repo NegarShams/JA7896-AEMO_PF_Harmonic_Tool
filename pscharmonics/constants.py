@@ -20,9 +20,13 @@ import time
 
 # Meta Data
 __author__ = 'David Mills'
+__version__ = '1.0.0'
 __email__ = 'david.mills@pscconsulting.com'
 __phone__ = '+44 7899 984158'
-__status__ = 'Constants'
+__status__ = 'In Development - Beta'
+
+# Label used when displaying messages
+__title__ = 'PSC Automated Frequency Scan Tool'
 
 nom_freq = 50.0
 logger_name = str()
@@ -34,6 +38,11 @@ default_max_processes = 3
 
 # Unique identifier populated for each study run
 uid = time.strftime('%Y%m%d_%H%M%S')
+
+# Reference to local directory used by other packages
+local_directory=os.path.abspath(os.path.dirname(__file__))
+# TODO: UNITTEST - Check whether this file exists
+user_guide_reference='JA7896-03:  PSC Harmonics UserGuide.pdf'
 
 class General:
 	# Value that is used as leading value
@@ -48,7 +57,6 @@ class General:
 	prj = 'Project'
 	sc = 'Study Case'
 	op = 'Operating Scenario'
-
 
 class PowerFactory:
 	"""
@@ -535,7 +543,7 @@ DEBUG = 'DEBUG'
 
 class GuiDefaults:
 	gui_title='PSC - Automated PowerFactory Frequency Scans Tool'
-	color_main_window = '#%02x%02x%02x' % (160, 216, 192)
+	color_main_window = '#%02x%02x%02x' % (239, 243, 241)
 
 	# Default labels for buttons (only those which get changed during running)
 	button_select_settings_label = 'Select Settings File'
@@ -549,10 +557,23 @@ class GuiDefaults:
 	psc_font = ('Calibri', '10', 'bold')
 	psc_color_web_blue = '#%02x%02x%02x' % (43, 112, 170)
 	psc_color_grey = '#%02x%02x%02x' % (89, 89, 89)
+	font_heading_color = '#%02x%02x%02x' % (0, 0, 255)
+	img_size_psc = (120, 120)
 
-	# Set to WPD green
-	color_main_window = '#%02x%02x%02x' % (160, 216, 192)
+	# TODO: Test logos exist
+	img_pth_psc_main = os.path.join(local_directory, 'PSC Logo RGB Vertical.png')
+	img_pth_psc_window = os.path.join(local_directory, 'PSC Logo no tag-1200.gif')
+
+	# TODO: Test hyperlink works
+	hyperlink_psc_website = 'https://www.pscconsulting.com/'
+
+	# Colors
 	color_pop_up_window = 'light grey'
+	error_color = '#%02x%02x%02x' % (255, 32, 32)
+
+
+	# Reference to the Tkinter binding of a mouse button
+	mouse_button_1 = '<Button - 1>'
 
 class StudySettings:
 	# Names for index in Inputs spreadsheet
