@@ -63,7 +63,7 @@ def add_terminals(row_data):
 	:param tuple row_data: Single row of data from excel workbook to be imported
 	:return list combined_entry: List of data as a combined entry
 	"""
-	logger = logging.getLogger(constants.logger_name)
+	logger = constants.logger
 	if len(row_data) < 4:
 		# If row_data is less than 4 then it means an old HAST inputs sheet has probable been used and so a default
 		# value will be assumed instead
@@ -448,7 +448,7 @@ class Excel:
 # 		:return None
 # 		"""
 # 		# Get handle for logger
-# 		logger = logging.getLogger(constants.logger_name)
+# 		logger = constants.logger
 # 		self.list_of_terms = [TerminalDetails(k[0], k[1], k[2], k[3]) for k in list_of_terminals]
 # 		self.dict_of_terms = {(k.substation, k.terminal): k.name for k in self.list_of_terms}
 #
@@ -486,7 +486,7 @@ class Excel:
 # 		:return None
 # 		"""
 # 		# Get handle for logger
-# 		logger = logging.getLogger(constants.logger_name)
+# 		logger = constants.logger
 # 		# Filters already converted to the correct type on initial import so just reference list
 # 		# TODO: Move processing of filters to here rather than initial import
 # 		self.list_of_filters = list_of_filters
@@ -540,7 +540,7 @@ class Excel:
 # 		:return list sc_details:  Returns list of study case names and there corresponding technical details
 # 		"""
 # 		# Get handle for logger
-# 		logger = logging.getLogger(constants.logger_name)
+# 		logger = constants.logger
 #
 # 		# If has already been populated then just return the list
 # 		if not self.sc_details:
@@ -574,7 +574,7 @@ class Excel:
 # 		:return list sc_details:  Returns list of study case names and there corresponding technical details
 # 		"""
 # 		# Get handle for logger
-# 		logger = logging.getLogger(constants.logger_name)
+# 		logger = constants.logger
 #
 # 		# If has already been populated then just return the list
 # 		if not self.cont_details:
@@ -627,7 +627,7 @@ class StudySettings:
 		self.include_intact = bool()
 
 		self.c = constants.StudySettings
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		# Sheet name
 		self.sht = sht
@@ -792,7 +792,7 @@ class StudyInputsDev:
 		# General constants
 		self.pth = pth_file
 		self.filename = os.path.basename(pth_file)
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		# TODO: Adjust to update if an Import Error occurs
 		self.error = False
@@ -1078,7 +1078,7 @@ class CouplerDetails:
 		elif status == constants.HASTInputs.switch_close:
 			status = True
 		else:
-			logger = logging.getLogger(constants.logger_name)
+			logger = constants.logger
 			logger.warning(
 				(
 					'The breaker <{}> associated with substation <{}> has a value of {} which is not expected value of '
@@ -1186,7 +1186,7 @@ class LFSettings:
 		:param str existing_command:  Reference to an existing command where it already exists
 		:param list detailed_settings:  Settings to be used where existing command does not exist
 		"""
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		# Add the Load Flow command to string
 		if existing_command:
@@ -1444,7 +1444,7 @@ class FSSettings:
 		:param str existing_command:  Reference to an existing command where it already exists
 		:param list detailed_settings:  Settings to be used where existing command does not exist
 		"""
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		# Add the Load Flow command to string
 		if existing_command:
@@ -1528,7 +1528,7 @@ class ResultsExport:
 		:param str pth:  Path to where the results should be saved
 		:param str name:  Name that should be used for the results file
 		"""
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		self.parent_pth = pth
 		self.results_name = name

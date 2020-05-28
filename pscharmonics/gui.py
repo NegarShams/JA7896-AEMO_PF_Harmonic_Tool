@@ -521,7 +521,7 @@ class MainGui:
 		)
 		hyp_user_manual.grid(row=row, column=col + 1, padx=5, pady=5)
 		hyp_user_manual.bind(constants.GuiDefaults.mouse_button_1, lambda e: webbrowser.open_new(
-			os.path.join(constants.local_directory, constants.user_guide_reference)))
+			os.path.join(constants.local_directory, constants.General.user_guide_reference)))
 
 		CreateToolTip(widget=hyp_user_manual, text=(
 			"Open the GUI user guide"

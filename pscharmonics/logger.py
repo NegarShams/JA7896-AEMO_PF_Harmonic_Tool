@@ -1,34 +1,25 @@
 """
 #######################################################################################################################
-###											logger																	###
-###		Script deals with the logging of messages to both a log handler and to PowerFactory if powerfactory.py is 	###
-###		active																										###
+###													logger.py														###
+###		Script deals with writing data to PowerFactory and any processing that takes place which requires 			###
+###		interacting with power factory																				###
 ###																													###
 ###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
-###		project JI6973 for EirGrid project PSPF010 - Specialise Support in Power Quality Analysis during 2018		###
 ###																													###
 #######################################################################################################################
-
 """
 import logging
 import logging.handlers
-import pscharmonics.constants as constants
 import sys
 import os
-import unittest
 
-# Meta Data
-__author__ = 'David Mills'
-__version__ = '1.3a'
-__email__ = 'david.mills@pscconsulting.com'
-__phone__ = '+44 7899 984158'
-__status__ = 'In Development - Alpha'
+import pscharmonics.constants as constants
 
 class Logger:
 	""" Contained within a class since logger will need to print to both power factory and
 		to the various log files
 	"""
-	def __init__(self, pth_debug_log, pth_progress_log, pth_error_log, app=None, debug=False):
+	def __init__(self, pth_debug_log=str(), pth_progress_log=str(), pth_error_log=str(), app=None, debug=False):
 		"""
 			Initialise logger
 		:param str pth_progress_log:  Full path to the location of the log file that contains the process messages
@@ -52,16 +43,52 @@ class Logger:
 		self.pth_progress_log = pth_progress_log
 		self.pth_error_log = pth_error_log
 		self.app = app
+		self.pf_executed = False
 		self.debug_mode = debug
 
 		self.file_handlers=[]
 
-		# Determine status of whether PowerFactory is running script or if being run from Python
-		self.pf_executed = self.pf_terminal_running()
-
 		# Set up logger and establish handle for logger
-		self.logger = self.setup_logging()
+		self.setup_logging()
 		self.initial_log_messages()
+
+	def check_paths_exist(self):
+		"""
+			Function confirms that the desired paths for the log messages already exist and if not will
+			create them / revert to the default locations
+		:return None:
+		"""
+		default_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Logs'))
+
+		# Check a path exists if one has been provided
+		if self.pth_progress_log:
+			pth, progress_name = os.path.split(self.pth_progress_log)
+
+			if not os.path.isdir(pth):
+				self.logger.error(
+					(
+						'The desired path for the log messages: {} does not exist, instead the log messages will be '
+						'saved in the default folder {}'
+					).format(pth, default_folder)
+				)
+				debug_name = os.path.basename(self.pth_debug_log)
+				error_name = os.path.basename(self.pth_error_log)
+
+				self.pth_debug_log = os.path.join(default_folder, debug_name)
+				self.pth_progress_log = os.path.join(default_folder, progress_name)
+				self.pth_error_log = os.path.join(default_folder, error_name)
+		else:
+			# Check default folder exists and if not create it
+			if not os.path.isdir(default_folder):
+				os.mkdir(default_folder)
+				self.logger.debug('Path for log messages created: {}'.format(default_folder))
+
+			c = constants.General
+			self.pth_debug_log = os.path.join(default_folder, '{}_{}.log'.format(c.debug_log, constants.uid))
+			self.pth_progress_log = os.path.join(default_folder, '{}_{}.log'.format(c.progress_log, constants.uid))
+			self.pth_error_log = os.path.join(default_folder, '{}_{}.log'.format(c.error_log, constants.uid))
+
+		return None
 
 	def pf_terminal_running(self):
 		"""
@@ -89,18 +116,20 @@ class Logger:
 			Function to setup the logging functionality
 		:return object logger:  Handle to the logger for writing messages
 		"""
-		# logging.getLogger().setLevel(logging.CRITICAL)
-		# logging.getLogger().disabled = True
-		logger = logging.getLogger(constants.logger_name)
-		logger.handlers = []
-		# Ensures that even debug messages are captured even if they are not written to log file
+		self.logger = logging.getLogger(constants.logger_name)
+		self.logger.handlers = []
 
-		logger.setLevel(logging.DEBUG)
+		# Ensures that even debug messages are captured even if they are not written to log file
+		self.logger.setLevel(logging.DEBUG)
 
 		# Produce formatter for log entries
 		log_formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(message)s',
 										  datefmt='%Y-%m-%d %H:%M:%S')
 
+		# Confirm log paths exists
+		self.check_paths_exist()
+
+		# Add handlers
 		self.handler_progress_log = self.get_file_handlers(pth=self.pth_progress_log,
 														  min_level=logging.INFO,
 														  buffer=True, flush_level = logging.ERROR,
@@ -125,12 +154,12 @@ class Logger:
 			self.handler_stream_log.setLevel(logging.INFO)
 
 		# Add handlers to logger
-		logger.addHandler(self.handler_progress_log)
-		logger.addHandler(self.handler_debug_log)
-		logger.addHandler(self.handler_error_log)
-		logger.addHandler(self.handler_stream_log)
+		self.logger.addHandler(self.handler_progress_log)
+		self.logger.addHandler(self.handler_debug_log)
+		self.logger.addHandler(self.handler_error_log)
+		self.logger.addHandler(self.handler_stream_log)
 
-		return logger
+		return None
 
 	def initial_log_messages(self):
 		"""
@@ -280,63 +309,3 @@ class Logger:
 		:return None:
 		"""
 		self.logging_final_report_and_closure()
-
-#  ----- UNIT TESTS -----
-class TestLoggerSetup(unittest.TestCase):
-	"""
-		UnitTest to test the operation of various excel workbook functions
-	"""
-	def setUp(self):
-		logging.shutdown()
-		# Get path to file that is running
-		pth = os.path.dirname(os.path.abspath(__file__))
-		pth_test_file = 'test_file_store'
-		self.debug_log = os.path.join(pth, pth_test_file, 'debug_log.log')
-		self.progress_log = os.path.join(pth, pth_test_file, 'process_log.log')
-		self.error_log = os.path.join(pth, pth_test_file, 'error_log.log')
-
-		for file in (self.progress_log, self.debug_log, self.error_log):
-			if os.path.isfile(file):
-				os.remove(file)
-
-		self.logger = Logger(pth_debug_log=self.debug_log,
-							 pth_progress_log=self.progress_log,
-							 pth_error_log=self.error_log,
-							 app=None)
-
-	def test_progress_logger(self):
-		"""
-			Tests that only a process log file is produced
-		"""
-		self.logger.debug('Test debug message')
-		self.logger.info('Test info message')
-
-		self.logger.close_logging()
-		self.assertTrue(os.path.isfile(self.progress_log))
-		self.assertFalse(os.path.isfile(self.debug_log))
-		self.assertTrue(self.logger.error_count==0)
-
-	def test_error_logger(self):
-		self.logger.debug('Test debug message')
-		self.logger.info('Test info message')
-		self.logger.warning('Test warning message')
-		self.logger.error('Test error message')
-
-		self.logger.close_logging()
-		self.assertTrue(os.path.isfile(self.error_log))
-		self.assertFalse(os.path.isfile(self.debug_log))
-		self.assertTrue(self.logger.error_count == 1)
-
-	def test_debug_logger(self):
-		self.logger.debug('Test debug message')
-		self.logger.info('Test info message')
-		self.logger.warning('Test warning message')
-		self.logger.error('Test error message')
-		self.logger.critical('Test critical message')
-
-		self.logger.close_logging()
-		self.assertTrue(os.path.isfile(self.debug_log))
-		self.assertTrue(self.logger.error_count == 1)
-
-	def tearDown(self):
-		self.logger.close_logging()

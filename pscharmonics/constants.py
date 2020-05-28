@@ -15,8 +15,8 @@ import os
 import sys
 import unittest
 import glob
-import logging
 import time
+
 
 # Meta Data
 __author__ = 'David Mills'
@@ -28,21 +28,14 @@ __status__ = 'In Development - Beta'
 # Label used when displaying messages
 __title__ = 'PSC Automated Frequency Scan Tool'
 
-nom_freq = 50.0
-logger_name = str()
-
-# When parallel processing will ensure this number of cpus are kept free
-cpu_keep_free = 1
-# If unable to calculate this is the assumed maximum number of processes
-default_max_processes = 3
+logger_name = 'PSC'
+logger = None
 
 # Unique identifier populated for each study run
 uid = time.strftime('%Y%m%d_%H%M%S')
 
 # Reference to local directory used by other packages
 local_directory=os.path.abspath(os.path.dirname(__file__))
-# TODO: UNITTEST - Check whether this file exists
-user_guide_reference='JA7896-03:  PSC Harmonics UserGuide.pdf'
 
 class General:
 	# Value that is used as leading value
@@ -57,6 +50,14 @@ class General:
 	prj = 'Project'
 	sc = 'Study Case'
 	op = 'Operating Scenario'
+
+	# Default names to use for log messages
+	debug_log = 'DEBUG'
+	progress_log = 'INFO'
+	error_log = 'ERROR'
+
+	# TODO: UNITTEST - Check whether this file exists
+	user_guide_reference='JA7896-03:  PSC Harmonics UserGuide.pdf'
 
 class PowerFactory:
 	"""
@@ -227,7 +228,7 @@ class PowerFactory:
 										errors thrown if incorrect version provided
 		"""
 		# Get reference to logger
-		self.logger = logging.getLogger(logger_name)
+		self.logger = logger
 
 		default_install_directory = r'C:\Program Files\DIgSILENT'
 		power_factory_search = 'PowerFactory 20*'
@@ -304,7 +305,7 @@ class FaultEvent:
 	mod_cnt = 'mod_cnt'
 
 class Contingencies:
-	""" Contains constants associated with naming of contingenceis used in export """
+	""" Contains constants associated with naming of contingencies used in export """
 	# Name to give for base_case / intact system condition
 	intact = 'Intact'
 

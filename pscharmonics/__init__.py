@@ -8,9 +8,11 @@
 ###																													###
 #######################################################################################################################
 """
-
-# import pscharmonics.logger as logger
+import pscharmonics.logger as logger
 import pscharmonics.file_io as file_io
 import pscharmonics.pf as pf
 import pscharmonics.constants as constants
 import pscharmonics.gui as gui
+
+if constants.logger is None:
+	constants.logger = logger.Logger()

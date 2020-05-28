@@ -5,7 +5,6 @@
 ###		interacting with power factory																				###
 ###																													###
 ###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
-###		project JI6973 for EirGrid project PSPF010 - Specialise Support in Power Quality Analysis during 2018		###
 ###																													###
 #######################################################################################################################
 """
@@ -16,7 +15,6 @@ import math
 import pscharmonics.constants as constants
 import pscharmonics.file_io as file_io
 import time
-import logging
 import distutils.version
 import pandas as pd
 
@@ -104,77 +102,6 @@ def remove_string_endings(astring, trailing):
 		return astring[:-len(trailing)]
 	return astring
 
-def add_filter_to_pf(_app, filter_name, filter_ref, q, freq, logger):
-	"""
-		Adds the filter detailed to the PF model
-	:param _app: handle to power factory application
-	:param file_io.FilterDetails filter_ref:  Handle to FilterDetails class form HAST import
-	:param float q:  MVAR value for filter
-	:param float freq:  Frequency value for filter
-	:param str filter_name:  Name of filter being added which includes associated contingency
-	:param logger:  Handle for logger in case of any error messages
-	:return None:
-	"""
-	# Check that is supposed to be added
-	if not filter_ref.include:
-		logger.error(
-			'Filter <{}> is set to not be included but has been attempted to be added, there is an error somewhere'
-				.format(filter_ref.name))
-		raise IOError('An error has occured trying to add a filter which should not be added')
-
-	hdl_substation = _app.GetCalcRelevantObjects(filter_ref.sub)
-
-	hdl_filter, _ = create_object(location=hdl_substation[0],
-								  pfclass=constants.PowerFactory.pf_filter,
-								  name=filter_name)
-
-	c = constants.PowerFactory
-	# Add cubicle for filter
-	hdl_terminal = hdl_substation[0].GetContents(filter_ref.term)
-	hdl_cubicle, _ = create_object(location=hdl_terminal[0],
-								   pfclass=c.pf_cubicle,
-								   name=filter_name)
-
-	# Set input mode to design mode (DES)
-	hdl_filter.SetAttribute(c.pf_shn_inputmode, c.pf_shn_selectedinput)
-
-	# Set attributes for new filter
-	hdl_filter.SetAttribute(c.pf_shn_term, hdl_cubicle)
-	hdl_filter.SetAttribute(c.pf_shn_voltage, filter_ref.nom_voltage)
-	hdl_filter.SetAttribute(c.pf_shn_type, filter_ref.type)
-	hdl_filter.SetAttribute(c.pf_shn_q, q)
-	# For some reason need to set frequency and tuning order
-	hdl_filter.SetAttribute(c.pf_shn_freq, freq)
-	hdl_filter.SetAttribute(c.pf_shn_tuning, freq / constants.nom_freq)
-	# For some reason need to set q factor
-	hdl_filter.SetAttribute(c.pf_shn_qfactor, filter_ref.quality_factor)
-	# #hdl_filter.SetAttribute(c.pf_shn_qfactor_nom, filter_ref.quality_factor * (constants.nom_freq / freq))
-	hdl_filter.SetAttribute(c.pf_shn_qfactor_nom, filter_ref.quality_factor)
-
-	hdl_filter.SetAttribute(c.pf_shn_rp, filter_ref.resistance_parallel)
-	logger.debug('Filter {} added to substation {} with Q = {} MVAR and resonant frequency = {} Hz'
-				 .format(filter_name, hdl_cubicle, q, freq))
-
-	logger.info('Filter {} added to model'.format(hdl_filter))
-	logger.debug('Filter input mode set to: {} and should be {}'.format(hdl_filter.GetAttribute(c.pf_shn_inputmode),
-																		c.pf_shn_selectedinput))
-	logger.debug('Connected cubicle = {} = {}'.format(hdl_cubicle, hdl_filter.GetAttribute(c.pf_shn_term)))
-	logger.debug(
-		'Nominal voltage = {}kV = {}kV'.format(filter_ref.nom_voltage, hdl_filter.GetAttribute(c.pf_shn_voltage)))
-	logger.debug('Shunt type = {} = {}'.format(filter_ref.type, hdl_filter.GetAttribute(c.pf_shn_type)))
-	logger.debug('Shunt Q = {}MVAR = {}MVAR'.format(q, hdl_filter.GetAttribute(c.pf_shn_q)))
-	logger.debug('Shunt tuning frequency = {:.2f}Hz = {:.2f}Hz'.format(freq, hdl_filter.GetAttribute(c.pf_shn_freq)))
-	logger.debug('Shunt tuning order = {:.1f} = {:.1f}'.format(freq / constants.nom_freq,
-															   hdl_filter.GetAttribute(c.pf_shn_tuning)))
-	logger.debug(
-		'Shunt Q factor = {} = {}'.format(filter_ref.quality_factor, hdl_filter.GetAttribute(c.pf_shn_qfactor)))
-	logger.debug('Shunt Rp = {} = {}'.format(filter_ref.resistance_parallel, hdl_filter.GetAttribute(c.pf_shn_rp)))
-
-	# Update drawing so will appear if go and investigate study case
-	_app.ExecuteCmd('grp/abi')
-
-	return None
-
 def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the results file
 	"""
 		Adds the results variables to the results file
@@ -256,7 +183,7 @@ class PFStudyCase:
 		"""
 
 
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		# Status checker on whether this is the base_case study case.  If true then certain functions and additional
 		# data sets are populated
@@ -309,7 +236,7 @@ class PFStudyCase:
 		# self.res_pth = results_pth
 		#
 		# # Get logger
-		# self.logger = logging.getLogger(constants.logger_name)
+		# self.logger = constants.logger
 		#
 		# # Handle for study cases that will require activating
 		# self.sc = sc
@@ -1250,7 +1177,7 @@ class PFProject:
 		:param str uid:  Unique identifier given for this study
 		:param str res_pth: (optional=str()) - This is the path that the processed results will be saved in
 		"""
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 		self.logger.info('Study cases associated with PowerFactory project {} being initialised'.format(name))
 		# self.prj_active = False
 
@@ -2145,7 +2072,7 @@ class PowerFactory:
 	def __init__(self):
 		""" Gets the relevant powerfactory version and initialises """
 		self.c = constants.PowerFactory
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		self.pf_initialised = False
 
@@ -2266,6 +2193,9 @@ class PowerFactory:
 				# Add status update
 				self.logger.debug('PowerFactory initialised successfully')
 				self.pf_initialised = True
+				self.logger.app = app
+				self.logger.pf_executed = self.logger.pf_terminal_running()
+				self.toggle_graphical_updating()
 
 			else:
 				# In case of an older version of PowerFactory being run
@@ -2279,6 +2209,9 @@ class PowerFactory:
 
 				self.logger.debug('PowerFactory initialised successfully')
 				self.pf_initialised = True
+				self.logger.app = app
+				self.logger.pf_executed = self.logger.pf_terminal_running()
+				self.toggle_graphical_updating()
 				# Clear the powerfactory output window
 				app.ClearOutputWindow()  # Clear Output Window
 
@@ -2525,6 +2458,26 @@ class PowerFactory:
 
 		return existing_delay
 
+	def toggle_graphical_updating(self, enable=False):
+		"""
+			Function disables / enables graphical updating in PowerFactory to speed up study runs
+		:return:
+		"""
+		# Disable graphic updating
+		if self.logger.pf_terminal_running() and not constants.DEBUG:
+			if enable:
+				self.logger.info('Graphic updating enabled')
+				app.SetGraphicUpdate(1)
+				app.EchoOff()
+			else:
+				self.logger.info('Graphic updating and detailed load flow results will not be shown until script completes')
+				app.SetGraphicUpdate(1)
+				app.EchoOn()
+		else:
+			self.logger.info('Running in debug or Python terminal mode and so all details and progress updates are output')
+
+		return None
+
 
 def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=None, fs_settings=None, export_pth=str()):
 	"""
@@ -2532,7 +2485,7 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 	:param pd.DataFrame df_study_cases:
 	:return dict pf_projects:  Returns a dictionary of PF project instances
 	"""
-	logger = logging.getLogger(constants.logger_name)
+	logger = constants.logger
 
 	# Loop through each project and create a PFProject instance, then check can activate
 	pf_projects = dict()
@@ -2574,7 +2527,7 @@ def run_pre_case_checks(
 	:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
 	:return pd.DataFrame df_case_check: DataFrame showing contingencies which are convergent
 	"""
-	logger = logging.getLogger(constants.logger_name)
+	logger = constants.logger
 	c = constants.Contingencies
 
 	# Loops through all projects and obtains DataFrame, these are then combined into a single DataFrame
@@ -2646,7 +2599,7 @@ def run_studies(pf_projects, inputs):
 	:return None
 	"""
 	t0 = time.time()
-	logger = logging.getLogger(constants.logger_name)
+	logger = constants.logger
 	# Iterate through each project and create the various cases, the includes running a pre-case check but no
 	# output is saved at this point
 	for project_name, project in pf_projects.items():
