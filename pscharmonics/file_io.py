@@ -1326,12 +1326,19 @@ class LFSettings:
 		self.iPbalancing = load_flow_settings[13]  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
 
 		# Get DataObject handle for reference busbar
-		net_folder_name, substation, terminal = load_flow_settings[14].split('\\')
-		# Confirm that substation and terminal types exist in name
-		if not substation.endswith(constants.PowerFactory.pf_substation):
-			self.substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
-		if not terminal.endswith(constants.PowerFactory.pf_terminal):
-			self.terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
+		ref_machine = load_flow_settings[14]
+
+		# To avoid error when passed empty string or empty cell which is imported as pd.na
+		if not ref_machine or pd.isna(ref_machine):
+			self.substation = None
+			self.terminal = None
+		else:
+			net_folder_name, substation, terminal = ref_machine.split('\\')
+			# Confirm that substation and terminal types exist in name
+			if not substation.endswith(constants.PowerFactory.pf_substation):
+				self.substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
+			if not terminal.endswith(constants.PowerFactory.pf_terminal):
+				self.terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
 
 
 		self.phiini = load_flow_settings[15]  # Angle
@@ -1394,22 +1401,28 @@ class LFSettings:
 		:param powerfactory.app app:
 		:return None:
 		"""
-		pf_sub = app.GetCalcRelevantObjects(self.substation)
-
-		if len(pf_sub) == 0:
+		# Confirm that a machine has actually been provided
+		if self.substation is None or self.terminal is None:
 			pf_term = None
-		else:
-			pf_term = pf_sub[0].GetContents(self.terminal)
-			if len(pf_term) == 0:
-				pf_term = None
+			self.logger.debug('No reference machine provided in inputs')
 
-		if pf_term is None:
-			self.logger.warning(
-				(
-					'Either the substation {} or terminal {} detailed as being the reference busbar cannot be '
-					'found and therefore no reference busbar will be defined in the PowerFactory load flow'
-				).format(self.substation, self.terminal)
-			)
+		else:
+			pf_sub = app.GetCalcRelevantObjects(self.substation)
+
+			if len(pf_sub) == 0:
+				pf_term = None
+			else:
+				pf_term = pf_sub[0].GetContents(self.terminal)
+				if len(pf_term) == 0:
+					pf_term = None
+
+			if pf_term is None:
+				self.logger.warning(
+					(
+						'Either the substation {} or terminal {} detailed as being the reference busbar cannot be '
+						'found and therefore no reference busbar will be defined in the PowerFactory load flow'
+					).format(self.substation, self.terminal)
+				)
 
 		return pf_term
 
