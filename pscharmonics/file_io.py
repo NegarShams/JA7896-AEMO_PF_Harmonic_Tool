@@ -13,9 +13,12 @@ import os
 import numpy as np
 import itertools
 import pscharmonics.constants as constants
-import logging
+import glob
 import pandas as pd
 import collections
+import math
+import shutil
+import time
 
 
 # Meta Data
@@ -249,420 +252,746 @@ def delete_old_files(pth, logger, thresholds=constants.General.file_number_thres
 
 	return num_deleted
 
-class Excel:
-	""" Class to deal with the writing and reading from excel and therefore allowing unittesting of the
-	functions
+class ExtractResults:
+	def __init__(self, target_file, search_pths):
+		""" Process the extraction of the results """
+		self.logger = constants.logger
 
-	Note:  Each call will create a new excel instance
-	"""
-	def __init__(self, print_info=print, print_error=print):
+		df, vars = self.combine_multiple_hast_runs(search_pths=search_pths)
+		self.extract_results(pth_file=target_file, df=df, vars_to_export=vars)
+
+
+	def combine_multiple_hast_runs(self, search_pths, drop_duplicates=True):
 		"""
-			Function initialises a new instance of an excel application
-		TODO: To be replaced with logging handler
-		:param builtin_function_or_method print_info:  Handle for print engine used for printing info messages
-		:param builtin_function_or_method print_error:  Handle for print engine used for printing error messages
+			Function will combine multiple HAST results extracts into a single HAST results file
+		:param list search_pths:  List of folders which contain the results files to be combined / extracted
+									each folder must contain raw .csv results exports + a HAST inputs
+		:param bool drop_duplicates:  (Optional=True) - If set to False then duplicated columns will be included in the output
+		:return pd.DataFrame df, list vars_to_export:
+					Combined results into single dataframe,
+					list of variables for export
 		"""
-		# Constants
-		# Sheets and starting rows for analysis
-		self.analysis_sheets = constants.analysis_sheets
-		# IEC limits
-		# If on input spreadsheet then can be used to test against allocated limits
-		self.iec_limits = constants.iec_limits
-		self.limits = list(zip(*[self.iec_limits[1]]))
+		c = constants.Results
+		logger = constants.logger
 
-		# Updated with logging handlers once setup finished
-		self.log_info = print_info
-		self.log_error = print_error
+		logger.info(
+			'Importing all results files in following list of folders: \n\t{}'.format('\n\t'.join(search_pths))
+		)
 
-		# Value set to true if importing workbook is a success
-		self.import_success = False
+		# Loop through each folder, obtain the hast files and produce the dataframes
 
-	def import_excel_harmonic_inputs(self, pth_workbook):  # Import Excel Harmonic Input Settings
+		all_dfs = []
+		vars_to_export = []
+
+		# Loop through each folder, import the hast inputs sheet and results files
+		for folder in search_pths:
+			# Import results into a single dataframe
+			combined = PreviousResultsExport(pth=folder)
+			all_dfs.append(combined.df)
+
+			# Include list of variables for export
+			vars_to_export.extend(combined.inputs.settings.get_vars_to_export())
+
+		# Combine all results together
+		df = pd.concat(all_dfs, axis=1)
+		# Sorts to improve performance
+		df.sort_index(axis=1, level=0, inplace=True)
+
+		# Create unique list of variables to export without upsetting order
+		# 	https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
+		seen = set()
+		seen_add = seen.add
+		vars_to_export = [x for x in vars_to_export if not (x in seen or seen_add(x))]
+
+		if drop_duplicates:
+			# Remove any duplicate data sets with matching column names and rows
+			original_shape = df.shape
+			# Gets list of duplicated index values and will only compare actual values if duplicated
+			df_t = df.T
+			cols = df_t.index[df_t.index.duplicated()].tolist()
+
+			if len(cols) != 0:
+				# Adds index to columns so only rows which are completely duplicated are considered
+				df_t['TEMP'] = df_t.index
+				# Removes any completely duplicated rows in transposed dataframe
+				# These will be columns which contain exactly the same values in both sets of results
+				df_t = df_t.drop_duplicates()
+				# Remove temporary index and transpose back
+				del df_t['TEMP']
+				df = df_t.T
+
+			# Check if any columns are still duplicated as this must now be due to different result sets
+			# Check and rename results if duplicated study case names at level (Full Results Name)
+			duplicated_col_names = df.columns.get_duplicates()
+			if not duplicated_col_names.empty:
+				# Produce dictionary for any duplicated names
+				dict_duplicates = {k: 1 for k in duplicated_col_names}
+				idx_sc = df.columns.names.index(c.lbl_StudyCase)
+				idx_full_name = df.columns.names.index(c.lbl_FullName)
+
+				# Get names for existing columns
+				existing_columns = df.columns.tolist()
+
+				new_cols = []
+				for col in existing_columns:
+					# Loop through each column and rename those which appear in the list of duplicated columns
+					try:
+						duplicated_count = dict_duplicates[col]
+					except KeyError:
+						duplicated_count = False
+
+					if duplicated_count:
+						# Rename duplicated columns to be the form 'sc_name(dup_count)'
+						new_col = list(col)
+						sc_name = col[idx_sc]
+						full_name = col[idx_full_name]
+						# Produce new names for study case and full name
+						new_sc_name = '{}({})'.format(sc_name, duplicated_count)
+						new_full_name = full_name.replace(sc_name, new_sc_name)
+						new_col[idx_sc] =  new_sc_name
+						new_col[idx_full_name] = new_full_name
+						dict_duplicates[col] += 1
+					else:
+						new_col = col
+
+					new_cols.append(tuple(new_col))
+
+				columns=pd.MultiIndex.from_tuples(tuples=new_cols, names=df.columns.names)
+				df.columns = columns
+				duplicated_col_names2 = df.columns.get_duplicates()
+				logger.warning(('Some results have the same study case name but different values, the user should '
+								'check the results that are being combined and confirm where the mistake has been made.\n'
+								'For now the studycases have been renamed with (1), (2), (etc.) for presentation.\n'
+								'In total {} columns have been renamed')
+							   .format(len(duplicated_col_names)-len(duplicated_col_names2))
+							   )
+				if not duplicated_col_names2.empty:
+					raise IOError(' There are still duplicated columns being detected')
+
+			# Check for changes and record differences
+			new_shape = df.shape
+			if new_shape[1] != original_shape[1]:
+				logger.warning(('The input datasets had duplicated columns and '
+								'therefore some have been removed.\n'
+								'{} columns have been removed')
+							   .format(original_shape[1]-new_shape[1]))
+
+			else:
+				logger.debug('No duplicated data in results files imported from: {}'
+							 .format(search_pths))
+			if new_shape[0] != original_shape[0]:
+				raise SyntaxError('There has been an error in the processing and some rows have been deleted.'
+								  'Check the script')
+		else:
+			logger.debug('No check for duplicates carried out')
+
+		# Sort the results so that in study_case name order
+		df.sort_index(axis=1, level=[c.lbl_Reference_Terminal, c.lbl_Terminal, c.lbl_StudyCase], inplace=True)
+
+		return df, vars_to_export
+
+	def extract_results(self, pth_file, df, vars_to_export, plot_graphs=True):
 		"""
-			Import Excel Harmonic Input Settings
-		:param str pth_workbook: Name of workbook to be imported
-		:return analysis_dict: Dictionary of the settings for the analysis work
+			Extract results into workbook with each result on separate worksheet
+		:param str pth_file:  File to save workbook to
+		:param pd.DataFrame df:  Pandas dataframe to be extracted
+		:param list vars_to_export:  List of variables to export based on Hast Inputs class
+		:param bool plot_graphs:  (optional=True) - If set to False then graphs will not be exported
+		:return None:
 		"""
-		# Initialise empty dictionary
-		analysis_dict = dict()
 
-		# #wb = self.xl.Workbooks.Open(pth_workbook)  # Open workbook
-		# #c = self.excel_constants
-		# print(c.xlDown)
-		# #self.xl.Visible = False  # Make excel Visible
-		# #self.xl.DisplayAlerts = False  # Don't Display Alerts
+		self.logger.info('Exporting imported results to {}'.format(pth_file))
 
-		# Loop through each worksheet defined in <analysis_sheets>
-		for x in self.analysis_sheets:
-			# Import worksheet using pandas
-			# Import data for this specific worksheet
-			# TODO: Need to add something to capture when sheet name is missing
-			current_worksheet = x[0]
-			df = pd.read_excel(
-				pth_workbook, sheet_name=x[0], header=x[1], usecols=x[2], skiprows=x[3]
+		# Obtain constants
+		c = constants.Results
+
+		start_row = c.start_row
+
+		# Delete empty column headers which correlate to either frequency of harmonic number data which
+		# has already been used as the index
+		df.drop(columns=c.lbl_to_delete, inplace=True, level=0)
+
+		# Group the data frame by node name
+		list_dfs = df.groupby(level=c.lbl_Reference_Terminal, axis=1)
+		num_nodes = len(list_dfs)
+		self.logger.info('Exporting results for {} nodes'.format(num_nodes))
+
+		# Export to excel with a new sheet for each node
+		i=0
+		try:
+			with pd.ExcelWriter(pth_file, engine='xlsxwriter') as writer:
+				for node_name, _df in list_dfs:
+					self.logger.info(' - \t {}/{} Exporting node {}'.format(i+1, num_nodes, node_name))
+					i += 1
+					col = c.start_col
+					for var in vars_to_export:
+						# Will only include index and header labels if True
+						# include_index = col <= c.start_col
+						include_index = True
+
+						df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
+						if not df_to_export.empty:
+							# Results are sorted in study case then contingency then filter order
+							df_to_export.to_excel(writer, merge_cells=True,
+												  sheet_name=node_name,
+												  startrow=start_row, startcol=col,
+												  header=include_index, index_label=False)
+
+							# Add graphs if data is self-impedance
+							if var == constants.PowerFactory.pf_z1 and plot_graphs:
+								self.logger.info(' \t - \t Adding graph for node {}'.format(node_name))
+
+								num_rows = df_to_export.shape[0]
+								# Get number of columns to include in each graph grouping
+								dict_graph_grouping = self.graph_grouping(df=df_to_export, startcol=col+1)
+								names = df_to_export.columns.names
+								row_cont = start_row + names.index(constants.Results.lbl_FullName)
+
+
+								self.add_graph(writer, sheet_name=node_name,
+										  row_cont=row_cont,
+										  row_start=start_row + len(names) + 1,
+										  col_freq=col,
+										  num_rows=num_rows,
+										  graph_groups=dict_graph_grouping,
+										  chrt_row_num=0)
+
+								# Get grouping of graphs to compare study cases
+								dict_graph_grouping = self.graph_grouping(
+									df=df_to_export, group_by=constants.Results.chart_grouping_base_case,
+									startcol=col+1
+								)
+
+								self.add_graph(writer, sheet_name=node_name,
+										  row_cont=row_cont,
+										  row_start=start_row + len(names) + 1,
+										  col_freq=col,
+										  num_rows=num_rows,
+										  graph_groups=dict_graph_grouping,
+										  chrt_row_num=1)
+
+							col = col + df_to_export.shape[1] + c.col_spacing
+						else:
+							self.logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
+		except PermissionError:
+			self.logger.critical(
+				(
+					'Unable to write to excel workbook {} since it is either already open or you do not have the '
+					'appropriate permissions to save here.  Please check and then rerun.'
+				).format(pth_file)
+			)
+			raise PermissionError('Unable to write to workbook')
+
+		return None
+
+	def add_graph(self, writer, sheet_name, row_cont, row_start, col_freq, num_rows,
+				  graph_groups, chrt_row_num):
+		"""
+			Add graph to HAST export
+		:param pd.ExcelWriter writer:  Handle for the workbook that will be controlling the excel instance
+		:param str sheet_name: Name of sheet to add graph to
+		:param int row_cont: Row number which contains the contingency description
+		:param int row_start: Start row for results to plot
+		:param int col_freq: Number of column which contains the frequency data
+		:param int num_rows:  Number of rows containing the data to be plotted
+		:param collections.OrderedDict graph_groups:  Names and groups to use for graph grouping in the form
+				key:[column numbers relative to the first column]
+		:param int chrt_row_num:  Number for this chart which determines the vertical row number the chart is added to
+		:return:
+		"""
+		c = constants.Results
+		color_map = c().get_color_map()
+
+		# Get handles
+		wkbk = writer.book
+		sht = writer.sheets[sheet_name]
+
+		# Calculate the row number for the end of the dataset
+		max_row = row_start+num_rows
+
+		# Loop through each column and add series
+		charts = []
+		max_plots = len(color_map) - 1
+
+		plots = self.split_plots(max_plots, graph_groups)
+
+		for chart_name, cols in plots.items():
+			chrt = wkbk.add_chart(c.chart_type)
+			# Adjusted to include the name of the sheet in the chart title and fixing the font_size
+			# #chrt.set_title({'name':chart_name})
+			chrt.set_title({'name':'{} - {}'.format(sheet_name, chart_name),
+							'name_font':{'size':c.font_size_chart_title}})
+			charts.append(chrt)
+			color_i = 0
+
+			# Loop through each column and add series
+			for col in cols:
+				chrt.add_series({
+					'name': [sheet_name, row_cont, col],
+					'categories': [sheet_name, row_start, col_freq, max_row, col_freq],
+					'values': [sheet_name, row_start, col, max_row, col],
+					'marker': {'type': 'none'},
+					'line':  {'color': color_map[color_i],
+							  'width': c.line_width}
+				})
+
+				# color_i is used to determine the maximum number of plots that can be stored
+				color_i += 1
+
+		for i, chrt in enumerate(charts):
+			# Add axis labels
+			chrt.set_x_axis({'name': c.lbl_Frequency, 'label_position': c.lbl_position,
+							 'major_gridlines': c.grid_lines})
+			chrt.set_y_axis({'name': c.lbl_Impedance, 'label_position': c.lbl_position,
+							 'major_gridlines': c.grid_lines})
+
+			# Set chart size
+			chrt.set_size({'width': c.chrt_width, 'height': c.chrt_height})
+
+			# Add the legend to the chart
+			sht.insert_chart(c.chrt_row+(c.chrt_vert_space*chrt_row_num), c.chrt_col+(c.chrt_space*i), chrt)
+
+		return None
+
+	def graph_grouping(self, df, group_by=constants.Results.chart_grouping, startcol=0):
+		"""
+			Determines sizes for grouping of graphs together
+			CAVEAT:  Assumes that the DataFrame order matches with the order in Excel
+		:param pd.DataFrame df: Dataframe to calculate grouping for
+		:param tuple group_by: (optional = constants.Results.graph_grouping) = Levels to group by
+		:param int startcol: (optional=0) Column which graphs start from to be added to the dataframe columns
+		:return dict col_nums:  {Name of graph: Relative column numbers for results
+		"""
+		# Determine number of results in each group so that it can determine whether multiple graphs are needed
+		df_groups = list(df.groupby(axis=1, level=group_by).size())
+
+		# If only single plot on each graph then no need to separate at this level so go up 1 level
+		if max(df_groups) == 1 and len(group_by)>1:
+			self.logger.debug('Only single value for each entry so no need to split across multiple graphs')
+			group_by = group_by[:-1]
+
+		# Produce dictionary which looks up column numbers for each set of results that are to be grouped by
+		col_nums = collections.OrderedDict()
+		for key, v in df.groupby(axis=1, level=group_by):
+			if type(key) is not str:
+				k = '_'.join(key)
+			else:
+				k = key
+			list_col_nums = list(df.columns.get_locs(list(map(list, zip(*v.columns.to_list())))))
+			col_nums[k] =[x+startcol for x in list_col_nums]
+
+		return col_nums
+
+	def split_plots(self, max_plots, graph_groups):
+		"""
+			Figures out how to split the plots into groups based on the grouping and maximum of 255 plots (or max_plots)
+			Returns the relevant names and excel column number
+		:param int max_plots:  Maximum number of plots to include
+		:param collections.OrderedDict graph_groups:  Dictionary of graph grouping in the format
+			key:[list of relative column numbers]
+		List of graph grouping produced by <graph_grouping>
+		:return collections.OrderedDict graphs:  Dictionary of the graph title and relevant column numbers
+		"""
+		graphs = collections.OrderedDict()
+
+		for title, list_of_cols in graph_groups.items():
+			# Get all columns in range associated with this group
+			# Number of plots this group needs to be split into
+			number_of_plots = math.ceil(len(list_of_cols) / max_plots)
+
+			# If greater than 1 then split into equal size groups with basecase plot at starting point
+			if number_of_plots > 1:
+				steps = math.ceil(len(list_of_cols) / number_of_plots)
+				a = [list_of_cols[i * steps:(i + 1) * steps] for i in range(int(math.ceil(len(list_of_cols) / steps)))]
+
+				for i, group in enumerate(a):
+					graphs['{}({})'.format(title, i + 1)] = group
+			else:
+				graphs['{}'.format(title)] = list_of_cols
+
+		return graphs
+
+class PreviousResultsExport:
+	""" Used for importing the setings and previously exported results """
+	def __init__(self, pth):
+		"""
+
+		:param str pth:  path that will contain the input files
+		"""
+
+		self.logger = constants.logger
+
+		self.search_pth = pth
+		self.logger.debug('Processing results saved in: {}'.format(self.search_pth))
+
+		# Get inputs used
+		self.inputs = self.get_input_values()
+
+		# Get a single DataFrame for all results
+		self.df = self.import_all_results(study_type=constants.Results.study_fs)
+		self.logger.debug('All results for folder: {} imported'.format(self.search_pth))
+
+	def get_input_values(self):
+		"""
+			Function to import the inputs file found in a folder (only a single file is expected to be found)
+		:param str search_pth:  Directory which contains the HAST Inputs
+		:return file_io.StudyInputsDev processed_inputs:  Processed import
+		"""
+		# Obtain reference to HAST workbook from target directory
+		c = constants.HASTInputs
+		logger = constants.logger
+
+		# Find the inputs file for this folder
+		list_of_input_files = glob.glob('{}\{}*{}'.format(self.search_pth, c.file_name, c.file_format))
+		if len(list_of_input_files) == 0:
+			logger.critical(
+				(
+					'No inputs file formatted as *{} found in the folder {}, please check an inputs file exists'
+				).format(c.file_name, c.file_format, self.search_pth)
+			)
+			raise IOError('No Inputs file found')
+		elif len(list_of_input_files) > 1:
+			inputs_workbook = list_of_input_files[0]
+			logger.warning(
+				(
+					'Multiple input files were found in the folder {} with the format {}*{} as follows: \n\t {}\n'
+					'The following file was assumed to be the correct one: {}'
+				).format(self.search_pth, c.file_name, c.file_format, '\n\t'.join(list_of_input_files), inputs_workbook)
+			)
+		else:
+			inputs_workbook = list_of_input_files[0]
+
+		# Process the imported workbook into (gui_mode prevents the creation of a folder for the exports)
+		processed_inputs = StudyInputsDev(inputs_workbook, gui_mode=True)
+		# Set export folder = this folder
+		processed_inputs.settings.export_folder = self.search_pth
+		logger.info('Inputs from file: {} extracted'.format(inputs_workbook))
+		return processed_inputs
+
+	def import_all_results(self, study_type='FS'):
+		"""
+			Function to import all results into a single DataFrame
+		:param str study_type: (Optional='FS') - Leading characters to use in search string
+		:return pd.DataFrame single_df:  Combined imported files into single DataFrame
+		"""
+		self.study_type = study_type
+
+		# Get list of all files in folder for frequency scan
+		files = glob.glob('{}\{}*.csv'.format(self.search_pth, study_type))
+		no_files = len(files)
+		self.logger.debug('Importing {} results files in directory: {}'.format(no_files, self.search_pth))
+
+		# Import each results file and combine into a single dataframe
+		dfs = []
+		for i, file in enumerate(files):
+			df = self.process_file(pth=file)
+			dfs.append(df)
+			self.logger.info(' - \t {}/{} Results file: {} imported'.format(i+1, no_files, os.path.basename(file)))
+
+		if len(dfs) != no_files:
+			self.logger.error(
+				(
+					'There was an issue in the file import and not all were imported.\n '
+					'Only {} of {} files were imported\n'
+					'However, the script will continue until something critical occurs'
+				)
+					.format(len(dfs), no_files)
 			)
 
-			row_input = []
-			# #current_worksheet = x[0]
+		single_df = pd.concat(dfs, axis=1)
+		self.logger.debug(
+			'Single dataset for all results in folder:  {}'.format(self.search_pth)
+		)
+		return single_df
 
-			# Code only to be executed for these sheets
-			if current_worksheet in constants.PowerFactory.HAST_Input_Scenario_Sheets:
-				# Loop through each row of DataFrame and convert series to list
-				for index, data_series in df.iterrows():
-					# Convert the Series to a list and return the required data
-					# drop nan values from series
-					# TODO: Should include data checking on import to improve processing speed
-					data_to_process = data_series.dropna()
-					row_value = data_to_process.tolist()
-					if current_worksheet == constants.PowerFactory.sht_Contingencies:
-						row_value = add_contingency(row_data=row_value)
+	def process_file(self, pth):
+		"""
+			# Process the imported results file into a dataframe with the relevant multi-index
+		:param str pth:  Full path to results that need importing
+		:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
+		"""
+		c = constants.Results
+		idx = pd.IndexSlice
 
-					# Routine for Base_Scenarios worksheet
-					elif current_worksheet == constants.PowerFactory.sht_Scenarios:
-						row_value = add_scenarios(row_data=row_value)
+		# Import dataframe
+		df = pd.read_csv(pth, header=[0, 1])
 
-					# Routine for Terminals worksheet
-					elif current_worksheet == constants.PowerFactory.sht_Terminals:
-						row_value = add_terminals(row_data=row_value)
+		# set index based on frequency
+		df.index = df.loc[:, idx[:, constants.PowerFactory.pf_freq]].squeeze()
 
-					# Routine for Filters worksheet
-					elif current_worksheet == constants.PowerFactory.sht_Filters:
-						row_value = FilterDetails(row_data=row_value)
+		# Get from results file:
+		#	Node / Mutual Name
+		#	Variable type
+		filename = os.path.basename(pth)
 
-					row_input.append(row_value)
+		# Process the file name to understand the study case being considered
+		sc_name, cont_name = self.process_file_name(file_name=filename)
 
-			# More efficiently checking which worksheet looking at
-			elif current_worksheet in constants.PowerFactory.HAST_Input_Settings_Sheets:
-				# For these worksheets input settings are in a series and can be converted to a list directly
-				row_input = df.iloc[:,0].tolist()
+		# Create full name for study
+		full_name = '{}_{}'.format(sc_name, cont_name)
 
-				if current_worksheet == constants.PowerFactory.sht_LF:
-					# Process inputs for Loadflow_Settings
-					row_input = add_lf_settings(row_data=row_input)
+		columns = list(zip(*df.columns.tolist()))
+		# To manually deal with renaming of mutual impedance values
+		var_names = columns[0]
+		var_types = columns[1]
 
-				elif current_worksheet == constants.PowerFactory.sht_Freq:
-					# Process inputs for Frequency_Sweep settings
-					row_input = add_freq_settings(row_data=row_input)
+		# Mutual impedance dataframe
+		df_mutual = pd.DataFrame().reindex_like(df)
+		df_mutual = df_mutual.drop(df.columns, axis=1)
+		new_var_names1 = []
+		new_var_names2 = []
+		new_ref_terminals1 = []
+		new_ref_terminals2 = []
+		new_var_types1 = []
+		new_var_types2 = []
+		for i, var in enumerate(var_names):
+			var_names, ref_terms = self.extract_var_name(var_name=var)
+			var_type = self.extract_var_type(var_types[i])
 
-				elif current_worksheet == constants.PowerFactory.sht_HLF:
-					# Process inputs for Harmonic_Loadflow
-					row_input = add_hlf_settings(row_data=row_input)
+			# Mutual impedance data
+			if type(var_names) is tuple:
+				# If mutual impedance data is returned then need to duplicate dataframe to create data in the other direction
+				new_var_names1.append(var_names[0])
+				new_var_names2.append(var_names[1])
+				new_ref_terminals1.append(ref_terms[0])
+				new_ref_terminals2.append(ref_terms[1])
+				new_var_types1.append(var_type)
+				new_var_types2.append(var_type)
 
-				elif current_worksheet ==  constants.PowerFactory.sht_Study:
-					# Process inputs for Study Settings
-					row_input = add_study_settings(row_data=row_input)
+				# Create a copy of the data
+				df_mutual[df.columns[i]] = df[df.columns[i]]
+			else:
+				# If no mutual impedance data then just extract variable names in lists
+				new_var_names1.append(var_names)
+				new_ref_terminals1.append(ref_terms)
+				new_var_types1.append(var_type)
 
-			# Combine imported results in a dictionary relevant to the worksheet that has been imported
-			analysis_dict[current_worksheet] = row_input  # Imports range of values into a list of lists
+		# Produce new multi-index containing new headers
+		col_headers1 = [(ref_terminal, var_name, sc_name, cont_name, full_name, var_type)
+						for ref_terminal, var_name, var_type in zip(new_ref_terminals1, new_var_names1, new_var_types1)]
+		col_headers2 = [(ref_terminal, var_name, sc_name, cont_name, full_name, var_type)
+						for ref_terminal, var_name, var_type in zip(new_ref_terminals2, new_var_names2, new_var_types2)]
 
-		# #wb.Close()  # Close Workbook
-		return analysis_dict
+		# Names for headers
+		names = (c.lbl_Reference_Terminal,
+				 c.lbl_Terminal,
+				 c.lbl_StudyCase,
+				 c.lbl_Contingency,
+				 c.lbl_FullName,
+				 c.lbl_Result)
 
-# class StudyInputs:
-# 	"""
-# 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
-# 	"""
-# 	def __init__(self, hast_inputs=None, uid_time=constants.uid, filename=''):
-# 		"""
-# 			Initialises the settings based on the HAST Study Settings spreadsheet
-# 		:param dict hast_inputs:  Dictionary of input data returned from file_io.Excel.import_excel_harmonic_inputs
-# 		:param str uid_time:  Time string to use as the uid for these files
-# 		:param str filename:  Filename of the HAST Inputs file used from which this data is extracted
-# 		"""
-# 		c = constants.PowerFactory
-# 		# General constants
-# 		self.filename=filename
-#
-# 		self.uid = uid_time
-#
-# 		# Attribute definitions (study settings)
-# 		self.pth_results_folder = str()
-# 		self.results_name = str()
-# 		self.progress_log_name = str()
-# 		self.error_log_name = str()
-# 		self.debug_log_name = str()
-# 		self.pth_results_folder_temp = str()
-# 		self.pf_netelm = str()
-# 		self.pf_mutelm = str()
-# 		self.pf_resfolder = str()
-# 		self.pf_opscen_folder = str()
-# 		self.pre_case_check = bool()
-# 		self.fs_sim = bool()
-# 		self.hrm_sim = bool()
-# 		self.skip_failed_lf = bool()
-# 		self.del_created_folders = bool()
-# 		self.export_to_excel = bool()
-# 		self.excel_visible = bool()
-# 		self.include_rx = bool()
-# 		self.include_convex_hull = bool()
-# 		self.export_z = bool()
-# 		self.export_z12 = bool()
-# 		self.export_hrm = bool()
-#
-# 		# Attribute definitions (study_case_details)
-# 		self.sc_details = dict()
-# 		self.sc_names = list()
-#
-# 		# Attribute definitions (contingency_details)
-# 		self.cont_details = dict()
-# 		self.cont_names = list()
-#
-# 		# Attribute definitions (terminals)
-# 		self.list_of_terms = list()
-# 		self.dict_of_terms = dict()
-#
-# 		# Attribute definitions (filters)
-# 		self.list_of_filters = list()
-#
-# 		# Load Flow Settings
-# 		# Will contain full string to load flow command to be used
-# 		self.pf_loadflow_command = str()
-# 		# Will contain reference to LFSettings which contains all settings
-# 		self.lf = LFSettings()
-#
-# 		# Process study settings
-# 		self.study_settings(hast_inputs[c.sht_Study])
-#
-# 		# Process load flow settings
-# 		self.load_flow_settings(hast_inputs[c.sht_LF])
-#
-# 		# Process List of Terminals
-# 		self.process_terminals(hast_inputs[c.sht_Terminals])
-# 		self.process_filters(hast_inputs[c.sht_Filters])
-#
-# 		# Process study case details
-# 		self.sc_names = self.get_study_cases(hast_inputs[c.sht_Scenarios])
-# 		self.cont_names = self.get_contingencies(hast_inputs[c.sht_Contingencies])
-#
-# 	def study_settings(self, list_study_settings=None, df_settings=None):
-# 		"""
-# 			Populate study settings
-# 		:param list list_study_settings:
-# 		:param pd.DataFrame df_settings:  DataFrame of study settings for processing
-# 		:return None:
-# 		"""
-# 		# Since this is settings, convert DataFrame to list and extract based on position
-# 		if df_settings is not None:
-# 			l = df_settings[1].tolist()
-# 		else:
-# 			l = list_study_settings
-#
-# 		# Folder to store logs (progress/error) and the excel results if empty will use current working directory
-# 		if not l[0]:
-# 			self.pth_results_folder = os.getcwd() + "\\"
-# 		else:
-# 			self.pth_results_folder = l[0]
-#
-# 		# Leading names to use for exported excel result file (python adds on the unique time and date).
-# 		self.results_name = '{}{}{}.'.format(self.pth_results_folder, l[1], self.uid)
-# 		self.progress_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[2], self.uid)
-# 		self.error_log_name = '{}{}{}.txt'.format(self.pth_results_folder, l[3], self.uid)
-# 		self.debug_log_name = '{}{}{}.txt'.format(self.pth_results_folder, constants.DEBUG, self.uid)
-#
-# 		# Temporary folder to use to store results exported during script run
-# 		self.pth_results_folder_temp = os.path.join(self.pth_results_folder, self.uid)
-#
-# 		# Constants for power factory
-# 		self.pf_netelm = l[4]
-# 		self.pf_mutelm = '{}{}'.format(l[5], self.uid)
-# 		self.pf_resfolder = '{}{}'.format(l[6], self.uid)
-# 		self.pf_opscen_folder = '{}{}'.format(l[7], self.uid)
-#
-# 		# Constants to control study running
-# 		self.pre_case_check = l[8]
-# 		self.fs_sim = l[9]
-# 		self.hrm_sim = l[10]
-# 		self.skip_failed_lf = l[11]
-# 		self.del_created_folders = l[12]
-# 		self.export_to_excel = l[13]
-# 		self.excel_visible = l[14]
-# 		self.include_rx = l[15]
-# 		self.include_convex_hull = l[16]
-# 		self.export_z = l[17]
-# 		self.export_z12 = l[18]
-# 		self.export_hrm = l[19]
-#
-# 		return None
-#
-# 	def load_flow_settings(self, list_lf_settings):
-# 		"""
-# 			Populate load flow settings
-# 		:param list list_lf_settings:
-# 		:return None:
-# 		"""
-# 		# If there is no value provided then assume
-# 		if not list_lf_settings[0]:
-# 			self.lf.populate_data(load_flow_settings=list_lf_settings[1:])
-# 			self.pf_loadflow_command = None
-# 		else:
-# 			# Settings file for existing load flow settings in PowerFactory
-# 			self.pf_loadflow_command = '{}.{}'.format(list_lf_settings[0], constants.PowerFactory.ldf_command)
-# 			self.lf = None
-# 		return None
-#
-# 	def process_terminals(self, list_of_terminals):
-# 		"""
-# 			Processes the terminals from the HAST input into a dictionary so can lookup the name to use based on
-# 			substation and terminal
-# 		:param list list_of_terminals: List of terminals from HAST inputs, expected in the form
-# 			[name, substation, terminal, include mutual]
-# 		:return None
-# 		"""
-# 		# Get handle for logger
-# 		logger = constants.logger
-# 		self.list_of_terms = [TerminalDetails(k[0], k[1], k[2], k[3]) for k in list_of_terminals]
-# 		self.dict_of_terms = {(k.substation, k.terminal): k.name for k in self.list_of_terms}
-#
-# 		# Confirm that none of the terminal names are greater than the maximum allowed character length
-# 		terminal_names = [k.name for k in self.list_of_terms]
-# 		long_names = [x for x in terminal_names if len(x) > constants.HASTInputs.max_terminal_name_length]
-# 		if long_names:
-#
-# 			logger.critical('The following terminal names are greater than the maximum allowed length of {} characters'
-# 							.format(constants.HASTInputs.max_terminal_name_length))
-# 			for x in long_names:
-# 				logger.critical('Terminal name: {}'.format(x))
-# 			raise ValueError(('The terminal names in the HAST inputs {} are too long! Reduce them to less than {} '
-# 							 'characters.').format(self.filename, constants.HASTInputs.max_terminal_name_length))
-#
-# 		# Check all terminal names are unique
-# 		# Get duplicated terminals and report to user then exit
-# 		duplicates = [x for n, x in enumerate(terminal_names) if x in terminal_names[:n]]
-# 		if duplicates:
-# 			msg = ('The user defined Terminal names given in the HAST Inputs workbook {} are not unique for '
-# 				  'each entry.  Please check rename some of the terminals').format(self.filename)
-# 			# Get duplicated entries
-# 			logger.critical(msg)
-# 			logger.critical('The following terminal names have been duplicated:')
-# 			for name in duplicates:
-# 				logger.critical('\t - User Defined Terminal Name: {}'.format(name))
-# 			raise ValueError(msg)
-#
-# 		return None
-#
-# 	def process_filters(self, list_of_filters):
-# 		"""
-# 			Processes the filters from the HAST input into a list of all filters
-# 		:param list list_of_filters: List of handles to type file_io.FilterDetails
-# 		:return None
-# 		"""
-# 		# Get handle for logger
-# 		logger = constants.logger
-# 		# Filters already converted to the correct type on initial import so just reference list
-# 		# TODO: Move processing of filters to here rather than initial import
-# 		self.list_of_filters = list_of_filters
-#
-# 		# Check no filter names are duplicated
-# 		filter_names = [k.name for k in self.list_of_filters]
-# 		# Check all filter names are unique
-# 		# Duplicated filter names
-# 		duplicates = [x for n,x in enumerate(filter_names) if x not in filter_names[:n]]
-# 		if duplicates:
-# 			msg = ('The user defined Filter names given in the HAST Inputs workbook {} are not unique for '
-# 				  'each entry.  Please check rename some of the terminals').format(self.filename)
-# 			logger.critical(msg)
-# 			logger.critical('The following names are duplicated:')
-# 			for name in duplicates:
-# 				logger.critical('\t - User Defined Filter Name: {}'.format(name))
-# 			raise ValueError(msg)
-# 		return None
-#
-# 	def vars_to_export(self):
-# 		"""
-# 			Determines the variables that will be exported from PowerFactory and they will be exported in this order
-# 		:return list pf_vars:  Returns list of variables in the format they are defined in PowerFactory
-# 		"""
-# 		c = constants.PowerFactory
-# 		pf_vars = []
-#
-# 		# The order variables are added here determines the order they appear in the export
-# 		# If self impedance data should be exported
-# 		if self.export_z:
-# 			# Whether to include RX data as well
-# 			if self.include_rx:
-# 				pf_vars.append(c.pf_r1)
-# 				pf_vars.append(c.pf_x1)
-# 			pf_vars.append(c.pf_z1)
-#
-# 		# If mutual impedance data should be exported
-# 		if self.export_z12:
-# 			# If RX data should be exported
-# 			if self.include_rx:
-# 				pf_vars.append(c.pf_r12)
-# 				pf_vars.append(c.pf_x12)
-# 			pf_vars.append(c.pf_z12)
-#
-# 		return pf_vars
-#
-# 	def get_study_cases(self, list_of_studycases):
-# 		"""
-# 			Populates dictionary which references all the relevant HAST study case details and then returns a list
-# 			of the names of all the StudyCases that have been considered.
-# 		:return list sc_details:  Returns list of study case names and there corresponding technical details
-# 		"""
-# 		# Get handle for logger
-# 		logger = constants.logger
-#
-# 		# If has already been populated then just return the list
-# 		if not self.sc_details:
-# 			# Loop through each row of the imported data
-# 			sc_names = list()
-# 			for sc in list_of_studycases:
-# 				# Transfer row of inputs to class <StudyCaseDetails>
-# 				new_sc = StudyCaseDetails(sc)
-# 				sc_names.append(new_sc.name)
-# 				# Add to dictionary
-# 				self.sc_details[new_sc.name] = new_sc
-#
-# 			# Get list of study_case names and confirm they are all unique
-# 			# Get duplicated study case names
-# 			duplicates = [x for n,x in enumerate(sc_names) if x in sc_names[:n]]
-# 			if duplicates:
-# 				msg = ('The user defined Study Case names given in the HAST Inputs workbook {} are not unique for '
-# 					   'each entry.  Please check rename some of the user defined names').format(self.filename)
-# 				logger.critical(msg)
-# 				logger.critical('The following SC names have been duplicated:')
-# 				for name in duplicates:
-# 					logger.critical('\t - Study Case Name: {}'.format(name))
-# 				raise ValueError(msg)
-#
-# 		return list(self.sc_details.keys())
-#
-# 	def get_contingencies(self, list_of_contingencies):
-# 		"""
-# 			Populates dictionary which references all the relevant HAST study case details and then returns a list
-# 			of the names of all the StudyCases that have been considered.
-# 		:return list sc_details:  Returns list of study case names and there corresponding technical details
-# 		"""
-# 		# Get handle for logger
-# 		logger = constants.logger
-#
-# 		# If has already been populated then just return the list
-# 		if not self.cont_details:
-# 			# Loop through each row of the imported data
-# 			cont_names = list()
-# 			for sc in list_of_contingencies:
-# 				# Transfer row of inputs to class <StudyCaseDetails>
-# 				new_cont = ContingencyDetails(sc)
-# 				cont_names.append(new_cont.name)
-# 				# Add to dictionary
-# 				self.cont_details[new_cont.name] = new_cont
-#
-# 			# Get list of contingency names and confirm they are all unique
-# 			# Get duplicated contingency names
-# 			duplicates = [x for n,x in enumerate(cont_names) if x in cont_names[:n]]
-# 			if duplicates:
-# 				msg = ('The user defined Contingency names given in the HAST Inputs workbook {} are not unique for '
-# 					   'each entry.  Please check and rename some of the user defined names').format(self.filename)
-# 				logger.critical(msg)
-# 				logger.critical('The following names that have been provided are duplicated:')
-# 				for name in duplicates:
-# 					logger.critical('\t - Contingency Name: {}'.format(name))
-# 				raise ValueError(msg)
-#
-#
-# 		return list(self.cont_details.keys())
+		# Produce multi-index and assign to DataFrames
+		columns1 = pd.MultiIndex.from_tuples(tuples=col_headers1, names=names)
+		columns2 = pd.MultiIndex.from_tuples(tuples=col_headers2, names=names)
 
+		# Replace previous multi-index with new
+		df.columns = columns1
+		df_mutual.columns = columns2
+
+		# Combine dataframes into one and return
+		df = pd.concat([df, df_mutual], axis=1)
+
+		# Obtain nominal voltage for each terminal
+		idx = pd.IndexSlice
+		# Add in row to contain the nominal voltage
+		df.loc[c.idx_nom_voltage] = str()
+
+		dict_nom_voltage = dict()
+
+		# Find the nominal voltage for each terminal (if exists)
+		for term, df_sub in df.groupby(axis=1, level=c.lbl_Reference_Terminal):
+			idx_filter = idx[:,:,:,:,:,'e:uknom']
+			try:
+				# Obtain nominal voltage and then set row values appropriately to include in results
+				nom_voltage = df.loc[:,idx_filter].iloc[0,0]
+				dict_nom_voltage[term] = nom_voltage
+			except KeyError:
+				pass
+
+		# Check for any duplicated multi-index entries (typically contingencies) and rename
+		to_keep = 'first'
+		if any(df.columns.duplicated(keep=to_keep)):
+			self.logger.debug('Processing duplicated results in the HAST results file: {}'.format(pth))
+			# Get duplicated and non-duplicated into separate DataFrames
+			duplicated_entries = df.loc[:, df.columns.duplicated(keep=to_keep)]
+			non_duplicated_entries = df.loc[:, ~df.columns.duplicated(keep=to_keep)]
+
+			# Rename duplicated_entries and report to user (contingency is the entry that is renamed)
+			# Only allows for a single duplicated entry
+			if any(duplicated_entries.columns.duplicated()):
+				self.logger.critical(
+					(
+						'Unexpected error when trying to deal with duplicate columns for processing of the HAST results '
+						'file: {}'
+					).format(pth)
+				)
+				raise IOError('Multiple duplicated entries')
+
+			# Produce new column labels for each contingency
+			terminals = set(duplicated_entries.columns.get_level_values(level=c.lbl_Reference_Terminal))
+			msg = (
+				(
+					'During processing of the HAST results file: {} some duplicated entries have been for the '
+					'following terminals: \n'
+				).format(pth)
+			)
+			msg += '\n'.join(['\t - Terminal:  {}'.format(x) for x in terminals])
+			msg += '\n To resolve this the following changes have been made to the duplicated entries:\n'
+			for label in (c.lbl_Contingency, c.lbl_FullName):
+				# Get all the old and new labels and combine together into a lookup dictionary
+				old_labels = set(duplicated_entries.columns.get_level_values(level=label))
+				new_labels = ['{}({})'.format(x, 1) for x in old_labels]
+				replacement = dict(zip(old_labels, new_labels))
+				# Replace the duplicated entries with the new ones
+				duplicated_entries.rename(columns=replacement, level=label, inplace=True)
+				msg += '\n'.join(
+					['\t - For {} value {} has been replaced with {}'.format(label, k, v) for k,v in replacement.items()]
+				) +'\n'
+			self.logger.warning(msg)
+
+			# Combine the two DataFrames back into a single DataFrame
+			df = pd.concat([duplicated_entries, non_duplicated_entries], axis=1)
+
+		# Update the DataFrame to include the nominal voltage for every terminal
+		for term, nom_voltage in dict_nom_voltage.items():
+			df.loc[c.idx_nom_voltage, idx[term,:,:,:,:,:]] = nom_voltage
+
+		# Add the new nominal voltage into the index data
+		df = df.T.set_index(c.idx_nom_voltage, append=True).T
+		df = df.reorder_levels([c.lbl_Reference_Terminal, c.lbl_Terminal, c.idx_nom_voltage,
+								  c.lbl_StudyCase, c.lbl_Contingency,
+								  c.lbl_FullName, c.lbl_Result], axis=1)
+
+		return df
+
+	def process_file_name(self, file_name):
+		"""
+			Splits up the file name to identify the study type, case and contingency
+		:param str file_name:  Existing file name
+		:return list components: [study_type, study_case, contingency) where file_name remaining
+		"""
+		c = constants.Results
+		sc_name = ''
+		cont_name = ''
+
+		# Remove study_type and extension from filename
+		file_name.replace('.csv', '')
+		file_name.replace('{}{}'.format(self.study_type, c.joiner), '')
+
+		# Find which study case is shown
+		for sc in self.inputs.cases.index:
+			if sc in file_name:
+				sc_name = sc
+				file_name = file_name.replace('{}{}'.format(sc_name, c.joiner), '')
+				break
+
+		# Find which contingnecy is considered
+		# TODO: Check that _ symbol not used in studycase or contingency name
+		for cont in self.inputs.contingencies.keys():
+			if cont in file_name:
+				cont_name = cont
+				break
+
+		return sc_name, cont_name
+
+	def extract_var_name(self, var_name):
+		"""
+			Function extracts the variable name from the list
+		:param str var_name: Name to extract relevant component from
+		:return str var_name: Shortened name to use for processing (var1 = Substation or Mutual, var2 = Terminal)
+		"""
+		# Variable declarations
+		c = constants.PowerFactory
+		var_sub = False
+		var_term = False
+		ref_terminal = ''
+
+		# Separate PowerFactory path into individual entries
+		vars_list = var_name.split('\\')
+		terminal_names = [x.name for x in self.inputs.terminals.values()]
+		substations = [x.substation for x in self.inputs.terminals.values()]
+
+		# Process each variable to identify the mutual / terminal names
+		for var in vars_list:
+			if '.{}'.format(c.pf_mutual) in var:
+				# Remove the reference to mutual impedance from the terminal
+				var_name = var.replace('.{}'.format(c.pf_mutual), '')
+
+				term1 = None
+				term2 = None
+				for term in terminal_names:
+					if var_name.startswith(term):
+						term1 = term
+					if var_name.endswith(term):
+						term2 = term
+
+				# Combine terminals into name
+				ref_terminal = (term1, term2)
+
+				# Check that names have been determined for each variable
+				if not all(ref_terminal):
+					self.logger.error(
+						(
+							'Not completely sure if the reference terminals for mutual impedance {} are correct. In '
+							'determining the reference terminals it is assumed that the mutual impedance is named '
+							'as "Terminal 1_Terminal 2" but this seems not to be the case here.\n The following '
+							'terminals have been identified: \n'
+							'{}\n{}'
+						).format(var_name, ref_terminal[0], ref_terminal[1])
+					)
+				# Two mutual names returns in lists for each direction and each ref_terminal
+				# Variable names as lists in reverse order
+				var_name = ('_'.join(ref_terminal),
+							'_'.join(ref_terminal[::-1]))
+				# Mutual name found so exit for loop
+				break
+			elif '.{}'.format(c.pf_substation) in var:
+				var_sub = var
+			elif '.{}'.format(c.pf_terminal) in var:
+				var_term = var
+			elif '.{}'.format(c.pf_results) in var:
+				# This correlates to the frequency data but that has already been provided and so can
+				# be deleted from the results
+				var_name = constants.Results.lbl_to_delete
+				ref_terminal = constants.Results.lbl_to_delete
+				break
+
+		# Lookup HAST terminal name from input spreadsheet
+		if ref_terminal == '':
+			for term in self.inputs.terminals.values():
+				# Find matching substation and terminal
+				if term.substation == var_sub and term.terminal == var_term:
+					ref_terminal = term.name
+					break
+
+			if ref_terminal == '':
+				self.logger.critical(
+					(
+						'Substation {} in the results does not appear in the inputs list of substations with the '
+						'associated terminal {}.  List of inputs are:\n\t{}'
+					).format(var_sub, '\n\t'.join([term.name for term in self.inputs.terminals]))
+				)
+				raise ValueError(
+					(
+						'Substation {} not found in inputs {} but has appeared in results'
+					).format(var_sub, self.search_pth)
+				)
+
+		return var_name, ref_terminal
+
+	def extract_var_type(self, var_type):
+		"""
+			Function extracts the variable type by splitting at the first space
+		:param str var_type: Typically provided in the format 'c:R_12 in Ohms'
+		:return str (var_type): Shortened name to use for processing
+		"""
+		var_extract = var_type.split(' ')[0]
+
+		# Raises an exception if poor data inputs given
+		if var_extract not in constants.HASTInputs.all_variable_types:
+			raise IOError('The variable extracted {} from {} is not one of the input types {}'
+						  .format(var_extract, var_type, constants.HASTInputs.all_variable_types))
+		return var_extract
 
 class StudySettings:
 	"""
@@ -712,6 +1041,30 @@ class StudySettings:
 			wkbk, sheet_name=self.sht, index_col=0, usecols=(0, 1), skiprows=4, header=None, squeeze=True
 		)
 		self.process_inputs()
+
+	def get_vars_to_export(self):
+		"""
+			Determines the variables that will be exported from PowerFactory and they will be exported in this order
+		:return list pf_vars:  Returns list of variables in the format they are defined in PowerFactory
+		"""
+		c = constants.PowerFactory
+		pf_vars = [c.pf_z1, ]
+
+		# The order variables are added here determines the order they appear in the export
+		# If self impedance data should be exported
+		if self.export_rx:
+			pf_vars.append(c.pf_r1)
+			pf_vars.append(c.pf_x1)
+
+		# If mutual impedance data should be exported
+		if self.export_mutual:
+			# If RX data should be exported
+			if self.export_rx:
+				pf_vars.append(c.pf_r12)
+				pf_vars.append(c.pf_x12)
+			pf_vars.append(c.pf_z12)
+
+		return pf_vars
 
 	def process_inputs(self):
 		""" Process all of the inputs into attributes of the class """
@@ -763,6 +1116,40 @@ class StudySettings:
 			self.logger.info('The directory for the results {} does not exist but has been created'.format(folder))
 
 		return folder
+
+	def add_folder(self, pth_results_file):
+		"""
+			Folder creates a results file
+		:param str pth_results_file:
+		:return:
+		"""
+		delay_counter = 5
+
+		# Get the full path to the results file
+		pth, file_name = os.path.split(pth_results_file)
+		foldername, _ = os.path.splitext(file_name)
+
+		target_folder = os.path.join(pth, file_name)
+
+		if os.path.exists(target_folder):
+			self.logger.warning(
+				(
+					'The target folder for the results already exists, this will now be deleted including all of '
+					'its contents.  The script will wait {} seconds before doing this during which time you can stop it'
+				)
+			)
+			for x in range(delay_counter):
+				self.logger.warning('Waiting {} / {} seconds'.format(x, delay_counter))
+				time.sleep(1)
+			shutil.rmtree(target_folder)
+
+		self.logger.debug('Creating folder {} for the results'.format(target_folder))
+
+		os.mkdir(target_folder)
+		self.export_folder = target_folder
+
+		return None
+
 
 	# def process_result_name(self, def_value=constants.StudySettings.def_results_name):
 	# 	"""
@@ -839,6 +1226,7 @@ class StudySettings:
 
 		return None
 
+
 class StudyInputsDev:
 	"""
 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
@@ -888,6 +1276,30 @@ class StudyInputsDev:
 			raise IOError('No workbook or path to file provided')
 
 		return wkbk
+
+	def copy_inputs_file(self):
+		"""
+			Function copies the inputs file to the desired results folder and applies the appropriate header
+		:return:
+		"""
+
+		src = self.pth
+
+		# Produce new name for inputs file
+		file_name = os.path.basename(src)
+		dest = os.path.join(
+			self.settings.export_folder, '{}_{}{}'.format(
+				constants.HASTInputs.file_name,
+				constants.uid,
+				file_name
+			)
+		)
+
+		# Copy to destination
+		self.logger.debug('Saving inputs file {} in to export folder: {}'.format(src, dest))
+		shutil.copyfile(src=src, dst=dest)
+
+		return None
 
 	def process_study_cases(self, sht=constants.HASTInputs.study_cases, wkbk=None, pth_file=None):
 		"""
@@ -1008,7 +1420,7 @@ class StudyInputsDev:
 		:param str sht:  (optional) Name of worksheet to use
 		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
 		:param str pth_file: (optional) File path to workbook
-		:return dict study_cases:
+		:return dict terminals: type: TerminalDetails
 		"""
 
 		# Import workbook as dataframe
@@ -1082,6 +1494,7 @@ class StudyInputsDev:
 
 		settings = FSSettings(existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
 		return settings
+
 
 class StudyCaseDetails:
 	def __init__(self, list_of_parameters):

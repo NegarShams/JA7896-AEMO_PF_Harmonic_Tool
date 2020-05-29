@@ -976,7 +976,7 @@ class PFStudyCase:
 		self.create_load_flow(lf_settings=lf_settings)
 		self.create_results_files()
 		self.create_freq_sweep(fs_settings=fs_settings)
-		self.fs_export_cmd, export_pth = self.set_results_export(result=self.fs_results)
+		self.fs_export_cmd, export_pth = self.set_results_export(result=self.fs_results, res_type=constants.Results.study_fs)
 
 		self.fs_result_exports.append(export_pth)
 		self.logger.debug(
@@ -986,14 +986,15 @@ class PFStudyCase:
 			).format(self.sc, self.ldf, self.fs, self.fs_export_cmd, export_pth)
 		)
 
-	def set_results_export(self, result):
+	def set_results_export(self, result, res_type):
 		"""
 			Function will create a results export command (.ComRes) to then use to deal with exporting all the results
 			into a CSV file as soon as they are completed.  They can then be processed by a different script.
 		:param powerfactory.DataObject result:  handle to powerfactory result that should be extracted
+		:param str res_type:  Leading name used for results type
 		:return (powerfactory.DataObject, res_export_pth):  Handle to PF ComRes function, Full path to exported result
 		"""
-		res_export_path = os.path.join(self.res_pth, '{}.csv'.format(self.name))
+		res_export_path = os.path.join(self.res_pth, '{}{}{}.csv'.format(res_type, constants.Results.joiner, self.name))
 
 		c = constants.PowerFactory.ComRes
 		# Create com_res file to deal with extracting the results
@@ -1075,7 +1076,7 @@ class PFStudyCase:
 		new_cases = list()
 		for cont_name, cont_case in self.df[self.df[constants.Contingencies.status]==True].iterrows():
 			# Create name for new case as combination of provided name and contingency
-			new_name = '{}-{}'.format(self.name, cont_name)
+			new_name = '{}{}{}'.format(self.name, constants.Results.joiner, cont_name)
 
 			# Copy the current study_case and operating scenario
 			new_sc = sc_folder.AddCopy(self.sc, new_name)
@@ -2600,6 +2601,10 @@ def run_studies(pf_projects, inputs):
 	"""
 	t0 = time.time()
 	logger = constants.logger
+	# Instruct saving of the inputs folder to the desired results folder
+	inputs.copy_inputs_file()
+
+
 	# Iterate through each project and create the various cases, the includes running a pre-case check but no
 	# output is saved at this point
 	for project_name, project in pf_projects.items():

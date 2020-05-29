@@ -144,6 +144,8 @@ class PowerFactory:
 	pf_x12 = 'c:X_12'
 	pf_z12 = 'c:Z_12'
 	pf_nom_voltage = 'e:uknom'
+	pf_freq = 'b:fnow in Hz'
+	pf_harm = 'b:ifnow'
 
 	ldf_command = 'ComLdf'
 	hldf_command = 'ComHldf'
@@ -374,7 +376,9 @@ class Results:
 	# Lables for all results details
 	skipped = 'Study Skipped'
 
-	study_types = ('FS', 'HLF')
+	study_fs = 'FS'
+	# Symbol used to join study_case name with contingency name
+	joiner = '_'
 	extension = '.xlsx'
 	# Labels used for frequency scan results extract
 	lbl_StudyCase = 'Study Case'
@@ -481,7 +485,7 @@ class Results:
 		return self.color_map
 
 class HASTInputs:
-	file_name = 'HAST Inputs'
+	file_name = 'Inputs'
 	file_format = '.xlsx'
 	base_case = 'Base_Case'
 	mutual_variables = ["c:Z_12", "c:R_12", "c:X_12"]

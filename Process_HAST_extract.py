@@ -648,186 +648,186 @@ def import_all_results(search_pth, hast_inputs, search_type='FS'):
 				.format(search_pth, time.time()-t0))
 	return single_df
 
-def get_hast_values(search_pth):
-	"""
-		Function to import the HAST inputs and return the class reference needed
-	:param str search_pth:  Directory which contains the HAST Inputs
-	:return hast2.file_io.StudyInputs processed_inputs:  Processed import
-	"""
-	# Obtain reference to HAST workbook from target directory
-	c = constants.HASTInputs
+# def get_hast_values(search_pth):
+# 	"""
+# 		Function to import the HAST inputs and return the class reference needed
+# 	:param str search_pth:  Directory which contains the HAST Inputs
+# 	:return hast2.file_io.StudyInputs processed_inputs:  Processed import
+# 	"""
+# 	# Obtain reference to HAST workbook from target directory
+# 	c = constants.HASTInputs
+#
+# 	list_of_input_files = glob.glob('{}\{}*{}'.format(search_pth, c.file_name, c.file_format))
+# 	if len(list_of_input_files) == 0:
+# 		logger.critical(('No HAST inputs file formatted as {}*{} found in the folder {}, please check'
+# 						'a HAST inputs file exists')
+# 						.format(c.file_name, c.file_format, search_pth))
+# 		raise IOError('No HAST Inputs file found')
+# 	elif len(list_of_input_files) > 1:
+# 		hast_inputs_workbook = list_of_input_files[0]
+# 		logger.warning(('Multiple HAST input files were found in the folder {} with the format {}*{} \n'
+# 						'as follows: {} \n'
+# 						'The following file was used assumed to be the correct one: {}')
+# 					   .format(search_pth, c.file_name, c.file_format,
+# 							   list_of_input_files, hast_inputs_workbook))
+# 	else:
+# 		hast_inputs_workbook = list_of_input_files[0]
+#
+# 	# Import HAST workbook using file_io import
+# 	# #with hast2.file_io.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
+# 	excel_cls = hast2.file_io.Excel(print_info=logger.info, print_error=logger.error)
+# 	analysis_dict = excel_cls.import_excel_harmonic_inputs(pth_workbook=hast_inputs_workbook)
+#
+# 	# Process the imported workbook into
+# 	processed_inputs = hast2.file_io.StudyInputs(analysis_dict)
+# 	logger.info('Inputs from HAST file: {} extracted'.format(hast_inputs_workbook))
+# 	return processed_inputs
 
-	list_of_input_files = glob.glob('{}\{}*{}'.format(search_pth, c.file_name, c.file_format))
-	if len(list_of_input_files) == 0:
-		logger.critical(('No HAST inputs file formatted as {}*{} found in the folder {}, please check'
-						'a HAST inputs file exists')
-						.format(c.file_name, c.file_format, search_pth))
-		raise IOError('No HAST Inputs file found')
-	elif len(list_of_input_files) > 1:
-		hast_inputs_workbook = list_of_input_files[0]
-		logger.warning(('Multiple HAST input files were found in the folder {} with the format {}*{} \n'
-						'as follows: {} \n'
-						'The following file was used assumed to be the correct one: {}')
-					   .format(search_pth, c.file_name, c.file_format,
-							   list_of_input_files, hast_inputs_workbook))
-	else:
-		hast_inputs_workbook = list_of_input_files[0]
-
-	# Import HAST workbook using file_io import
-	# #with hast2.file_io.Excel(print_info=logger.info, print_error=logger.error) as excel_cls:
-	excel_cls = hast2.file_io.Excel(print_info=logger.info, print_error=logger.error)
-	analysis_dict = excel_cls.import_excel_harmonic_inputs(pth_workbook=hast_inputs_workbook)
-
-	# Process the imported workbook into
-	processed_inputs = hast2.file_io.StudyInputs(analysis_dict)
-	logger.info('Inputs from HAST file: {} extracted'.format(hast_inputs_workbook))
-	return processed_inputs
-
-def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
-	"""
-		Function will combine multiple HAST results extracts into a single HAST results file
-	:param list search_pths:  List of folders which contain the results files to be combined / extracted
-	 							each folder must contain raw .csv results exports + a HAST inputs
-	:param bool drop_duplicates:  (Optional=True) - If set to False then duplicated columns will be included in the output
-	:return pd.DataFrame df, list vars_to_export, bool export_graphs, bool export_convex_hull:
-				Combined results into single dataframe,
-				list of variables for export
-				Whether any of the hast files required graphs to be exported
-				Whether any of the hast files required convex hull to be produced
-	"""
-	t0 = time.time()
-	logger.info('Importing all hast results files in list folders: \n' +
-				 '\n'.join('\t{}' for  _ in range(len(search_pths))).format(*search_pths))
-	# Loop through each folder, obtain the hast files and produce the dataframes
-	c = constants.Results
-	all_dfs = []
-	vars_to_export = []
-
-	# Constant used to determine whether graphs should be included or not
-	export_graphs = PLOT_GRAPHS
-	export_convex_hull = INCLUDE_CONVEX_HULL
-
-	# Loop through each folder, import the hast inputs sheet and results files
-	for folder in search_pths:
-		t0 = time.time()
-		logger.debug('Importing hast files in folder: {}'.format(folder))
-		_hast_inputs = get_hast_values(search_pth=folder)
-		_combined_df = import_all_results(search_pth=folder,
-										  hast_inputs=_hast_inputs)
-		all_dfs.append(_combined_df)
-		logger.debug('Importing of all results in folder {} completed in {:.2f} seconds'
-					 .format(folder, time.time()-t0))
-
-		# Include list of variables for export
-		vars_to_export.extend(_hast_inputs.vars_to_export())
-
-		# Determines whether graphs should be plotted or not, if any of the HAST inputs requires graphs
-		# or the constant above PLOT_GRAPHS then they will be included
-		export_graphs = any((_hast_inputs.export_to_excel, export_graphs))
-		export_convex_hull = any((export_convex_hull, _hast_inputs.include_convex_hull))
-
-	t1 = time.time()
-	logger.info('All results imported in {:.2f} seconds'.format(t1-t0))
-
-	# Combine all results together
-	df = pd.concat(all_dfs, axis=1)
-	# Sorts to improve performance
-	df.sort_index(axis=1, level=0, inplace=True)
-	# df.sort_index(axis=0, level=0)
-
-	# Create unique list of variables to export without upsetting order
-	# 	https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
-	seen = set()
-	seen_add = seen.add
-	vars_to_export = [x for x in vars_to_export if not (x in seen or seen_add(x))]
-
-	if drop_duplicates:
-		# Remove any duplicate datasets with matching column names and rows
-		original_shape = df.shape
-		# Gets list of duplicated index values and will only compare actual values if duplicated
-		df_t = df.T
-		cols = df_t.index[df_t.index.duplicated()].tolist()
-
-		if len(cols) != 0:
-			# Adds index to columns so only rows which are completely duplicated are considered
-			df_t['TEMP'] = df_t.index
-			# Removes any completely duplicated rows in transposed dataframe
-			# These will be columns which contain exactly the same values in both sets of results
-			df_t = df_t.drop_duplicates()
-			# Remove temporary index and transpose back
-			del df_t['TEMP']
-			df = df_t.T
-
-		# Check if any columns are still duplicated as this must now be due to different result sets
-		# Check and rename results if duplicated study case names at level (Full Results Name)
-		duplicated_col_names = df.columns.get_duplicates()
-		if not duplicated_col_names.empty:
-			# Produce dictionary for any duplicated names
-			dict_duplicates = {k: 1 for k in duplicated_col_names}
-			idx_sc = df.columns.names.index(c.lbl_StudyCase)
-			idx_full_name = df.columns.names.index(c.lbl_FullName)
-
-			# Get names for existing columns
-			existing_columns = df.columns.tolist()
-
-			new_cols = []
-			for col in existing_columns:
-				# Loop through each column and rename those which appear in the list of duplicated columns
-				try:
-					duplicated_count = dict_duplicates[col]
-				except KeyError:
-					duplicated_count = False
-
-				if duplicated_count:
-					# Rename duplicated columns to be the form 'sc_name(dup_count)'
-					new_col = list(col)
-					sc_name = col[idx_sc]
-					full_name = col[idx_full_name]
-					# Produce new names for study case and full name
-					new_sc_name = '{}({})'.format(sc_name, duplicated_count)
-					new_full_name = full_name.replace(sc_name, new_sc_name)
-					new_col[idx_sc] =  new_sc_name
-					new_col[idx_full_name] = new_full_name
-					dict_duplicates[col] += 1
-				else:
-					new_col = col
-
-				new_cols.append(tuple(new_col))
-
-			columns=pd.MultiIndex.from_tuples(tuples=new_cols, names=df.columns.names)
-			df.columns = columns
-			duplicated_col_names2 = df.columns.get_duplicates()
-			logger.warning(('Some results have the same study case name but different values, the user should '
-							'check the results that are being combined and confirm where the mistake has been made.\n'
-							'For now the studycases have been renamed with (1), (2), (etc.) for presentation.\n'
-							'In total {} columns have been renamed')
-						   .format(len(duplicated_col_names)-len(duplicated_col_names2))
-						   )
-			if not duplicated_col_names2.empty:
-				raise IOError(' There are still duplicated columns being detected')
-
-		# Check for changes and record differences
-		new_shape = df.shape
-		if new_shape[1] != original_shape[1]:
-			logger.warning(('The input datasets had duplicated columns and '
-						   'therefore some have been removed.\n'
-						   '{} columns have been removed')
-						   .format(original_shape[1]-new_shape[1]))
-
-		else:
-			logger.debug('No duplicated data in results files imported from: {}'
-						 .format(search_pths))
-		if new_shape[0] != original_shape[0]:
-			raise SyntaxError('There has been an error in the processing and some rows have been deleted.'
-							  'Check the script')
-	else:
-		logger.debug('No check for duplicates carried out')
-
-	# Sort the results so that in study_case name order
-	df.sort_index(axis=1, level=[c.lbl_Reference_Terminal, c.lbl_Terminal, c.lbl_StudyCase], inplace=True)
-
-	logger.info('Imported results combined and duplicates removed in {:.2f}'.format(time.time()-t1))
-	return df, vars_to_export, export_graphs, export_convex_hull
+# def combine_multiple_hast_runs(search_pths, drop_duplicates=True):
+# 	"""
+# 		Function will combine multiple HAST results extracts into a single HAST results file
+# 	:param list search_pths:  List of folders which contain the results files to be combined / extracted
+# 	 							each folder must contain raw .csv results exports + a HAST inputs
+# 	:param bool drop_duplicates:  (Optional=True) - If set to False then duplicated columns will be included in the output
+# 	:return pd.DataFrame df, list vars_to_export, bool export_graphs, bool export_convex_hull:
+# 				Combined results into single dataframe,
+# 				list of variables for export
+# 				Whether any of the hast files required graphs to be exported
+# 				Whether any of the hast files required convex hull to be produced
+# 	"""
+# 	t0 = time.time()
+# 	logger.info('Importing all hast results files in list folders: \n' +
+# 				 '\n'.join('\t{}' for  _ in range(len(search_pths))).format(*search_pths))
+# 	# Loop through each folder, obtain the hast files and produce the dataframes
+# 	c = constants.Results
+# 	all_dfs = []
+# 	vars_to_export = []
+#
+# 	# Constant used to determine whether graphs should be included or not
+# 	export_graphs = PLOT_GRAPHS
+# 	export_convex_hull = INCLUDE_CONVEX_HULL
+#
+# 	# Loop through each folder, import the hast inputs sheet and results files
+# 	for folder in search_pths:
+# 		t0 = time.time()
+# 		logger.debug('Importing hast files in folder: {}'.format(folder))
+# 		# _hast_inputs = get_hast_values(search_pth=folder)
+# 		# _combined_df = import_all_results(search_pth=folder,
+# 		# 								  hast_inputs=_hast_inputs)
+# 		all_dfs.append(_combined_df)
+# 		logger.debug('Importing of all results in folder {} completed in {:.2f} seconds'
+# 					 .format(folder, time.time()-t0))
+#
+# 		# Include list of variables for export
+# 		vars_to_export.extend(_hast_inputs.vars_to_export())
+#
+# 		# Determines whether graphs should be plotted or not, if any of the HAST inputs requires graphs
+# 		# or the constant above PLOT_GRAPHS then they will be included
+# 		export_graphs = any((_hast_inputs.export_to_excel, export_graphs))
+# 		export_convex_hull = any((export_convex_hull, _hast_inputs.include_convex_hull))
+#
+# 	t1 = time.time()
+# 	logger.info('All results imported in {:.2f} seconds'.format(t1-t0))
+#
+# 	# Combine all results together
+# 	df = pd.concat(all_dfs, axis=1)
+# 	# Sorts to improve performance
+# 	df.sort_index(axis=1, level=0, inplace=True)
+# 	# df.sort_index(axis=0, level=0)
+#
+# 	# Create unique list of variables to export without upsetting order
+# 	# 	https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
+# 	seen = set()
+# 	seen_add = seen.add
+# 	vars_to_export = [x for x in vars_to_export if not (x in seen or seen_add(x))]
+#
+# 	if drop_duplicates:
+# 		# Remove any duplicate datasets with matching column names and rows
+# 		original_shape = df.shape
+# 		# Gets list of duplicated index values and will only compare actual values if duplicated
+# 		df_t = df.T
+# 		cols = df_t.index[df_t.index.duplicated()].tolist()
+#
+# 		if len(cols) != 0:
+# 			# Adds index to columns so only rows which are completely duplicated are considered
+# 			df_t['TEMP'] = df_t.index
+# 			# Removes any completely duplicated rows in transposed dataframe
+# 			# These will be columns which contain exactly the same values in both sets of results
+# 			df_t = df_t.drop_duplicates()
+# 			# Remove temporary index and transpose back
+# 			del df_t['TEMP']
+# 			df = df_t.T
+#
+# 		# Check if any columns are still duplicated as this must now be due to different result sets
+# 		# Check and rename results if duplicated study case names at level (Full Results Name)
+# 		duplicated_col_names = df.columns.get_duplicates()
+# 		if not duplicated_col_names.empty:
+# 			# Produce dictionary for any duplicated names
+# 			dict_duplicates = {k: 1 for k in duplicated_col_names}
+# 			idx_sc = df.columns.names.index(c.lbl_StudyCase)
+# 			idx_full_name = df.columns.names.index(c.lbl_FullName)
+#
+# 			# Get names for existing columns
+# 			existing_columns = df.columns.tolist()
+#
+# 			new_cols = []
+# 			for col in existing_columns:
+# 				# Loop through each column and rename those which appear in the list of duplicated columns
+# 				try:
+# 					duplicated_count = dict_duplicates[col]
+# 				except KeyError:
+# 					duplicated_count = False
+#
+# 				if duplicated_count:
+# 					# Rename duplicated columns to be the form 'sc_name(dup_count)'
+# 					new_col = list(col)
+# 					sc_name = col[idx_sc]
+# 					full_name = col[idx_full_name]
+# 					# Produce new names for study case and full name
+# 					new_sc_name = '{}({})'.format(sc_name, duplicated_count)
+# 					new_full_name = full_name.replace(sc_name, new_sc_name)
+# 					new_col[idx_sc] =  new_sc_name
+# 					new_col[idx_full_name] = new_full_name
+# 					dict_duplicates[col] += 1
+# 				else:
+# 					new_col = col
+#
+# 				new_cols.append(tuple(new_col))
+#
+# 			columns=pd.MultiIndex.from_tuples(tuples=new_cols, names=df.columns.names)
+# 			df.columns = columns
+# 			duplicated_col_names2 = df.columns.get_duplicates()
+# 			logger.warning(('Some results have the same study case name but different values, the user should '
+# 							'check the results that are being combined and confirm where the mistake has been made.\n'
+# 							'For now the studycases have been renamed with (1), (2), (etc.) for presentation.\n'
+# 							'In total {} columns have been renamed')
+# 						   .format(len(duplicated_col_names)-len(duplicated_col_names2))
+# 						   )
+# 			if not duplicated_col_names2.empty:
+# 				raise IOError(' There are still duplicated columns being detected')
+#
+# 		# Check for changes and record differences
+# 		new_shape = df.shape
+# 		if new_shape[1] != original_shape[1]:
+# 			logger.warning(('The input datasets had duplicated columns and '
+# 						   'therefore some have been removed.\n'
+# 						   '{} columns have been removed')
+# 						   .format(original_shape[1]-new_shape[1]))
+#
+# 		else:
+# 			logger.debug('No duplicated data in results files imported from: {}'
+# 						 .format(search_pths))
+# 		if new_shape[0] != original_shape[0]:
+# 			raise SyntaxError('There has been an error in the processing and some rows have been deleted.'
+# 							  'Check the script')
+# 	else:
+# 		logger.debug('No check for duplicates carried out')
+#
+# 	# Sort the results so that in study_case name order
+# 	df.sort_index(axis=1, level=[c.lbl_Reference_Terminal, c.lbl_Terminal, c.lbl_StudyCase], inplace=True)
+#
+# 	logger.info('Imported results combined and duplicates removed in {:.2f}'.format(time.time()-t1))
+# 	return df, vars_to_export, export_graphs, export_convex_hull
 
 def calc_rx_boundaries(df, sc=None):
 	"""

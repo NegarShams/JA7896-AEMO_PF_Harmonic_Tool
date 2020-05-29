@@ -702,6 +702,10 @@ class MainGui:
 		if pth_results:
 			self.results_file = pth_results
 
+			# Set the export folder for the inputs to be a new folder with the same name as the pth_results
+			self.inputs.settings.add_folder(pth_results)
+
+
 			# Run the pre-case check
 			try:
 				_ = pscharmonics.pf.run_studies(
@@ -709,7 +713,9 @@ class MainGui:
 					inputs=self.inputs
 				)
 
-				# Needs to enable the precase check button
+				_ = file_io.ExtractResults(target_file=self.results_file, search_pths=(self.inputs.settings.export_folder, ))
+
+				# Needs to enable the results check button
 				self.button_study_results.configure(state=tk.NORMAL)
 
 			except RuntimeError:

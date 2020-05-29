@@ -514,3 +514,57 @@ class TestDeleteOldFiles(unittest.TestCase):
 		""" Deletes the entire folder """
 		if os.path.isdir(self.temp_folder):
 			shutil.rmtree(self.temp_folder)
+
+class TestCombineResults(unittest.TestCase):
+	"""
+		Tests the function for deleting of files which are greater than a particular number
+	"""
+	def setUp(self):
+		""" Check previous results already exist """
+
+		self.results1 = os.path.join(TESTS_DIR, 'Detailed_1')
+		self.results2 = os.path.join(TESTS_DIR, 'Detailed_2')
+
+		for x in (self.results1, self.results2):
+			self.assertTrue(
+				os.path.isdir(x),
+				msg='The detailed results folder {} does not exist, run <test_pf.py> first to '
+					'produce'
+			)
+
+
+	def test_export_single_results_set(self):
+		""" Tests exporting of a single results set works """
+
+		src_paths = (self.results1, )
+		target_file = os.path.join(TESTS_DIR, 'combined_results1.xlsx')
+
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=src_paths)
+
+	def test_export_single_results_set2(self):
+		""" Tests exporting of a single results set works """
+
+		src_paths = (self.results2, )
+		target_file = os.path.join(TESTS_DIR, 'combined_results2.xlsx')
+
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=src_paths)
+
+	def test_export_combined_results_set(self):
+		""" Tests exporting of a single results set works """
+
+		src_paths = (self.results1, self.results2)
+		target_file = os.path.join(TESTS_DIR, 'combined_results3.xlsx')
+
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=src_paths)

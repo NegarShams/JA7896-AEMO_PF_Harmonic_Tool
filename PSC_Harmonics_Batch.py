@@ -56,6 +56,10 @@ if __name__ == '__main__':
 	# output is saved at this point
 	pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
+	# Export results
+	target_file = inputs.settings.export_folder+'.xlsx'
+	_ = pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=(inputs.settings.export_folder, ))
+
 	# Capture final time and report complete
 	t_end = time.time()
 	logger.info(
