@@ -4,7 +4,6 @@
 ###		Script deals with writing of data to excel and ensuring that a new instance of excel is used for processing	###
 ###																													###
 ###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
-###		project JI6973 for EirGrid project PSPF010 - Specialise Support in Power Quality Analysis during 2018		###
 ###																													###
 #######################################################################################################################
 """
