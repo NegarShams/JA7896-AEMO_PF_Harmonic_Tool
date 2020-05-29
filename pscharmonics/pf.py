@@ -915,10 +915,10 @@ class PFStudyCase:
 		# Determine types of variables to be declaring
 		c = constants.PowerFactory
 		if study_settings.export_rx:
-			self_variables = (c.pf_z1, c.pf_r1, c.pf_x1)
+			self_variables = (c.pf_nom_voltage, c.pf_z1, c.pf_r1, c.pf_x1)
 
 		else:
-			self_variables = (c.pf_z1, )
+			self_variables = (c.pf_nom_voltage, c.pf_z1)
 		self.logger.debug('Self impedance results declared for: {}'.format(' - '.join(self_variables)))
 
 		# Mutual variables to export
