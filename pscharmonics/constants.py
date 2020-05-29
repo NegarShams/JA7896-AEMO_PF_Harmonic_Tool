@@ -31,6 +31,8 @@ __title__ = 'PSC Automated Frequency Scan Tool'
 logger_name = 'PSC'
 logger = None
 
+DEBUG = False
+
 # Unique identifier populated for each study run
 uid = time.strftime('%Y%m%d_%H%M%S')
 
@@ -306,11 +308,6 @@ class PowerFactory:
 			)
 			raise EnvironmentError('Incompatible Python version')
 
-class FaultEvent:
-	""" Constants associated with a PowerFactory Fault Event """
-	# pf variable to associate a fault case with a contingency
-	mod_cnt = 'mod_cnt'
-
 class Contingencies:
 	""" Contains constants associated with naming of contingencies used in export """
 	# Name to give for base_case / intact system condition
@@ -484,7 +481,7 @@ class Results:
 		self.color_map=dict(zip(index, values))
 		return self.color_map
 
-class HASTInputs:
+class StudyInputs:
 	file_name = 'Inputs'
 	file_format = '.xlsx'
 	base_case = 'Base_Case'
@@ -518,38 +515,6 @@ class HASTInputs:
 	# Text use to define an open or close status for a switch
 	switch_open = 'Open'
 	switch_close = 'Close'
-
-
-# In format:  (sheet_name, header row, data columns, rows to skip) - all numbers 0 indexed
-analysis_sheets = (
-	(PowerFactory.sht_Study, None, 'B', 4),
-	(PowerFactory.sht_Scenarios, 0, 'A:D', 3),
-	(PowerFactory.sht_Contingencies, 0, 'A:AB', 3),
-	(PowerFactory.sht_Terminals, 0, 'A:D', 3),
-	(PowerFactory.sht_LF, None, 'D', 3),
-	(PowerFactory.sht_Freq, None, 'D', 4),
-	(PowerFactory.sht_HLF, None, 'D', 4),
-	(PowerFactory.sht_Filters, 0, 'A:L', 3))
-
-#analysis_sheets = (
-#	(PowerFactory.sht_Study, None, 'D', 4),
-#	(PowerFactory.sht_Scenarios, 3, 'A:D', 4),
-#	(PowerFactory.sht_Contingencies, 'A5'),
-#	(PowerFactory.sht_Terminals, "A5"),
-#	(PowerFactory.sht_LF, "D4"),
-#	(PowerFactory.sht_Freq, "D5"),
-#	(PowerFactory.sht_HLF, "D5"),
-#	(PowerFactory.sht_Filters, "A5"))
-
-iec_limits = [
-	["IEC", "61000-3-6", "Harmonics", "THD", 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-	 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
-	["IEC", "61000-3-6", "Limits", 3, 1.4, 2, 0.8, 2, 0.4, 2, 0.4, 1, 0.35, 1.5, 0.32, 1.5, 0.3, 0.3, 0.28, 1.2,
-	 0.265, 0.93, 0.255, 0.2, 0.246, 0.88, 0.24, 0.816, 0.233, 0.2, 0.227, 0.703, 0.223, 0.66, 0.219, 0.2, 0.2158,
-	 0.58, 0.2127, 0.55, 0.21, 0.2, 0.2075]]
-
-# Format to use to mark debug log
-DEBUG = 'DEBUG'
 
 class GuiDefaults:
 	gui_title='PSC - Automated PowerFactory Frequency Scans Tool'
@@ -607,37 +572,6 @@ class StudySettings:
 
 	# Default values
 	def_results_name = 'Results_'
-
-
-class Extensions:
-	""" Default extension """
-	excel = '.xlsx'
-
-class TestResultsExtract(unittest.TestCase):
-	"""
-		Unit Test to test the operation and constant definition of the Results Extract class
-	"""
-	@classmethod
-	def setUpClass(cls):
-		"""
-			Setup the handle for the Results Extract class
-		:return:
-		"""
-		cls.res_extract = Results()
-
-	def test_results_extract_constant(self):
-		"""
-			Simple test to confirm test case is operational
-		"""
-		self.assertEqual(self.res_extract.lbl_StudyCase, Results.lbl_StudyCase)
-
-	def test_color_map(self):
-		"""
-			Test to confirm import of N-1 Color map successful and convertion into a
-			dictionary of values works correctly
-		"""
-		dict_color_map = self.res_extract.get_color_map()
-		self.assertEqual('#000000', dict_color_map[0])
 
 class Author:
 	""" Contains details of the author """

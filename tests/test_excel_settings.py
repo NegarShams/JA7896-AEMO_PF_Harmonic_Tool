@@ -46,7 +46,7 @@ class TestInputs(unittest.TestCase):
 		"""
 		# Initialise logger
 		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		cls.inputs = pscharmonics.file_io.StudyInputsDev(pth_file=pth_inputs)
+		cls.inputs = pscharmonics.file_io.StudyInputs(pth_file=pth_inputs)
 
 	def test_study_case_no_inputs(self):
 		""" Confirm that if no inputs provided then will raise error """
@@ -213,7 +213,7 @@ class TestContingencies(unittest.TestCase):
 	def setUpClass(cls):
 		# Shortening of reference to class and functions under test
 		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		cls.test_cls = pscharmonics.file_io.StudyInputsDev(pth_inputs)
+		cls.test_cls = pscharmonics.file_io.StudyInputs(pth_inputs)
 
 	def test_dataframe_import_from_file(self):
 		""" Confirm DataFrame imported when loaded using a file """
@@ -238,7 +238,7 @@ class TestTerminals(unittest.TestCase):
 	def setUpClass(cls):
 		# Shortening of reference to class and functions under test
 		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		cls.test_cls = pscharmonics.file_io.StudyInputsDev(pth_inputs)
+		cls.test_cls = pscharmonics.file_io.StudyInputs(pth_inputs)
 
 	def test_dataframe_import_from_file(self):
 		""" Confirm DataFrame imported when loaded using a file """
@@ -293,10 +293,10 @@ class TestLoadFlowSettings(unittest.TestCase):
 		# Following command imports the Load Flow settings from the default inputs spreadsheet
 		# TODO: Must ensure reference busbar is defined correctly and default settings match PowerFactory case
 		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			self.df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.lf_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
@@ -357,10 +357,10 @@ class TestFreqSweepSettings(unittest.TestCase):
 		# Following command imports the Load Flow settings from the default inputs spreadsheet
 		# TODO: Must ensure reference busbar is defined correctly and default settings match PowerFactory case
 		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			self.df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.fs_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 

@@ -20,140 +20,6 @@ import math
 import shutil
 import time
 
-
-# Meta Data
-__author__ = 'David Mills'
-__version__ = '2.1.6'
-__email__ = 'david.mills@pscconsulting.com'
-__phone__ = '+44 7899 984158'
-__status__ = 'In Development - Beta'
-
-""" Following functions are used purely for processing the inputs of the HAST worksheet """
-def add_contingency(row_data):
-	"""
-		Function to read in the contingency data and save to list
-	:param list row_data:
-	:return list combined_entry:
-	"""
-	if len(row_data) > 2:
-		aa = row_data[1:]
-		station_name = aa[0::3]
-		breaker_name = aa[1::3]
-		breaker_status = aa[2::3]
-		breaker_name1 = ['{}.{}'.format(nam, constants.PowerFactory.pf_coupler) for nam in breaker_name]
-		combined_entry = list(zip(station_name, breaker_name1, breaker_status))
-		combined_entry.insert(0, row_data[0])
-	else:
-		combined_entry = [row_data[0], [0]]
-	return combined_entry
-
-def add_scenarios(row_data):
-	"""
-		Function to read in the scenario data and save to list
-	:param list row_data:
-	:return list combined_entry:
-	"""
-	combined_entry = [
-		row_data[0],
-		row_data[1],
-		'{}.{}'.format(row_data[2], constants.PowerFactory.pf_case),
-		'{}.{}'.format(row_data[3], constants.PowerFactory.pf_scenario)]
-	return combined_entry
-
-def add_terminals(row_data):
-	"""
-		Function to read in the terminals data and save to list
-	:param tuple row_data: Single row of data from excel workbook to be imported
-	:return list combined_entry: List of data as a combined entry
-	"""
-	logger = constants.logger
-	if len(row_data) < 4:
-		# If row_data is less than 4 then it means an old HAST inputs sheet has probable been used and so a default
-		# value will be assumed instead
-		logger.warning(('No status given for whether mutual impedance should be included for terminal {} and '
-						'so default value of {} assumed.  If this has happened for every node then it may be because '
-						'an old HAST Input format has been used.')
-					   .format(row_data[0], constants.HASTInputs.default_include_mutual))
-		row_data = list(row_data) + [constants.HASTInputs.default_include_mutual]
-
-	combined_entry = [
-		row_data[0],
-		'{}.{}'.format(row_data[1], constants.PowerFactory.pf_substation),
-		'{}.{}'.format(row_data[2], constants.PowerFactory.pf_terminal),
-		# Third column now contains TRUE or FALSE.  If True then data will be included including
-		# transfer impedance from other nodes to this node.  If False then no data will be included.
-		row_data[3]]
-
-	return combined_entry
-
-def add_lf_settings(row_data):
-	"""
-		Function to read in the load flow settings and save to list
-	:param list row_data:
-	:return list combined_entry:
-	"""
-	z = row_data
-
-	# Input data adjusted for backwards compatibility prior to inclusion of automatic tap adjustment of phase shifters
-	# in PowerFactory 2018
-	if len(row_data) == 56:
-		row_data.insert(4, constants.HASTInputs.def_automatic_pst_tap)
-
-	# Convert a nan value to an empty string for backwards compatibility if no Load Flow Command has been provided
-	# as an input
-	if z[0] is np.nan:
-		z[0] = str()
-
-	combined_entry = [
-		z[0],
-		int(z[1]), int(z[2]), int(z[3]), int(z[4]), int(z[5]), int(z[6]), int(z[7]), int(z[8]), int(z[9]), int(z[10]),
-		float(z[11]), int(z[12]), int(z[13]), int(z[14]), z[15], z[16], int(z[17]), int(z[18]), int(z[19]),	int(z[20]),
-		float(z[21]), int(z[22]), float(z[23]), int(z[24]), int(z[25]), int(z[26]), int(z[27]),	int(z[28]), int(z[29]),
-		int(z[30]), z[31], z[32], int(z[33]), z[34], int(z[35]), int(z[36]),
-		int(z[37]), int(z[38]), int(z[39]), z[40], z[41], z[42], z[43], int(z[44]), z[45], z[46], z[47],
-		z[48], z[49], z[50], z[51], z[52], z[53], int(z[54]), int(z[55]), int(z[56])]
-
-	return combined_entry
-
-def add_freq_settings(row_data):
-	"""
-		Function to read in the frequency sweep settings and save to list
-	:param list row_data:
-	:return list combined_entry:
-	"""
-	z = row_data
-	combined_entry = [z[0], z[1], int(z[2]), z[3], z[4], z[5], int(z[6]), z[7], z[8], z[9],
-					  z[10], z[11], z[12], z[13], int(z[14]), int(z[15])]
-	return combined_entry
-
-def add_hlf_settings(row_data):
-	"""
-		Function to read in the harmonic load flow settings and save to list
-	:param list row_data:
-	:return list combined_entry:
-	"""
-	z = row_data
-	combined_entry = [int(z[0]), int(z[1]), int(z[2]), int(z[3]), z[4], z[5], z[6], z[7],
-					  z[8], int(z[9]), int(z[10]), int(z[11]), int(z[12]), int(z[13]), int(z[14])]
-	return combined_entry
-
-def add_study_settings(row_data):
-	"""
-		Function to read in the study settings and save to list
-		TODO: Convert this to a class / process data formats whilst in DataFrame
-	:param list row_data:
-	:return list combined_entry:
-	"""
-	z = row_data
-	# No longer backwards compatible since the input settings for selecting a defined load flow file have been added
-	combined_entry = [
-		z[0], z[1], z[2], z[3], z[4], z[5], z[6], z[7],
-		bool(z[8]), bool(z[9]), bool(z[10]), bool(z[11]), bool(z[12]), bool(z[13]), bool(z[14]), bool(z[15]),
-		bool(z[16]), bool(z[17]), bool(z[18]), bool(z[19])
-	]
-
-	return combined_entry
-
 def update_duplicates(key, df):
 	"""
 		Function will look for any duplicates in a particular column and then append a number to everything after
@@ -635,10 +501,10 @@ class PreviousResultsExport:
 		"""
 			Function to import the inputs file found in a folder (only a single file is expected to be found)
 		:param str search_pth:  Directory which contains the HAST Inputs
-		:return file_io.StudyInputsDev processed_inputs:  Processed import
+		:return file_io.StudyInputs processed_inputs:  Processed import
 		"""
 		# Obtain reference to HAST workbook from target directory
-		c = constants.HASTInputs
+		c = constants.StudyInputs
 		logger = constants.logger
 
 		# Find the inputs file for this folder
@@ -662,7 +528,7 @@ class PreviousResultsExport:
 			inputs_workbook = list_of_input_files[0]
 
 		# Process the imported workbook into (gui_mode prevents the creation of a folder for the exports)
-		processed_inputs = StudyInputsDev(inputs_workbook, gui_mode=True)
+		processed_inputs = StudyInputs(inputs_workbook, gui_mode=True)
 		# Set export folder = this folder
 		processed_inputs.settings.export_folder = self.search_pth
 		logger.info('Inputs from file: {} extracted'.format(inputs_workbook))
@@ -988,16 +854,16 @@ class PreviousResultsExport:
 		var_extract = var_type.split(' ')[0]
 
 		# Raises an exception if poor data inputs given
-		if var_extract not in constants.HASTInputs.all_variable_types:
+		if var_extract not in constants.StudyInputs.all_variable_types:
 			raise IOError('The variable extracted {} from {} is not one of the input types {}'
-						  .format(var_extract, var_type, constants.HASTInputs.all_variable_types))
+						  .format(var_extract, var_type, constants.StudyInputs.all_variable_types))
 		return var_extract
 
 class StudySettings:
 	"""
 		Class contains the processing of each of the DataFrame items passed as part of the
 	"""
-	def __init__(self, sht=constants.HASTInputs.study_settings, wkbk=None, pth_file=None, gui_mode=False):
+	def __init__(self, sht=constants.StudyInputs.study_settings, wkbk=None, pth_file=None, gui_mode=False):
 		"""
 			Process the worksheet to extract the relevant StudyCase details
 		:param str sht:  (optional) Name of worksheet to use
@@ -1129,7 +995,7 @@ class StudySettings:
 		pth, file_name = os.path.split(pth_results_file)
 		foldername, _ = os.path.splitext(file_name)
 
-		target_folder = os.path.join(pth, file_name)
+		target_folder = os.path.join(pth, foldername)
 
 		if os.path.exists(target_folder):
 			self.logger.warning(
@@ -1226,8 +1092,7 @@ class StudySettings:
 
 		return None
 
-
-class StudyInputsDev:
+class StudyInputs:
 	"""
 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
 	"""
@@ -1289,7 +1154,7 @@ class StudyInputsDev:
 		file_name = os.path.basename(src)
 		dest = os.path.join(
 			self.settings.export_folder, '{}_{}{}'.format(
-				constants.HASTInputs.file_name,
+				constants.StudyInputs.file_name,
 				constants.uid,
 				file_name
 			)
@@ -1301,7 +1166,7 @@ class StudyInputsDev:
 
 		return None
 
-	def process_study_cases(self, sht=constants.HASTInputs.study_cases, wkbk=None, pth_file=None):
+	def process_study_cases(self, sht=constants.StudyInputs.study_cases, wkbk=None, pth_file=None):
 		"""
 			Function imports the DataFrame of study cases and then separates each one into it's own study case.  These
 			are then returned as a dictionary with the name being used as the key.
@@ -1348,7 +1213,7 @@ class StudyInputsDev:
 
 		return df
 
-	def process_contingencies(self, sht=constants.HASTInputs.contingencies, wkbk=None, pth_file=None):
+	def process_contingencies(self, sht=constants.StudyInputs.contingencies, wkbk=None, pth_file=None):
 		"""
 			Function imports the DataFrame of contingencies and then each into its own contingency under a single
 			dictionary key.  Each dictionary item contains the relevant outages to be taken in the form
@@ -1410,7 +1275,7 @@ class StudyInputsDev:
 
 		return contingency_cmd, contingencies
 
-	def process_terminals(self, sht=constants.HASTInputs.terminals, wkbk=None, pth_file=None):
+	def process_terminals(self, sht=constants.StudyInputs.terminals, wkbk=None, pth_file=None):
 		"""
 			Function imports the DataFrame of terminals.
 			These are then returned as a dictionary with the name being used as the key.
@@ -1455,7 +1320,7 @@ class StudyInputsDev:
 
 		return terminals
 
-	def process_lf_settings(self, sht=constants.HASTInputs.lf_settings, wkbk=None, pth_file=None):
+	def process_lf_settings(self, sht=constants.StudyInputs.lf_settings, wkbk=None, pth_file=None):
 		"""
 			Process the provided load flow settings
 		:param str sht:  (optional) Name of worksheet to use
@@ -1475,7 +1340,7 @@ class StudyInputsDev:
 		lf_settings = LFSettings(existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
 		return lf_settings
 
-	def process_fs_settings(self, sht=constants.HASTInputs.fs_settings, wkbk=None, pth_file=None):
+	def process_fs_settings(self, sht=constants.StudyInputs.fs_settings, wkbk=None, pth_file=None):
 		"""
 			Process the provided frequency sweep settings
 		:param str sht:  (optional) Name of worksheet to use
@@ -1494,7 +1359,6 @@ class StudyInputsDev:
 
 		settings = FSSettings(existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
 		return settings
-
 
 class StudyCaseDetails:
 	def __init__(self, list_of_parameters):
@@ -1525,7 +1389,7 @@ class ContingencyDetails:
 
 		# If contingency has been defined then needs to be included in results
 		# # Check if this contingency relates to the intact system in which case it will be skipped
-		if len(self.couplers) == 0 or self.name == constants.HASTInputs.base_case:
+		if len(self.couplers) == 0 or self.name == constants.StudyInputs.base_case:
 			self.skip = True
 		else:
 			self.skip = False
@@ -1547,9 +1411,9 @@ class CouplerDetails:
 			breaker = '{}.{}'.format(breaker, constants.PowerFactory.pf_coupler)
 
 		# Confirm that status for operation is either true or false
-		if status == constants.HASTInputs.switch_open:
+		if status == constants.StudyInputs.switch_open:
 			status = False
-		elif status == constants.HASTInputs.switch_close:
+		elif status == constants.StudyInputs.switch_close:
 			status = True
 		else:
 			logger = constants.logger
@@ -1560,8 +1424,8 @@ class CouplerDetails:
 					'that is what they intended'
 				).format(
 					breaker, substation, status,
-					constants.HASTInputs.switch_open, constants.HASTInputs.switch_close,
-					constants.HASTInputs.switch_open
+					constants.StudyInputs.switch_open, constants.StudyInputs.switch_close,
+					constants.StudyInputs.switch_open
 				)
 			)
 			status = False
@@ -1607,51 +1471,6 @@ class TerminalDetails:
 		# The following are populated once looked for in the specific PowerFactory project
 		self.pf_handle = None
 		self.found = None
-
-class FilterDetails:
-	"""
-		Class for each filter from the HAST import spreadsheet with a new entry for each substation
-	"""
-	def __init__(self, row_data):
-		"""
-			Function to read in the filters and save to list
-		:param list row_data:  List of values in the form:
-			[name to use for filters,
-			substation filter belongs to,
-			terminal at which filter should be connected,
-			type of filter to use (integer based on PF type),
-			Q start, Q stop, number of sizes
-			freq start, freq stop, number of freq steps,
-			quality factor to use,
-			parallel resistance (Rp) value to use
-			]
-		:return list combined_entry:
-		"""
-		# Variable initialisation
-		self.include = True
-		self.nom_voltage = 0.0
-
-		# Confirm row data exists
-		if row_data[0] is None:
-			self.include = False
-			return
-
-		# Name to use for filter
-		self.name = row_data[0]
-		# Substation and terminal within substation that filter should be connected to
-		self.sub ='{}.{}'.format(row_data[1], constants.PowerFactory.pf_substation)
-		self.term = '{}.{}'.format(row_data[2], constants.PowerFactory.pf_terminal)
-		# Type of filter to use
-		self.type = constants.PowerFactory.Filter_type[row_data[3]]
-		# Q values for filters (start, stop, no. steps)
-		self.q_range = list(np.linspace(row_data[4], row_data[5], row_data[6]))
-		self.f_range = list(np.linspace(row_data[7], row_data[8], row_data[9]))
-		# Quality factor and parallel resistance values to use
-		self.quality_factor = row_data[10]
-		self.resistance_parallel = row_data[11]
-
-		# Produce lists of each Q step for each frequency so multiple filters can be tested
-		self.f_q_values = list(itertools.product(self.f_range, self.q_range))
 
 class LFSettings:
 	def __init__(self, existing_command, detailed_settings):

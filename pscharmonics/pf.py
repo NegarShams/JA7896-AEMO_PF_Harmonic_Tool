@@ -91,17 +91,6 @@ def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into
 	else:
 		return scale[0], results
 
-def remove_string_endings(astring, trailing):
-	"""
-		Function to strip the end from a string if it exists, used to remove .IntCase
-	:param str astring:  Initial string
-	:param str trailing:  Trailing string to be removed if exists
-	:return str astring:  String returned without trail if it has been removed
-	"""
-	if astring.endswith(trailing):
-		return astring[:-len(trailing)]
-	return astring
-
 def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the results file
 	"""
 		Adds the results variables to the results file
@@ -115,11 +104,6 @@ def add_vars_res(elmres, element, res_vars):	# Adds the results variables to the
 		elmres.AddVariable(element, x)
 
 	return None
-
-def check_if_object_exists(location, name):  # Check if the object exists
-	# _new_object used instead of new_object to avoid shadowing
-	new_object = location.GetContents(name)
-	return new_object[0]
 
 def create_mutual_name(term1, term2):
 	"""
@@ -2036,6 +2020,7 @@ class PFProject:
 
 		# Execute command
 		ierr = self.task_auto.Execute()
+		ierr2 = 0
 
 		if ierr > 0:
 			self.logger.warning(
@@ -2049,9 +2034,9 @@ class PFProject:
 			self.task_auto.iEnableParal = 0
 
 			# Execute
-			ierr = self.task_auto.Execute()
+			ierr2 = self.task_auto.Execute()
 
-		if ierr > 0:
+		if ierr2 > 0:
 			self.logger.critical(
 				(
 					'Unable to run results for project {}, there may be a license issue that the user should look into. '
@@ -2596,7 +2581,7 @@ def run_studies(pf_projects, inputs):
 		Function runs the studies to create the cases and run all studies based on
 		the provided dictionary of projects and input settings
 	:param dict pf_projects:  Dictionary of projects for which all studies will be run
-	:param file_io.StudyInputsDev inputs:  Input settings
+	:param file_io.StudyInputs inputs:  Input settings
 	:return None
 	"""
 	t0 = time.time()

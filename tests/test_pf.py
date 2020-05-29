@@ -267,10 +267,10 @@ class TestPFProject(unittest.TestCase):
 		# Load flow settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.lf_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
@@ -309,10 +309,10 @@ class TestPFProject(unittest.TestCase):
 		# Load flow settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.lf_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
@@ -347,10 +347,10 @@ class TestPFProject(unittest.TestCase):
 		# Load flow settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.fs_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
@@ -390,10 +390,10 @@ class TestPFProject(unittest.TestCase):
 		# Load flow settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.fs_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
@@ -447,10 +447,10 @@ class TestPFProject(unittest.TestCase):
 		# Load flow settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		with pd.ExcelFile(def_inputs_file) as wkbk:
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.fs_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.fs_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
@@ -458,10 +458,10 @@ class TestPFProject(unittest.TestCase):
 			fs_settings = pscharmonics.file_io.FSSettings(
 				existing_command=df.iloc[0], detailed_settings=df.iloc[1:])
 
-			# Import here should match pscconsulting.file_io.StudyInputsDev().process_lf_settings
+			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			df = pd.read_excel(
 				wkbk,
-				sheet_name=pscharmonics.constants.HASTInputs.lf_settings,
+				sheet_name=pscharmonics.constants.StudyInputs.lf_settings,
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
@@ -549,7 +549,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Import all settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		cls.settings = pscharmonics.file_io.StudyInputsDev(pth_file=def_inputs_file)
+		cls.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
 
 	def test_create_fault_cases(self):
 		"""
@@ -1079,7 +1079,7 @@ class TestPFProjectTerminals(unittest.TestCase):
 
 		# Import all settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		cls.settings = pscharmonics.file_io.StudyInputsDev(pth_file=def_inputs_file)
+		cls.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
 
 		# Folders to delete
 		cls.folders = list()
@@ -1239,7 +1239,7 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 
 		# Import all settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		cls.settings = pscharmonics.file_io.StudyInputsDev(pth_file=def_inputs_file)
+		cls.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
 
 	def test_pre_case_check_for_all_projects(self):
 		"""
@@ -1370,7 +1370,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 
 		# Import settings for Detailed Study
 		settings_file = os.path.join(TESTS_DIR, 'Inputs_Detailed.xlsx')
-		inputs = pscharmonics.file_io.StudyInputsDev(pth_file=settings_file)
+		inputs = pscharmonics.file_io.StudyInputs(pth_file=settings_file)
 
 		inputs.settings.export_folder = target_pth
 
@@ -1410,7 +1410,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 
 		# Import settings for Detailed Study
 		settings_file = os.path.join(TESTS_DIR, 'Inputs_Detailed2.xlsx')
-		inputs = pscharmonics.file_io.StudyInputsDev(pth_file=settings_file)
+		inputs = pscharmonics.file_io.StudyInputs(pth_file=settings_file)
 
 		inputs.settings.export_folder = target_pth
 

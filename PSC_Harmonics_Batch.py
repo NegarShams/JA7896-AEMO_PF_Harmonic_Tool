@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
 	# Retrieve inputs
 	pth_inputs = os.path.join(os.path.dirname(__file__), input_spreadsheet_name)
-	inputs = pscharmonics.file_io.StudyInputsDev(pth_file=pth_inputs)
+	inputs = pscharmonics.file_io.StudyInputs(pth_file=pth_inputs)
 
 	# Initialise PowerFactory instance
 	pf = pscharmonics.pf.PowerFactory()
