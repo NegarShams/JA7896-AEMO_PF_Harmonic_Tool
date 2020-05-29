@@ -14,6 +14,7 @@ import sys
 import os
 
 import pscharmonics.constants as constants
+import pscharmonics.file_io as file_io
 
 class Logger:
 	""" Contained within a class since logger will need to print to both power factory and
@@ -58,7 +59,12 @@ class Logger:
 			create them / revert to the default locations
 		:return None:
 		"""
-		default_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Logs'))
+		default_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs'))
+
+		# Checks the number of log messages in the default folder and provides appropriate warnings to the user before
+		# then deleting the oldest
+		num_deleted = file_io.delete_old_files(pth=default_folder, logger=self.logger)
+
 
 		# Check a path exists if one has been provided
 		if self.pth_progress_log:

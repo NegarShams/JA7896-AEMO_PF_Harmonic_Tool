@@ -187,6 +187,67 @@ def update_duplicates(key, df):
 
 	return df_updated, updated
 
+def delete_old_files(pth, logger, thresholds=constants.General.file_number_thresholds):
+	"""
+		Counts the number of files in a folder and if greater than a certain number it will warn the
+		user, if greater than another number it will delete the oldest files.
+	:param str pth:  Folder that contains the files
+	:param logging.getLogger, logger:  Handle to the logger
+	:param tuple thresholds: (int, int) (warning, delete) where
+								warning is the number at which a warning message is displayed
+								delete is where deleting of the files starts
+	:return int num_deleted:
+	"""
+	thres_warning = thresholds[0]
+	thres_delete = thresholds[1]
+
+	num_deleted = 0
+	# Check path exists first
+	if not os.path.isdir(pth):
+		logger.warning(
+			(
+				'Attempted to check for number of files in folder {} but that folder does not exist and could create '
+				'issues later in script'
+			).format(pth)
+		)
+
+	else:
+		# Get number of files
+		num_files = len([name for name in os.listdir(pth) if os.path.isfile('{}/{}'.format(pth, name))])
+
+		# Check if more than warning level
+		if thres_warning < num_files < thres_delete:
+			num_deleted = 0
+			logger.warning(
+				(
+					'There are {} files in the folder {}, when this number gets to {} the oldest will be deleted'
+				).format(num_files, pth, thres_delete)
+			)
+		# Check if more than delete level
+		elif num_files >= thres_delete:
+			logger.warning(
+				(
+					'There are {} files in the folder {}, the oldest will be reduced to get this number down to {}'
+				).format(num_files, pth, thres_warning)
+			)
+			num_to_delete = num_files - thres_warning
+
+			list_of_files = os.listdir(pth)
+			full_path = ['{}/{}'.format(pth, x) for x in list_of_files]
+			for x in range(num_to_delete):
+				oldest_file = min(full_path, key=os.path.getctime)
+				os.remove(oldest_file)
+				full_path.remove(oldest_file)
+				num_deleted += 1
+
+		else:
+			logger.debug(
+				(
+					'{} files in folder {} is less than the warning threshold {} and delete thresdhold {}'
+				).format(num_files, pth, thres_warning, thres_delete)
+			)
+
+	return num_deleted
 
 class Excel:
 	""" Class to deal with the writing and reading from excel and therefore allowing unittesting of the

@@ -7,6 +7,8 @@ import os
 import pandas as pd
 import math
 import shutil
+import random
+import string
 
 from tests.context import pscharmonics
 
@@ -414,3 +416,101 @@ class TestFreqSweepSettings(unittest.TestCase):
 		# Confirm value of some inputs
 		self.assertTrue(fs_settings.cmd is None)
 		self.assertTrue(fs_settings.settings_error)
+
+class TestDeleteOldFiles(unittest.TestCase):
+	"""
+		Tests the function for deleting of files which are greater than a particular number
+	"""
+	def setUp(self):
+		""" Creates a temporary folder for testing """
+
+		self.temp_folder = os.path.join(
+			TESTS_DIR,
+			'test_folder_{}'.format(''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(3)))
+		)
+
+		# Creates folder if doesn't already exist
+		if not os.path.isdir(self.temp_folder):
+			os.mkdir(self.temp_folder)
+
+		# Threshold values for testing (warning, error)
+		self.thresholds = (20, 30)
+
+
+	def test_path_does_not_exist(self):
+		""" Tests that if path doesn't exist just returns """
+
+		# Delete folder and confirm doesn't exist
+		shutil.rmtree(self.temp_folder)
+		self.assertFalse(os.path.isdir(self.temp_folder))
+
+		# Test deletion
+		num_deleted = pscharmonics.file_io.delete_old_files(pth=self.temp_folder, logger=pscharmonics.constants.logger)
+
+		self.assertTrue(num_deleted==0)
+
+	def test_below_thresholds(self):
+		""" Tests that if below threshold doesn't delete files"""
+
+		# Delete folder and confirm doesn't exist
+		for x in range(10):
+			file_pth = os.path.join(self.temp_folder, 'file{}.txt'.format(x))
+			with open(file_pth, 'w') as f:
+				f.write('test file')
+
+		# Test deletion
+		num_deleted = pscharmonics.file_io.delete_old_files(
+			pth=self.temp_folder, logger=pscharmonics.constants.logger, thresholds=self.thresholds)
+
+		self.assertTrue(num_deleted==0)
+
+	def test_warning_threshold(self):
+		""" Tests that if below threshold doesn't delete files"""
+
+		# Delete folder and confirm doesn't exist
+		for x in range(self.thresholds[0]+1):
+			file_pth = os.path.join(self.temp_folder, 'file{}.txt'.format(x))
+			with open(file_pth, 'w') as f:
+				f.write('test file')
+
+		# Test deletion
+		num_deleted = pscharmonics.file_io.delete_old_files(
+			pth=self.temp_folder, logger=pscharmonics.constants.logger, thresholds=self.thresholds)
+
+		self.assertTrue(num_deleted==0)
+
+	def test_delete_threshold(self):
+		""" Tests that if below threshold doesn't delete files"""
+
+		# Delete folder and confirm doesn't exist
+		for x in range(self.thresholds[1]):
+			file_pth = os.path.join(self.temp_folder, 'file{}.txt'.format(x))
+			with open(file_pth, 'w') as f:
+				f.write('test file')
+
+		# Test deletion
+		num_deleted = pscharmonics.file_io.delete_old_files(
+			pth=self.temp_folder, logger=pscharmonics.constants.logger, thresholds=self.thresholds)
+
+		self.assertTrue(num_deleted==self.thresholds[1]-self.thresholds[0])
+
+	def test_delete_threshold_using_constants(self):
+		""" Tests that if below threshold doesn't delete files"""
+
+		# Delete folder and confirm doesn't exist
+		for x in range(pscharmonics.constants.General.thres_delete):
+			file_pth = os.path.join(self.temp_folder, 'file{}.txt'.format(x))
+			with open(file_pth, 'w') as f:
+				f.write('test file')
+
+		# Test deletion
+		num_deleted = pscharmonics.file_io.delete_old_files(pth=self.temp_folder, logger=pscharmonics.constants.logger)
+
+		expected_delete = pscharmonics.constants.General.thres_delete - pscharmonics.constants.General.thres_warning
+		self.assertTrue(num_deleted==expected_delete)
+
+
+	def tearDown(self):
+		""" Deletes the entire folder """
+		if os.path.isdir(self.temp_folder):
+			shutil.rmtree(self.temp_folder)

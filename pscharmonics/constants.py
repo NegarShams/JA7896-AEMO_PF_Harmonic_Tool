@@ -59,6 +59,11 @@ class General:
 	# TODO: UNITTEST - Check whether this file exists
 	user_guide_reference='JA7896-03:  PSC Harmonics UserGuide.pdf'
 
+	# These are the threshold at which log messages will either be warned about or deleted
+	thres_warning = 500
+	thres_delete = 700
+	file_number_thresholds = (thres_warning, thres_delete)
+
 class PowerFactory:
 	"""
 		Constants used in this script
