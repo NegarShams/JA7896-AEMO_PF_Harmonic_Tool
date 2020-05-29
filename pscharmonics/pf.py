@@ -285,7 +285,7 @@ class PFStudyCase:
 	def create_load_flow(self, lf_settings):
 		"""
 			Create a load flow command in the study case so that the same settings will be run with the
-			frequency scan and HAST file so that there are no issues with non-convergence.
+			frequency scan so that there are no issues with non-convergence.
 		:param pscconsulting.file_io.LFSettings lf_settings:  Existing load flow settings
 		:return None:
 		"""
@@ -1243,36 +1243,6 @@ class PFProject:
 		# Initialise study_cases
 		self.base_sc = self.initialise_study_cases()
 
-		#
-		#
-		# self.task_auto = task_auto
-		# self.sc_cases = []
-		# self.folders = folders
-		#
-		# # Populated with the base study case
-		# self.sc_base = None
-		#
-		# # If Mutual impedance data required then added here
-		# self.include_mutual = include_mutual
-		# self.mutual_impedance_folder = None
-		# # list of mutual impedance elements in the format:
-		# # [(HAST_input_name,
-		# # 	mutual_impedance_name (i.e. 'from_to'),
-		# # 	reference to mutual element in pf,
-		# # 	reference to terminal 1 in pf,
-		# # 	reference to terminal 2 in pf)
-		# # ]
-		# self.list_of_mutual = []
-		# # List of names for which mutual impedance elements have been created in the form
-		# #	[from1_to1, to1_from1, from2_to2, to2_from2, ...]
-		# self.list_of_mutual_names = []
-		#
-		# # Network elements folder
-		# self.folder_network_elements = None
-		#
-		# # List of terminals for results
-		# self.terminals_index = None
-
 	def initialise_study_cases(self):
 		"""
 			Function loops through all study_case and operational scenario combinations and creates
@@ -1392,24 +1362,6 @@ class PFProject:
 				)
 				)
 		return None
-
-	# def process_fs_results(self, logger=None):
-	# 	""" Loop through each study case cls and process results files
-	# 	:return list fs_res
-	# 	"""
-	# 	fs_res = []
-	# 	for sc_cls in self.sc_cases:
-	# 		fs_res.extend(sc_cls.process_fs_results(logger=logger))
-	# 	return fs_res
-
-	# def process_hrlf_results(self, logger):
-	# 	""" Loop through each study case cls and process results files
-	# 	:return list hrlf_res:
-	# 	"""
-	# 	hrlf_res = []
-	# 	for sc_cls in self.sc_cases:
-	# 		hrlf_res.extend(sc_cls.process_hrlf_results(logger))
-	# 	return hrlf_res
 
 	def update_auto_exec(self):
 		"""

@@ -123,15 +123,15 @@ class ExtractResults:
 		""" Process the extraction of the results """
 		self.logger = constants.logger
 
-		df, vars = self.combine_multiple_hast_runs(search_pths=search_pths)
+		df, vars = self.combine_multiple_runs(search_pths=search_pths)
 		self.extract_results(pth_file=target_file, df=df, vars_to_export=vars)
 
 
-	def combine_multiple_hast_runs(self, search_pths, drop_duplicates=True):
+	def combine_multiple_runs(self, search_pths, drop_duplicates=True):
 		"""
-			Function will combine multiple HAST results extracts into a single HAST results file
+			Function will combine multiple results extracts into a single results file
 		:param list search_pths:  List of folders which contain the results files to be combined / extracted
-									each folder must contain raw .csv results exports + a HAST inputs
+									each folder must contain raw .csv results exports + a inputs
 		:param bool drop_duplicates:  (Optional=True) - If set to False then duplicated columns will be included in the output
 		:return pd.DataFrame df, list vars_to_export:
 					Combined results into single dataframe,
@@ -144,12 +144,12 @@ class ExtractResults:
 			'Importing all results files in following list of folders: \n\t{}'.format('\n\t'.join(search_pths))
 		)
 
-		# Loop through each folder, obtain the hast files and produce the dataframes
+		# Loop through each folder, obtain the files and produce the dataframes
 
 		all_dfs = []
 		vars_to_export = []
 
-		# Loop through each folder, import the hast inputs sheet and results files
+		# Loop through each folder, import the inputs sheet and results files
 		for folder in search_pths:
 			# Import results into a single dataframe
 			combined = PreviousResultsExport(pth=folder)
@@ -261,7 +261,7 @@ class ExtractResults:
 			Extract results into workbook with each result on separate worksheet
 		:param str pth_file:  File to save workbook to
 		:param pd.DataFrame df:  Pandas dataframe to be extracted
-		:param list vars_to_export:  List of variables to export based on Hast Inputs class
+		:param list vars_to_export:  List of variables to export based on Inputs class
 		:param bool plot_graphs:  (optional=True) - If set to False then graphs will not be exported
 		:return None:
 		"""
@@ -353,7 +353,7 @@ class ExtractResults:
 	def add_graph(self, writer, sheet_name, row_cont, row_start, col_freq, num_rows,
 				  graph_groups, chrt_row_num):
 		"""
-			Add graph to HAST export
+			Add graph to export
 		:param pd.ExcelWriter writer:  Handle for the workbook that will be controlling the excel instance
 		:param str sheet_name: Name of sheet to add graph to
 		:param int row_cont: Row number which contains the contingency description
@@ -500,10 +500,10 @@ class PreviousResultsExport:
 	def get_input_values(self):
 		"""
 			Function to import the inputs file found in a folder (only a single file is expected to be found)
-		:param str search_pth:  Directory which contains the HAST Inputs
+		:param str search_pth:  Directory which contains the Inputs
 		:return file_io.StudyInputs processed_inputs:  Processed import
 		"""
-		# Obtain reference to HAST workbook from target directory
+		# Obtain reference to workbook from target directory
 		c = constants.StudyInputs
 		logger = constants.logger
 
@@ -574,7 +574,7 @@ class PreviousResultsExport:
 		"""
 			# Process the imported results file into a dataframe with the relevant multi-index
 		:param str pth:  Full path to results that need importing
-		:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in HAST format
+		:return pd.DataFrame _df:  Return data frame processed ready for exporting to Excel in format
 		"""
 		c = constants.Results
 		idx = pd.IndexSlice
@@ -677,7 +677,7 @@ class PreviousResultsExport:
 		# Check for any duplicated multi-index entries (typically contingencies) and rename
 		to_keep = 'first'
 		if any(df.columns.duplicated(keep=to_keep)):
-			self.logger.debug('Processing duplicated results in the HAST results file: {}'.format(pth))
+			self.logger.debug('Processing duplicated results in the results file: {}'.format(pth))
 			# Get duplicated and non-duplicated into separate DataFrames
 			duplicated_entries = df.loc[:, df.columns.duplicated(keep=to_keep)]
 			non_duplicated_entries = df.loc[:, ~df.columns.duplicated(keep=to_keep)]
@@ -687,7 +687,7 @@ class PreviousResultsExport:
 			if any(duplicated_entries.columns.duplicated()):
 				self.logger.critical(
 					(
-						'Unexpected error when trying to deal with duplicate columns for processing of the HAST results '
+						'Unexpected error when trying to deal with duplicate columns for processing of the results '
 						'file: {}'
 					).format(pth)
 				)
@@ -697,7 +697,7 @@ class PreviousResultsExport:
 			terminals = set(duplicated_entries.columns.get_level_values(level=c.lbl_Reference_Terminal))
 			msg = (
 				(
-					'During processing of the HAST results file: {} some duplicated entries have been for the '
+					'During processing of the results file: {} some duplicated entries have been for the '
 					'following terminals: \n'
 				).format(pth)
 			)
@@ -822,7 +822,7 @@ class PreviousResultsExport:
 				ref_terminal = constants.Results.lbl_to_delete
 				break
 
-		# Lookup HAST terminal name from input spreadsheet
+		# Lookup terminal name from input spreadsheet
 		if ref_terminal == '':
 			for term in self.inputs.terminals.values():
 				# Find matching substation and terminal
@@ -1436,13 +1436,13 @@ class CouplerDetails:
 
 class TerminalDetails:
 	"""
-		Details for each terminal that data is required for from HAST processing
+		Details for each terminal that data is required for from processing
 	"""
 	def __init__(self, name=str(), substation=str(), terminal=str(), include_mutual=True, list_of_parameters=list()):
 		"""
 			Process each terminal
 		:param list list_of_parameters: (optional=none)
-		:param str name:  HAST Input name to use
+		:param str name:  Input name to use
 		:param str substation:  Name of substation within which terminal is contained
 		:param str terminal:   Name of terminal in substation
 		:param bool include_mutual:  (optional=True) - If mutual impedance data is not required for this terminal then
@@ -1597,7 +1597,7 @@ class LFSettings:
 
 	def populate_data(self, load_flow_settings):
 		"""
-			List of settings for the load flow from HAST if using a manual settings file
+			List of settings for the load flow from if using a manual settings file
 		:param list load_flow_settings:
 		"""
 
@@ -1791,7 +1791,7 @@ class FSSettings:
 
 	def populate_data(self, fs_settings):
 		"""
-			List of settings for the load flow from HAST if using a manual settings file
+			List of settings for the load flow from if using a manual settings file
 		:param list fs_settings:
 		"""
 

@@ -1,7 +1,7 @@
 """
 #######################################################################################################################
 ###											Constants																###
-###		Central point to store all constants associated with HAST													###
+###		Central point to store all constants associated with PSC harmonics											###
 ###																													###
 ###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
 ###		project JI6973 for EirGrid project PSPF010 - Specialise Support in Power Quality Analysis during 2019		###
@@ -87,8 +87,6 @@ class PowerFactory:
 	sht_LF = 'Loadflow_Settings'
 	sht_Freq = 'Frequency_Sweep'
 	sht_HLF = 'Harmonic_Loadflow'
-	HAST_Input_Scenario_Sheets = (sht_Contingencies, sht_Scenarios, sht_Terminals, sht_Filters)
-	HAST_Input_Settings_Sheets = (sht_Study, sht_LF, sht_Freq, sht_HLF)
 	# Different filter types available in PowerFactory 2016
 	Filter_type = {'C-Type':4,
 				   'Single':0,
@@ -134,10 +132,7 @@ class PowerFactory:
 	pf_os_folder_type = 'scen'
 
 	# Default results file name
-	default_results_name = 'HAST_Res'
 	default_fs_extension = '_FS'
-	default_hldf_extension = '_HLDF'
-	default_ldf_name = 'HAST_LDF'
 
 	pf_r1 = 'm:R'
 	pf_x1 = 'm:X'
