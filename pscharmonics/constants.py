@@ -12,7 +12,6 @@ import pandas as pd
 import numpy as np
 import os
 import sys
-import unittest
 import glob
 import time
 
@@ -61,9 +60,9 @@ class General:
 	user_guide_reference='JA7896-03:  PSC Harmonics UserGuide.pdf'
 
 	# These are the threshold at which log messages will either be warned about or deleted
-	thres_warning = 500
-	thres_delete = 700
-	file_number_thresholds = (thres_warning, thres_delete)
+	threshold_warning = 500
+	threshold_delete = 700
+	file_number_thresholds = (threshold_warning, threshold_delete)
 
 class PowerFactory:
 	"""
@@ -192,7 +191,7 @@ class PowerFactory:
 		export_type = 'iopt_exp'
 		# Name of file to export to (if appropriate)
 		file = 'f_name'
-		# Type of deparators to use (0 = Custom, 1 = system defaults)
+		# Type of separators to use (0 = Custom, 1 = system defaults)
 		separators = 'iopt_sep'
 		# Export object headers only (0 = all data, 1 = headers only)
 		object_head_only = 'iopt_honly'
@@ -364,7 +363,7 @@ class Results:
 	"""
 		Constants used in processing the results
 	"""
-	# Lables for all results details
+	# Labels for all results details
 	skipped = 'Study Skipped'
 
 	study_fs = 'FS'
@@ -398,7 +397,7 @@ class Results:
 
 	# Labels for charts
 	chart_type = {'type': 'scatter'}
-	lbl_Impedance = 'Impendance in Ohms'
+	lbl_Impedance = 'Impedance in Ohms'
 
 	# Positioning of charts in excel workbook
 	chrt_row = 1
@@ -463,7 +462,7 @@ class Results:
 									usecols=1, converters={1: hex_converter})
 		# Set the index of the dataframe equal to the first column
 		df_colormap.set_index(df_colormap.columns[0], inplace=True)
-		# Remove any nan values so that only actual colous remain and the length of the dataframe can be used
+		# Remove any nan values so that only actual colours remain and the length of the dataframe can be used
 		# to determine the plots
 		df_colormap.dropna(axis=0, inplace=True)
 

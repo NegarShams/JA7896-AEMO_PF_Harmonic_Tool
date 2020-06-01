@@ -9,8 +9,6 @@
 """
 
 import os
-import numpy as np
-import itertools
 import pscharmonics.constants as constants
 import glob
 import pandas as pd
@@ -66,8 +64,8 @@ def delete_old_files(pth, logger, thresholds=constants.General.file_number_thres
 								delete is where deleting of the files starts
 	:return int num_deleted:
 	"""
-	thres_warning = thresholds[0]
-	thres_delete = thresholds[1]
+	threshold_warning = thresholds[0]
+	threshold_delete = thresholds[1]
 
 	num_deleted = 0
 	# Check path exists first
@@ -84,21 +82,21 @@ def delete_old_files(pth, logger, thresholds=constants.General.file_number_thres
 		num_files = len([name for name in os.listdir(pth) if os.path.isfile('{}/{}'.format(pth, name))])
 
 		# Check if more than warning level
-		if thres_warning < num_files < thres_delete:
+		if threshold_warning < num_files < threshold_delete:
 			num_deleted = 0
 			logger.warning(
 				(
 					'There are {} files in the folder {}, when this number gets to {} the oldest will be deleted'
-				).format(num_files, pth, thres_delete)
+				).format(num_files, pth, threshold_delete)
 			)
 		# Check if more than delete level
-		elif num_files >= thres_delete:
+		elif num_files >= threshold_delete:
 			logger.warning(
 				(
 					'There are {} files in the folder {}, the oldest will be reduced to get this number down to {}'
-				).format(num_files, pth, thres_warning)
+				).format(num_files, pth, threshold_warning)
 			)
-			num_to_delete = num_files - thres_warning
+			num_to_delete = num_files - threshold_warning
 
 			list_of_files = os.listdir(pth)
 			full_path = ['{}/{}'.format(pth, x) for x in list_of_files]
@@ -111,25 +109,30 @@ def delete_old_files(pth, logger, thresholds=constants.General.file_number_thres
 		else:
 			logger.debug(
 				(
-					'{} files in folder {} is less than the warning threshold {} and delete thresdhold {}'
-				).format(num_files, pth, thres_warning, thres_delete)
+					'{} files in folder {} is less than the warning threshold {} and delete threshold {}'
+				).format(num_files, pth, threshold_warning, threshold_delete)
 			)
 
 	return num_deleted
 
 class ExtractResults:
-	def __init__(self, target_file, search_pths):
-		""" Process the extraction of the results """
+	def __init__(self, target_file, search_paths):
+		"""
+			Process the extraction of the results
+		:param str target_file:  Target file to save results to
+		:param tuple search_paths:  List of folder to search for the results files to export
+		"""
 		self.logger = constants.logger
 
-		df, vars = self.combine_multiple_runs(search_pths=search_pths)
-		self.extract_results(pth_file=target_file, df=df, vars_to_export=vars)
+		df, extract_vars = self.combine_multiple_runs(search_paths=search_paths)
+		self.extract_results(pth_file=target_file, df=df, vars_to_export=extract_vars)
 
 
-	def combine_multiple_runs(self, search_pths, drop_duplicates=True):
+	# noinspection PyMethodMayBeStatic
+	def combine_multiple_runs(self, search_paths, drop_duplicates=True):
 		"""
 			Function will combine multiple results extracts into a single results file
-		:param list search_pths:  List of folders which contain the results files to be combined / extracted
+		:param tuple search_paths:  List of folders which contain the results files to be combined / extracted
 									each folder must contain raw .csv results exports + a inputs
 		:param bool drop_duplicates:  (Optional=True) - If set to False then duplicated columns will be included in the output
 		:return pd.DataFrame df, list vars_to_export:
@@ -140,16 +143,16 @@ class ExtractResults:
 		logger = constants.logger
 
 		logger.info(
-			'Importing all results files in following list of folders: \n\t{}'.format('\n\t'.join(search_pths))
+			'Importing all results files in following list of folders: \n\t{}'.format('\n\t'.join(search_paths))
 		)
 
-		# Loop through each folder, obtain the files and produce the dataframes
+		# Loop through each folder, obtain the files and produce the DataFrames
 
 		all_dfs = []
 		vars_to_export = []
 
 		# Loop through each folder, import the inputs sheet and results files
-		for folder in search_pths:
+		for folder in search_paths:
 			# Import results into a single dataframe
 			combined = PreviousResultsExport(pth=folder)
 			all_dfs.append(combined.df)
@@ -236,14 +239,14 @@ class ExtractResults:
 			# Check for changes and record differences
 			new_shape = df.shape
 			if new_shape[1] != original_shape[1]:
-				logger.warning(('The input datasets had duplicated columns and '
+				logger.warning(('The input data ets had duplicated columns and '
 								'therefore some have been removed.\n'
 								'{} columns have been removed')
 							   .format(original_shape[1]-new_shape[1]))
 
 			else:
 				logger.debug('No duplicated data in results files imported from: {}'
-							 .format(search_pths))
+							 .format(search_paths))
 			if new_shape[0] != original_shape[0]:
 				raise SyntaxError('There has been an error in the processing and some rows have been deleted.'
 								  'Check the script')
@@ -447,6 +450,7 @@ class ExtractResults:
 
 		return col_nums
 
+	# noinspection PyMethodMayBeStatic
 	def split_plots(self, max_plots, graph_groups):
 		"""
 			Figures out how to split the plots into groups based on the grouping and maximum of 255 plots (or max_plots)
@@ -464,7 +468,7 @@ class ExtractResults:
 			# Number of plots this group needs to be split into
 			number_of_plots = math.ceil(len(list_of_cols) / max_plots)
 
-			# If greater than 1 then split into equal size groups with basecase plot at starting point
+			# If greater than 1 then split into equal size groups with base case plot at starting point
 			if number_of_plots > 1:
 				steps = math.ceil(len(list_of_cols) / number_of_plots)
 				a = [list_of_cols[i * steps:(i + 1) * steps] for i in range(int(math.ceil(len(list_of_cols) / steps)))]
@@ -477,7 +481,7 @@ class ExtractResults:
 		return graphs
 
 class PreviousResultsExport:
-	""" Used for importing the setings and previously exported results """
+	""" Used for importing the settings and previously exported results """
 	def __init__(self, pth):
 		"""
 
@@ -489,6 +493,9 @@ class PreviousResultsExport:
 		self.search_pth = pth
 		self.logger.debug('Processing results saved in: {}'.format(self.search_pth))
 
+		# Constant declarations
+		self.study_type = str()
+
 		# Get inputs used
 		self.inputs = self.get_input_values()
 
@@ -499,7 +506,6 @@ class PreviousResultsExport:
 	def get_input_values(self):
 		"""
 			Function to import the inputs file found in a folder (only a single file is expected to be found)
-		:param str search_pth:  Directory which contains the Inputs
 		:return file_io.StudyInputs processed_inputs:  Processed import
 		"""
 		# Obtain reference to workbook from target directory
@@ -653,7 +659,7 @@ class PreviousResultsExport:
 		df.columns = columns1
 		df_mutual.columns = columns2
 
-		# Combine dataframes into one and return
+		# Combine data frames into one and return
 		df = pd.concat([df, df_mutual], axis=1)
 
 		# Obtain nominal voltage for each terminal
@@ -665,7 +671,7 @@ class PreviousResultsExport:
 
 		# Find the nominal voltage for each terminal (if exists)
 		for term, df_sub in df.groupby(axis=1, level=c.lbl_Reference_Terminal):
-			idx_filter = idx[:,:,:,:,:,'e:uknom']
+			idx_filter = idx[:,:,:,:,:,constants.PowerFactory.pf_nom_voltage]
 			try:
 				# Obtain nominal voltage and then set row values appropriately to include in results
 				nom_voltage = df.loc[:,idx_filter].iloc[0,0]
@@ -750,8 +756,7 @@ class PreviousResultsExport:
 				file_name = file_name.replace('{}{}'.format(sc_name, c.joiner), '')
 				break
 
-		# Find which contingnecy is considered
-		# TODO: Check that _ symbol not used in studycase or contingency name
+		# Find which contingency is considered
 		for cont in self.inputs.contingencies.keys():
 			if cont in file_name:
 				cont_name = cont
@@ -774,7 +779,6 @@ class PreviousResultsExport:
 		# Separate PowerFactory path into individual entries
 		vars_list = var_name.split('\\')
 		terminal_names = [x.name for x in self.inputs.terminals.values()]
-		substations = [x.substation for x in self.inputs.terminals.values()]
 
 		# Process each variable to identify the mutual / terminal names
 		for var in vars_list:
@@ -844,6 +848,7 @@ class PreviousResultsExport:
 
 		return var_name, ref_terminal
 
+	# noinspection PyMethodMayBeStatic
 	def extract_var_type(self, var_type):
 		"""
 			Function extracts the variable type by splitting at the first space
@@ -992,9 +997,9 @@ class StudySettings:
 
 		# Get the full path to the results file
 		pth, file_name = os.path.split(pth_results_file)
-		foldername, _ = os.path.splitext(file_name)
+		folder_name, _ = os.path.splitext(file_name)
 
-		target_folder = os.path.join(pth, foldername)
+		target_folder = os.path.join(pth, folder_name)
 
 		if os.path.exists(target_folder):
 			self.logger.warning(
@@ -1151,7 +1156,7 @@ class StudyInputs:
 
 		# Produce new name for inputs file
 		file_name = os.path.basename(src)
-		dest = os.path.join(
+		destination = os.path.join(
 			self.settings.export_folder, '{}_{}{}'.format(
 				constants.StudyInputs.file_name,
 				constants.uid,
@@ -1160,8 +1165,8 @@ class StudyInputs:
 		)
 
 		# Copy to destination
-		self.logger.debug('Saving inputs file {} in to export folder: {}'.format(src, dest))
-		shutil.copyfile(src=src, dst=dest)
+		self.logger.debug('Saving inputs file {} in to export folder: {}'.format(src, destination))
+		shutil.copyfile(src=src, dst=destination)
 
 		return None
 

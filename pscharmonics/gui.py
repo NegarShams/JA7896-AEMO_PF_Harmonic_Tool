@@ -496,34 +496,6 @@ class MainGui:
 		"""
 		raise SyntaxError('Not developed yet')
 
-		# # Ask user for file to save results of pre_case check into
-		# pth_precase = tk.filedialog.asksaveasfilename(
-		# 	initialdir=self.init_dir,
-		# 	initialfile='Pre Case Check_{}.xlsx'.format(constants.uid),
-		# 	filetypes=constants.GuiDefaults.xlsx_types,
-		# 	title='Select the file to save the results of the pre-case check into'
-		# )
-		#
-		# if pth_precase:
-		# 	self.pre_case_file = pth_precase
-		#
-		# 	# Run the pre-case check
-		# 	_ = pscharmonics.pf.run_pre_case_checks(
-		# 		pf_projects=self.pf_projects,
-		# 		terminals=self.inputs.terminals,
-		# 		include_mutual=self.inputs.settings.export_mutual,
-		# 		export_pth=self.pre_case_file,
-		# 		contingencies=self.inputs.contingencies,
-		# 		contingencies_cmd=self.inputs.contingency_cmd
-		# 	)
-		#
-		# 	# Needs to enable the precase check button
-		# 	self.button_precase_results.configure(state=tk.NORMAL)
-		# else:
-		# 	self.logger.warning('No pre-case results file selected')
-		#
-		# return None
-
 	def load_results(self, results):
 		"""
 			Loads a spreadsheet with the pre-case check results
@@ -579,7 +551,7 @@ class MainGui:
 					inputs=self.inputs
 				)
 
-				_ = file_io.ExtractResults(target_file=self.results_file, search_pths=(self.inputs.settings.export_folder, ))
+				_ = file_io.ExtractResults(target_file=self.results_file, search_paths=(self.inputs.settings.export_folder,))
 
 				# Needs to enable the results check button
 				self.button_study_results.configure(state=tk.NORMAL)

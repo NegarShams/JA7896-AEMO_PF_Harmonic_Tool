@@ -14,12 +14,13 @@ import sys
 import os
 
 import pscharmonics.constants as constants
-import pscharmonics.file_io as file_io
 
 class Logger:
 	""" Contained within a class since logger will need to print to both power factory and
 		to the various log files
 	"""
+	logger = None # type: logging.Logger
+
 	def __init__(self, pth_debug_log=str(), pth_progress_log=str(), pth_error_log=str(), app=None, debug=False):
 		"""
 			Initialise logger
@@ -63,8 +64,6 @@ class Logger:
 
 		# Checks the number of log messages in the default folder and provides appropriate warnings to the user before
 		# then deleting the oldest
-		num_deleted = file_io.delete_old_files(pth=default_folder, logger=self.logger)
-
 
 		# Check a path exists if one has been provided
 		if self.pth_progress_log:
@@ -106,7 +105,6 @@ class Logger:
 		# to ensure log messages are not sent to StdOut as well as the log store
 		if self.app:
 			# Returns the currently set interface version or 0 if PowerFactory is started from external and
-			# SetInerfaceVersion() is not called
 			interface = self.app.GetInterfaceVersion()
 			if interface > 0:
 				status = True
@@ -267,14 +265,15 @@ class Logger:
 		self.logger.error(msg)
 
 	def critical(self, msg):
-		""" Critical error has occured """
+		""" Critical error has occurred """
 		# Get calling function to include in log message
+		# noinspection PyProtectedMember
 		caller = sys._getframe().f_back.f_code.co_name
 		self.critical_count += 1
 
 		if self.app and self.pf_executed:
 			try:
-				# Try statement since possible that an error has occured and it might not run
+				# Try statement since possible that an error has occurred and it might not run
 				self.app.PrintError(msg)
 			# If attribute doesn't exist then continue
 			except AttributeError:

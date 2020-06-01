@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
 	# Export results
 	target_file = inputs.settings.export_folder+'.xlsx'
-	_ = pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=(inputs.settings.export_folder, ))
+	_ = pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=(inputs.settings.export_folder,))
 
 	# Capture final time and report complete
 	t_end = time.time()

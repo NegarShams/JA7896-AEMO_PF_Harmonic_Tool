@@ -498,7 +498,7 @@ class TestDeleteOldFiles(unittest.TestCase):
 		""" Tests that if below threshold doesn't delete files"""
 
 		# Delete folder and confirm doesn't exist
-		for x in range(pscharmonics.constants.General.thres_delete):
+		for x in range(pscharmonics.constants.General.threshold_delete):
 			file_pth = os.path.join(self.temp_folder, 'file{}.txt'.format(x))
 			with open(file_pth, 'w') as f:
 				f.write('test file')
@@ -506,7 +506,7 @@ class TestDeleteOldFiles(unittest.TestCase):
 		# Test deletion
 		num_deleted = pscharmonics.file_io.delete_old_files(pth=self.temp_folder, logger=pscharmonics.constants.logger)
 
-		expected_delete = pscharmonics.constants.General.thres_delete - pscharmonics.constants.General.thres_warning
+		expected_delete = pscharmonics.constants.General.threshold_delete - pscharmonics.constants.General.threshold_warning
 		self.assertTrue(num_deleted==expected_delete)
 
 
@@ -543,7 +543,7 @@ class TestCombineResults(unittest.TestCase):
 		if os.path.isfile(target_file):
 			os.remove(target_file)
 
-		pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=src_paths)
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_paths)
 
 	def test_export_single_results_set2(self):
 		""" Tests exporting of a single results set works """
@@ -555,7 +555,7 @@ class TestCombineResults(unittest.TestCase):
 		if os.path.isfile(target_file):
 			os.remove(target_file)
 
-		pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=src_paths)
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_paths)
 
 	def test_export_combined_results_set(self):
 		""" Tests exporting of a single results set works """
@@ -567,4 +567,4 @@ class TestCombineResults(unittest.TestCase):
 		if os.path.isfile(target_file):
 			os.remove(target_file)
 
-		pscharmonics.file_io.ExtractResults(target_file=target_file, search_pths=src_paths)
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_paths)

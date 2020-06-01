@@ -1,7 +1,5 @@
 import unittest
 import os
-import sys
-import shutil
 
 from tests.context import pscharmonics
 

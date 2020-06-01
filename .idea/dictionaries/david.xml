@@ -1,17 +1,29 @@
 <component name="ProjectDictionaryState">
   <dictionary name="david">
     <words>
+      <w>allph</w>
       <w>apdist</w>
       <w>asht</w>
+      <w>autotasks</w>
+      <w>butldf</w>
       <w>cbts</w>
       <w>chctr</w>
       <w>chkcmd</w>
       <w>chrt</w>
+      <w>ciopt</w>
       <w>cmds</w>
+      <w>cntcy</w>
+      <w>compfd</w>
+      <w>comres</w>
+      <w>comtrade</w>
+      <w>contres</w>
       <w>conv</w>
       <w>cosfix</w>
       <w>cosvar</w>
       <w>cranbourne</w>
+      <w>csel</w>
+      <w>elmmut</w>
+      <w>elmres</w>
       <w>endcol</w>
       <w>endrow</w>
       <w>erreq</w>
@@ -19,16 +31,29 @@
       <w>errlf</w>
       <w>errmax</w>
       <w>filelocation</w>
+      <w>fltcases</w>
+      <w>fnow</w>
+      <w>fres</w>
       <w>frnom</w>
+      <w>fshow</w>
+      <w>fsres</w>
       <w>fstart</w>
       <w>fstep</w>
       <w>fstop</w>
       <w>getcwd</w>
       <w>ginf</w>
+      <w>grea</w>
+      <w>greaf</w>
+      <w>gridlines</w>
       <w>hldf</w>
+      <w>honly</w>
       <w>hrmb</w>
       <w>ictrlx</w>
+      <w>ifnow</w>
+      <w>ifshow</w>
       <w>igntow</w>
+      <w>inoconv</w>
+      <w>inputmode</w>
       <w>intialise</w>
       <w>iopt</w>
       <w>ioutall</w>
@@ -37,21 +62,27 @@
       <w>krelax</w>
       <w>loadflow</w>
       <w>loadmax</w>
+      <w>locn</w>
       <w>mainheading</w>
       <w>messagebox</w>
       <w>mutelm</w>
       <w>mutuals</w>
+      <w>netdat</w>
+      <w>netdata</w>
       <w>netelm</w>
       <w>newcol</w>
       <w>ninc</w>
       <w>noinit</w>
+      <w>nonconvergent</w>
       <w>noofgraphrows</w>
       <w>noofgraphrowsrange</w>
       <w>notopo</w>
+      <w>nres</w>
       <w>nsteps</w>
       <w>opscen</w>
       <w>outcmd</w>
       <w>outserv</w>
+      <w>paral</w>
       <w>pbalancing</w>
       <w>pfclass</w>
       <w>phiini</w>
@@ -59,21 +90,40 @@
       <w>pnight</w>
       <w>powerfactory</w>
       <w>precase</w>
+      <w>proc</w>
       <w>prot</w>
       <w>pscharmonics</w>
+      <w>psconsulting</w>
       <w>pspf</w>
+      <w>pssplt</w>
+      <w>qfactor</w>
+      <w>qtotn</w>
+      <w>recnt</w>
       <w>rembar</w>
       <w>resfolder</w>
+      <w>resvar</w>
+      <w>rpara</w>
+      <w>rscl</w>
       <w>scen</w>
+      <w>selectedinput</w>
       <w>sfix</w>
+      <w>shnt</w>
+      <w>shtype</w>
+      <w>simoutage</w>
       <w>stamode</w>
       <w>startcol</w>
       <w>startrow</w>
       <w>svar</w>
       <w>textfile</w>
+      <w>tsel</w>
+      <w>uknom</w>
+      <w>ushnm</w>
+      <w>vert</w>
       <w>vlmax</w>
       <w>vlmin</w>
       <w>workbookname</w>
+      <w>xlsm</w>
+      <w>xlsxwriter</w>
     </words>
   </dictionary>
 </component>

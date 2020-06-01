@@ -209,44 +209,6 @@ class PFStudyCase:
 		if self.base_case:
 			self.df = pd.DataFrame(columns=constants.Contingencies.df_columns)
 
-		# self.base_name = list_parameters[0]
-		# self.prj_name = list_parameters[1]
-		# self.sc_name = remove_string_endings(astring=list_parameters[2], trailing='.IntCase')
-		# self.op_name = remove_string_endings(astring=list_parameters[3], trailing='.IntScenario')
-		# self.cont_name = cont_name
-		# self.uid = uid
-		# self.filter_name = filter_name
-		# self.base_case = base_case
-		# self.res_pth = results_pth
-		#
-		# # Get logger
-		# self.logger = constants.logger
-		#
-		# # Handle for study cases that will require activating
-		# self.sc = sc
-		# self.op = op
-		# self.prj = prj
-		# self.task_auto = task_auto
-		#
-		# # Attributes set during study completion
-		# self.ldf = None
-		# self.frq = None
-		# self.hldf = None
-		# self.frq_export_com = None
-		# self.hldf_export_com = None
-		# self.results = None
-		# self.hldf_results = None
-		# self.com_res = None
-		# self.fs_scale = []
-		# self.hrm_scale = []
-		#
-		# # Dictionary for looking up frequency scan results
-		# self.fs_res = dict()
-		#
-		# # Paths for frequency and hlf results that are exported
-		# self.fs_result_exports = []
-		# self.hldf_result_exports = []
-
 	def toggle_state(self, deactivate=False):
 		"""
 			Function to toggle the state of the study case and operating scenario
@@ -348,7 +310,7 @@ class PFStudyCase:
 
 				# Active Power Control
 				ldf.iopt_apdist = lf_settings.iopt_apdist  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
-				# 2 According to Primary Control, 3 According to Inertias)
+				# 2 According to Primary Control, 3 According to inertia)
 
 				ldf.iPbalancing = lf_settings.iPbalancing  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
 
@@ -440,7 +402,7 @@ class PFStudyCase:
 
 	def create_freq_sweep(self, fs_settings):
 		"""
-			Create a frequencys weep command in the study case so that the same settings will be run for all
+			Create a frequency sweep command in the study case so that the same settings will be run for all
 			subsequent study cases.
 		:param pscconsulting.file_io.FSSettings fs_settings:  Settings to use
 		:return None:
@@ -497,7 +459,7 @@ class PFStudyCase:
 					fs.fstep = fs_settings.fstep  # Step Size
 					fs.i_adapt = fs_settings.i_adapt  # Automatic Step Size Adaption
 					fs.frnom = fs_settings.frnom  # Nominal Frequency
-					fs.fshow = fs_settings.fstop # Fixzed to be the same as the stop frequency
+					fs.fshow = fs_settings.fstop # Fixed to be the same as the stop frequency
 					fs.ifshow = float(fs_settings.fstop) / float(fs_settings.frnom)  # Harmonic Order
 
 					# Advanced
@@ -816,46 +778,6 @@ class PFStudyCase:
 
 		return None
 
-
-	# def process_hrlf_results(self, logger):
-	# 	"""
-	# 		Process the hrlf results ready for inclusion into spreadsheet
-	# 	:return hrm_res
-	# 	"""
-	# 	hrm_scale, hrm_res = retrieve_results(self.hldf_results, 1)
-	#
-	# 	hrm_scale.insert(1, "THD")  # Inserts the THD
-	# 	hrm_scale.insert(1, "Harmonic")  # Arranges the Harmonic Scale
-	# 	hrm_scale.insert(1, "Scale")
-	# 	hrm_scale.pop(4)  # Takes out the 50 Hz
-	# 	hrm_scale.pop(4)
-	# 	for res12 in hrm_res:
-	# 		# Rather than retrieving THD from the calculated parameters in PowerFactory it is calculated from the
-	# 		# calculated harmonic distortion.  This will be calculated upto and including the upper limits set in the
-	# 		# inputs for the harmonic load flow study
-	#
-	# 		# Try / except statement to allow error catching if a poor result is returned and will then be alerted
-	# 		# to user
-	# 		try:
-	# 			# res12[3:] used since at this stage the res12 format is:
-	# 			# [result type (i.e. m:HD), terminal (i.e. *.ElmTerm), H1, H2, H3, ..., Hx]
-	# 			thd = math.sqrt(sum(i * i for i in res12[3:]))
-	#
-	# 		except TypeError:
-	# 			logger.error(('Unable to calculate the THD since harmonic results retrieved from results variable {} ' +
-	# 						  ' have come out in an unexpected order and now contain a string \n' +
-	# 						  'The returned results <res12> are {}').format(self.hldf_results, res12))
-	# 			thd = 'NA'
-	#
-	# 		res12.insert(2, thd)  # Insert THD
-	# 		res12.insert(2, self.cont_name)  # Op scenario
-	# 		res12.insert(2, self.sc_name)  # Study case description
-	# 		res12.pop(5)
-	#
-	# 	self.hrm_scale = hrm_scale
-	#
-	# 	return hrm_res
-
 	def create_results_files(self):
 		"""
 			Function creates a results file if it does not already exist
@@ -1045,7 +967,7 @@ class PFStudyCase:
 			Function will loop through valid contingencies and create a new case setup to reflect that contingency
 			and that will then be stored in the temporary sc and op folders
 		:param powerfactory.DataObject sc_folder:  Reference to the folder to store temporary study cases in
-		:param powerfactory.DataObject op_folder:  Reference to the folder to store temporary oeprating scenarios in
+		:param powerfactory.DataObject op_folder:  Reference to the folder to store temporary operating scenarios in
 		:param str res_pth:  Path where all the results will be saved when the automatic study cases are run
 		:return list new_cases:  List of references to the newly created study cases
 		"""
@@ -1154,9 +1076,9 @@ class PFProject:
 			Initialise class
 		:param str name:  project name
 		:param pd.DataFrame df_studycases:  DataFrame containing all the base study cases associates with this project
-		:param psconsulting.file_io.LFSettings lf_settings:  (optional=None) - If provided then these settings will be
+		:param pscharmonics.file_io.LFSettings lf_settings:  (optional=None) - If provided then these settings will be
 															used and if not then default Load Flow command will be used
-		:param psconsulting.file_io.FSSettings fs_settings:  (optional=None) - If provided then these settings will be
+		:param pscharmonics.file_io.FSSettings fs_settings:  (optional=None) - If provided then these settings will be
 															used and if not then default Frequency Sweep command will be used
 		:param pd.DataFrame df_studycases:  DataFrame containing all the base study cases associates with this project
 		:param str uid:  Unique identifier given for this study
@@ -1875,7 +1797,7 @@ class PFProject:
 			created and are located in the Network data folders.
 			Mutual impedance elements have to be stored in the network data for the active project
 
-		:param pd.DataFrame df:  DataFrame of terminals that have been found already, this is popualted further and
+		:param pd.DataFrame df:  DataFrame of terminals that have been found already, this is populated further and
 								returned
 		:return pd.DataFrame, df:  Returns a DataFrame with the referencing for the mutual elements created
 		"""
@@ -1912,7 +1834,7 @@ class PFProject:
 						'and therefore no mutual elements can be created'
 					).format(self.net_data_items[0])
 				)
-				# Return eearly
+				# Return early
 				return df
 
 			# Reset mutual elements dictionary which is populated for each mutual element created in the form
@@ -1960,7 +1882,7 @@ class PFProject:
 
 	def run_parallel_tasks(self):
 		"""
-			Function to run parallel tasks and then detects if an error has occured.
+			Function to run parallel tasks and then detects if an error has occurred.
 			If an error occurs will run in non-parallel mode with a warning message to user
 		:return None:
 		"""
@@ -2086,7 +2008,7 @@ class PowerFactory:
 					try:
 						app = powerfactory.GetApplicationExt()  # Start PowerFactory  in engine mode
 					except powerfactory.ExitError as error:
-						# Will attempt to connect to license upto this many times
+						# Will attempt to connect to license up to this many times
 						if (
 								app_init_count < constants.PowerFactory.license_activation_attempts and
 								error.code in constants.PowerFactory.license_activation_error_codes
@@ -2305,38 +2227,13 @@ class PowerFactory:
 
 		return None
 
-	# def check_parallel_processing(self):
-	# 	"""
-	# 		Function determines the number of processes that powerfactory is set to run
-	# 	"""
-	# 	# TODO: Requires reference to ParallelMan Settings to work, needs further development
-	# 	# NOT CURRENTLY WORKING
-	#
-	# 	# Get number of cpus available
-	# 	number_of_cpu = multiprocessing.cpu_count()
-	#
-	# 	# Check number of processors set to be run
-	# 	current_processors = app.GetNumSlave()
-	#
-	# 	# Display warning of a small value
-	# 	if current_processors == 1 or current_processors < (number_of_cpu-1):
-	# 		self.logger.warning(
-	# 			(
-	# 				'Your PowerFactory settings are set to only allow running on {} parallel processors, this does not'
-	# 				'take full advantage of the machines capability which has {} processors and therefore may take '
-	# 				'longer to run.'
-	# 			).format(current_processors, number_of_cpu)
-	# 		)
-	#
-	# 	return None
-
 	def change_parallel_settings(self, delay=constants.PowerFactory.parallel_time_out, reduce=False):
 		"""
 			Function will change some of the parallel processing settings to increase the time allowed
 			before a response is necessary
 		:param int delay: Maximum delay when waiting for parallel processor response
 		:param bool reduce: (optional) If set to True then will reduce as well as increase
-		:return int existing_delay: Returns the original delay value incase needs restoring
+		:return int existing_delay: Returns the original delay value in case needs restoring
 		"""
 		# Before trying to activate a project confirm that PowerFactory has been initialised
 		if not app:
@@ -2421,6 +2318,10 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 	"""
 		Loops through each of the projects in the DataFrame of study cases and activates them to check they work
 	:param pd.DataFrame df_study_cases:
+	:param str uid:  Unique identifier for this study
+	:param file_io.LFSettings lf_settings:  Settings for load flow studies
+	:param file_io.FSSettings fs_settings:  Settings for frequency scan studies
+	:param str export_pth:  Path to export all results
 	:return dict pf_projects:  Returns a dictionary of PF project instances
 	"""
 	logger = constants.logger
@@ -2512,7 +2413,7 @@ def run_pre_case_checks(
 
 	# If a path has been provided then write it to excel
 	if export_pth:
-		# Confirm has a '.xlsx' extenion before continuing
+		# Confirm has a '.xlsx' extension before continuing
 		if not export_pth.endswith(constants.Results.extension):
 			export_pth = '{}{}'.format(export_pth, constants.Results.extension)
 

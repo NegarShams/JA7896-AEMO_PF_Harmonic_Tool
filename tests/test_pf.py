@@ -316,7 +316,7 @@ class TestPFProject(unittest.TestCase):
 				usecols=(3,), skiprows=3, header=None, squeeze=True
 			)
 
-		# Create instance with detaield settings rather than existing command
+		# Create instance with detailed settings rather than existing command
 		lf_settings = pscharmonics.file_io.LFSettings(
 			existing_command=str(), detailed_settings=df.iloc[1:]
 		)

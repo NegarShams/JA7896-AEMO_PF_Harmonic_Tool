@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 
 # Import main module
+# noinspection PyUnusedLocal
 import pscharmonics
 
 # Directory where all test files will be located
