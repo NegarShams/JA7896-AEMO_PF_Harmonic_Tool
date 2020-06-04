@@ -85,8 +85,18 @@ def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into
 	results = results[:-1]
 	elmres.Release()
 
-	df = pd.DataFrame(results).transpose()
+	logger = constants.logger
+	logger.debug(results)
+
+
 	if write_as_df:
+		# For some reason when running directly in PowerFactory cannot initiate immediately into a populated DataFrame
+		# therefore create empty dataFrame and then populate
+		logger.debug('Processing results: {} into a Dataframe'.format(elmres))
+		df = pd.DataFrame()
+		for i,res in enumerate(results):
+			# TODO: This section is preventing running from PowerFactory directly
+			df[res[0]] = res[2:-1]
 		return df
 	else:
 		return scale[0], results
@@ -168,6 +178,14 @@ class PFStudyCase:
 
 
 		self.logger = constants.logger
+		self.logger.debug(
+			(
+				'Initialising new PFStudyCase instance with name {} for:\n'
+				'\tProject: {}\n'
+				'\tStudy Case: {}\n'
+				'\tOperating Scenario {}\n'
+			).format(name, prj, sc, op)
+		)
 
 		# Status checker on whether this is the base_case study case.  If true then certain functions and additional
 		# data sets are populated
@@ -199,6 +217,11 @@ class PFStudyCase:
 		# If no results path is provided then warn user and saved results to same folder as the script
 		if not res_pth:
 			res_pth = os.path.abspath(os.path.join(os.path.abspath(__file__), '..'))
+			self.logger.debug(
+				'No results path provided for PFStudyCase instance <{}> and so default path of {} assumed'.format(
+					self.name, res_pth
+				)
+			)
 		self.res_pth = res_pth
 
 		# List of paths that contain the export files
@@ -207,7 +230,12 @@ class PFStudyCase:
 		# DataFrame that will be populated with status of each contingency run, only created for the base_case as for
 		# the actual contingency cases analysis is run individually on each study case / operating scenario combination
 		if self.base_case:
-			self.df = pd.DataFrame(columns=constants.Contingencies.df_columns)
+			self.logger.debug('The PFStudyCase instance <{}> that is being initialised is a base case'.format(self.name))
+			self.logger.debug('Pandas version is: {}'.format(pd.__version__))
+			# For some unknown reason when running from PowerFactory doesn't like to initialise an empty DataFrame with
+			# preset columns and therefore need to create empty DataFrame and subsequently assign the columns
+			# self.df = pd.DataFrame(columns=constants.Contingencies.df_columns)
+			self.df = pd.DataFrame()
 
 	def toggle_state(self, deactivate=False):
 		"""
@@ -227,9 +255,10 @@ class PFStudyCase:
 				err = 0
 		elif not deactivate and not self.active:
 			# Activate both study case and operating scenario
-			err = self.sc.Activate()
+			err1 = self.sc.Activate()
 			# TODO: Confirm correct operating scenario is actually being activated
-			err = self.op.Activate() + err
+			err2 = self.op.Activate()
+			err = err1 + err2
 			self.active = True
 		else:
 			err = 0
@@ -240,6 +269,18 @@ class PFStudyCase:
 		elif err > 0:
 			self.logger.error('Unable to activate either the study case {} or operating scenario {}'.format(
 				self.sc, self.op)
+			)
+		elif deactivate:
+			self.logger.debug(
+				'Successfully deactivated <{}> study case {} with operating scenario {}'.format(
+					self.name, self.sc, self.op
+				)
+			)
+		else:
+			self.logger.debug(
+				'Successfully activated <{}> study case {} with operating scenario {}'.format(
+					self.name, self.sc, self.op
+				)
 			)
 
 		return None
@@ -747,20 +788,31 @@ class PFStudyCase:
 			with the status being updated in the DataFrame.
 		:return:
 		"""
+		self.logger.debug(
+			'For ({}, {}, {}) processing contingency pre-case check results'.format(self.prj, self.sc, self.op)
+		)
+
 		c = constants.Contingencies
 		df = retrieve_results(elmres=self.cont_results, res_type=0, write_as_df=True)
+		self.logger.debug('Results retrieved for contingency results {}'.format(self.cont_results))
 
 		# If an empty DataFrame is returned then means all contingencies failed so set status to False
 		if df.empty:
-			self.df.loc[:, c.status] = False
+			self.df[c.status] = False
+			self.logger.info(
+				'No successful contingencies for study case {}, ({}, {}, {})'.format(
+					self.name, self.prj, self.sc, self.op)
+			)
 		else:
 			# Set columns to be based on first index
-			df.columns = df.loc[0, :]
+			self.logger.debug('Setting columns for DataFrame')
+			self.logger.debug(df)
+			# df.columns = df.iloc[0, :]
 
 			# Drop non-relevant rows
-			df.drop(labels=[0, 1], axis=0, inplace=True)
+			# df.drop(labels=[0, 1], axis=0, inplace=True)
 			# Drop last row which also isn't needed
-			df.drop(df.tail(1).index, inplace=True)
+			# df.drop(df.tail(1).index, inplace=True)
 
 			# Set the index for the DataFrame based on the object number
 			df.set_index(c.col_number, inplace=True)
@@ -879,6 +931,11 @@ class PFStudyCase:
 		:param file_io.FSSettings fs_settings:  (optional=None) Settings to use for the frequency sweep settings
 		:return None:
 		"""
+		self.logger.debug('Creating studies for case {} ({}, {}, {})'.format(self.name, self.prj, self.sc, self.op))
+
+		# Case needs to be active for studies to be created
+		self.toggle_state()
+
 		self.create_load_flow(lf_settings=lf_settings)
 		self.create_results_files()
 		self.create_freq_sweep(fs_settings=fs_settings)
@@ -1228,12 +1285,8 @@ class PFProject:
 			)
 
 			study_case_class.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
-			# TODO: replace with a create_studies command
-			# Assign relevant load flow to study case
-			# study_case_class.create_load_flow(lf_settings=self.lf_settings)
-			# # Assign relevant frequency scan to study case
-			# study_case_class.create_freq_sweep(fs_settings=self.fs_settings)
 
+			self.logger.debug('Duplicated case and associated studies created for intact model with name {}'.format(name))
 			base_study_cases[name] = study_case_class
 
 		return base_study_cases
@@ -1249,7 +1302,19 @@ class PFProject:
 		"""
 		# Ensure study case is deactivated before trying to copy
 		self.deactivate_study_case()
+
+		# Copy study case
+		self.logger.debug(
+			'Copying study case: {} to folder {} with new name {}'.format(
+				sc, self.sc_folder, name
+			))
 		new_sc = self.sc_folder.AddCopy(sc, name)
+
+		# Copy operating scenario
+		self.logger.debug(
+			'Copying operating scenario {} to folder {} with new name {}'.format(
+				op, self.op_folder, name
+			))
 		new_os = self.op_folder.AddCopy(op, name)
 
 		if new_sc is None or new_os is None:
@@ -1559,6 +1624,9 @@ class PFProject:
 		# Loop through each of the base study cases, run the contingency analysis, process the results
 		# and then combine the results into a single dataframe
 		for sc_name, sc in self.base_sc.items():
+			self.logger.debug(
+				'For ({}, {}, {}) carrying out pre-case check of contingencies'.format(self.prj, sc.sc, sc.op)
+			)
 			# Ensure study case is active in PowerFactory
 			sc.toggle_state()
 
@@ -1679,6 +1747,9 @@ class PFProject:
 			pfclass=constants.PowerFactory.autotasks_command,
 			name='{}_{}'.format(constants.General.cmd_autotasks_leader, self.uid)
 		)
+
+		self.logger.debug('Auto execution command {} created for project {}'.format(task_auto, self.prj))
+
 		return task_auto
 
 	def find_terminals(self, terminals_to_include, include_mutual=False):
@@ -1693,7 +1764,11 @@ class PFProject:
 
 		# Empty DataFrame which will be populated with the status of this terminal for this project
 		c = constants.Terminals
-		df = pd.DataFrame(columns=c.columns)
+		# For some unknown reason when running from PowerFactory doesn't like to initialise an empty DataFrame with
+		# preset columns and therefore need to create empty DataFrame and subsequently assign the columns
+		# df = pd.DataFrame(columns=c.columns)
+		df = pd.DataFrame()
+		# df.columns = c.columns
 
 		# Confirm project is active
 		# TODO: What happens if try to find a terminal that exists in project but not study case
@@ -2378,12 +2453,19 @@ def run_pre_case_checks(
 		prj.project_state()
 
 		# Obtain contingency analysis results for all relevant cases in this project
+		logger.info('For project {}, running a check on all of the contingencies'.format(project_name))
 		df_cont = prj.pre_case_check(contingencies=contingencies, contingencies_cmd=contingencies_cmd)
 		dfs_cont.append(df_cont)
 
+		logger.info(
+			'For project {}, testing of contingencies completed, checking validity of provided terminals'.format(
+				project_name
+			)
+		)
 		# Look for terminals in project and get DataFrame of those which cannot be found
 		df_term = prj.find_terminals(terminals_to_include=terminals, include_mutual=include_mutual)
 		dfs_term[project_name] = df_term
+
 
 	# Combine returned DataFrames into a single DataFrame
 	df_case_check_cont = pd.concat(dfs_cont)

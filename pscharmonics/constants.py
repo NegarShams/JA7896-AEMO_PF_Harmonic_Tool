@@ -29,7 +29,7 @@ __title__ = 'PSC Automated Frequency Scan Tool'
 logger_name = 'PSC'
 logger = None
 
-DEBUG = False
+DEBUG = True
 
 # Unique identifier populated for each study run
 uid = time.strftime('%Y%m%d_%H%M%S')
@@ -314,9 +314,9 @@ class Contingencies:
 	status = 'Convergent'
 
 	# Columns that are used for the contingency headers
-	df_columns = (
+	df_columns = [
 		prj, sc, op, cont, idx, status
-	)
+	]
 
 	# Maximum number of contingencies before which studies will be run using parallel processing
 	parallel_threshold = 50
@@ -342,9 +342,9 @@ class Terminals:
 	planned_name = 'Planned Mutual Impedance Name'
 
 	# Columns that are used for the contingency headers
-	columns = (
-		name, sub1, bus1, include_mutual, status, planned_name, sub2, bus2,
-	)
+	columns = [
+		name, sub1, bus1, include_mutual, status, planned_name, sub2, bus2
+	]
 
 	# Character used to join terminals together
 	join_char = '_'
@@ -561,7 +561,7 @@ class StudySettings:
 	project = 'Database'
 	studycase = 'Studycase'
 	scenario = 'Operational Scenario'
-	studycase_columns = (name, project, studycase, scenario)
+	studycase_columns = [name, project, studycase, scenario]
 
 	# Default values
 	def_results_name = 'Results_'

@@ -12,6 +12,7 @@ import logging
 import logging.handlers
 import sys
 import os
+import traceback
 
 import pscharmonics.constants as constants
 
@@ -21,7 +22,7 @@ class Logger:
 	"""
 	logger = None # type: logging.Logger
 
-	def __init__(self, pth_debug_log=str(), pth_progress_log=str(), pth_error_log=str(), app=None, debug=False):
+	def __init__(self, pth_debug_log=str(), pth_progress_log=str(), pth_error_log=str(), app=None):
 		"""
 			Initialise logger
 		:param str pth_progress_log:  Full path to the location of the log file that contains the process messages
@@ -46,7 +47,7 @@ class Logger:
 		self.pth_error_log = pth_error_log
 		self.app = app
 		self.pf_executed = False
-		self.debug_mode = debug
+		self.debug_mode = constants.DEBUG
 
 		self.file_handlers=[]
 
@@ -240,7 +241,9 @@ class Logger:
 
 	def debug(self, msg):
 		""" Handler for debug messages """
-		# Debug messages only written to logger
+		# Only print output to powerfactory if it has been passed to logger
+		if self.app and self.pf_executed:
+			self.app.PrintPlain(msg)
 		self.logger.debug(msg)
 
 	def info(self, msg):
@@ -279,6 +282,31 @@ class Logger:
 			except AttributeError:
 				pass
 		self.logger.critical('function <{}> reported {}'.format(caller, msg))
+
+	def exception_handler(self, exception_type, value, tb):
+		"""
+			If an unhandled exception occurs during running of the code it is directed to here
+		:param exception_type:
+		:param value: str
+		:param tb:
+		:return:
+		"""
+		msg = (
+			(
+				'Script failed with the following exception raised by Python: {0}\n\n'
+				'Below is the complete traceback that was created by Python: \n{}'
+			).format(value, traceback.format_exception(exception_type, value, tb))
+		)
+
+		if self.app and self.pf_executed:
+			try:
+				# Try statement since possible that an error has occurred and it might not run
+				self.app.PrintError(msg)
+			# If attribute doesn't exist then continue
+			except AttributeError:
+				pass
+
+		self.logger.critical(msg=msg)
 
 	def flush(self):
 		""" Flush all loggers to file before continuing """

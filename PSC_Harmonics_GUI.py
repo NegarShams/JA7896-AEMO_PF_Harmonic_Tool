@@ -18,6 +18,7 @@
 import logging
 import time
 import pscharmonics
+import sys
 
 if __name__ == '__main__':
 	"""
@@ -27,8 +28,10 @@ if __name__ == '__main__':
 	t_start = time.time()
 
 	# Initialise and run log message
-	logger = logging.getLogger(pscharmonics.constants.logger_name)
-	logger.setLevel(level=logging.DEBUG)
+	# logger = logging.getLogger(pscharmonics.constants.logger_name)
+	# logger.setLevel(level=logging.DEBUG)
+	sys.excepthook = pscharmonics.constants.logger.exception_handler
+	logger = pscharmonics.constants.logger
 
 	logger.info('Running {} in Graphical User Interface (GUI) Mode'.format(pscharmonics.constants.__title__))
 

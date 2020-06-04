@@ -487,6 +487,9 @@ class MainGui:
 		else:
 			self.logger.warning('No pre-case results file selected')
 
+		# Raise to top window
+		self.master.lift()
+
 		return None
 
 	def combine_results(self):
@@ -567,6 +570,9 @@ class MainGui:
 		else:
 			self.logger.warning('No results file selected')
 
+		# Raise to top window
+		self.master.lift()
+
 		return None
 
 	def load_settings_file(self):
@@ -623,7 +629,8 @@ class MainGui:
 						text='Settings file: {} loaded but unable to initialise projects'.format(file_name)
 					)
 
-		# Return the parent window
+		# Raise window to top view again
+		self.master.lift()
 		# self.master.deiconify()
 
 		return None
