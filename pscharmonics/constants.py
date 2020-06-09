@@ -305,6 +305,8 @@ class Contingencies:
 	""" Contains constants associated with naming of contingencies used in export """
 	# Name to give for base_case / intact system condition
 	intact = 'Intact'
+	# This is the default contingency number that is given for the intact study case
+	intact_cont_num = -1
 
 	prj = General.prj
 	sc = General.sc

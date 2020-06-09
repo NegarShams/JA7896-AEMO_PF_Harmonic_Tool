@@ -12,7 +12,7 @@ import pscharmonics.file_io as file_io
 import pscharmonics.pf as pf
 import pscharmonics.constants as constants
 import pscharmonics.gui as gui
-import pscharmonics.processing as processing
+# import pscharmonics.processing as processing
 import sys
 
 if constants.logger is None:

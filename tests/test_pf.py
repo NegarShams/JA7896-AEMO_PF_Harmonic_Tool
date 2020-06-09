@@ -1241,6 +1241,54 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		cls.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
 
+	def test_pre_case_check_no_contingencies(self):
+		"""
+			Tests that if a pre-case check is run with no contingencies it still returns something useful
+		:return:
+		"""
+		c = pscharmonics.constants.Contingencies
+
+		# Inputs file for no contingencies
+		inputs_file = os.path.join(TESTS_DIR, 'Inputs_NoContingencies.xlsx')
+		settings = pscharmonics.file_io.StudyInputs(pth_file=inputs_file)
+
+		# Target excel path
+		excel_pth = os.path.join(TESTS_DIR, 'pre_case_check_no_cont.xlsx')
+		# Check doesn't exist initially and if it does then delete
+		if os.path.isfile(excel_pth):
+			os.remove(excel_pth)
+		self.assertFalse(os.path.exists(excel_pth))
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=settings.cases,
+			uid=uid
+		)
+
+		# Get DataFrame from pre_case check and also ask to create file
+		# Only interested in the pre_case check for the contingencies at this stage
+		df_summary, df_term = pscharmonics.pf.run_pre_case_checks(
+			pf_projects=pf_projects,
+			terminals=settings.terminals,
+			include_mutual=True,
+			export_pth=excel_pth,
+			contingencies=settings.contingencies
+		)
+
+		# Confirm the returned terminals match the expected length
+		self.assertEqual(len(df_term.index), 7)
+
+		# Confirm DataFrame is expected length (2 intact cases) and number of non_convergent cases is as expected
+		# (1 non-convergent intact case)
+		self.assertEqual(len(df_summary.index), 2)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 1)
+
+		# Confirm that excel spreadsheet has been created (and delete if necessary)
+		self.assertTrue(os.path.isfile(excel_pth))
+		if test_delete_excel_outputs:
+			os.remove(excel_pth)
+
 	def test_pre_case_check_for_all_projects(self):
 		"""
 			Function tests that running pre_case check for all projects correctly reports non-convergent cases
@@ -1277,8 +1325,8 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		self.assertEqual(len(df_term.index), 7)
 
 		# Confirm DataFrame is expected length and number of non_convergent cases is as expected
-		self.assertEqual(len(df_summary.index), 4)
-		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 2)
+		self.assertEqual(len(df_summary.index), 6)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 4)
 
 		# Confirm that excel spreadsheet has been created (and delete if necessary)
 		self.assertTrue(os.path.isfile(excel_pth))
@@ -1288,6 +1336,43 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 	def test_produce_outputs(self):
 		"""
 			Function tests that running pre_case check for all projects correctly reports non-convergent cases
+			and produces a suitable excel export
+		:return:
+		"""
+		# Create random path for temporary files
+		target_pth = os.path.join(
+			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+		)
+		if os.path.isdir(target_pth):
+			raise SyntaxError('Random path {} already exists'.format(target_pth))
+		else:
+			os.mkdir(target_pth)
+		self.settings.settings.export_folder = target_pth
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid,
+			lf_settings=self.settings.lf_settings,
+			fs_settings=self.settings.fs_settings,
+			export_pth=target_pth
+		)
+
+		# Iterate through each project and create the various cases, the includes running a pre-case check but no
+		# output is saved at this point
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=self.settings)
+
+		# Find out how many results produced and then confirm that matches with expected number
+		num_results = len([name for name in os.listdir(target_pth) if os.path.isfile(os.path.join(target_pth, name))])
+		self.assertEqual(num_results, 4)
+
+		if test_delete_excel_outputs:
+			os.remove(target_pth)
+
+	def test_produce_outputs_no_cont(self):
+		"""
+			Function tests that running studies for a projects correctly reports non-convergent cases
 			and produces a suitable excel export
 		:return:
 		"""
@@ -1429,6 +1514,46 @@ class TestPFDetailedInputs(unittest.TestCase):
 		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
 		# TODO: Confirm results as expected
+
+		if test_delete_excel_outputs:
+			os.remove(target_pth)
+
+	def test_complete_test_produce_outputs_3_no_contingencies(self):
+		"""
+			Function runs tests using detailed outputs to produce a set of results that can be used elsewhere
+
+			This export is for a study case with no contingencies
+		:return:
+		"""
+		# Create path for results from detailed tests
+		target_pth = os.path.join(TESTS_DIR, 'Detailed_3')
+		if os.path.isdir(target_pth):
+			print('Existing contents in path: {} will be deleted'.format(target_pth))
+			files = glob.glob(target_pth + '\\*')
+			for f in files:
+				os.remove(f)
+		else:
+			os.mkdir(target_pth)
+
+		# Import settings for Detailed Study
+		settings_file = os.path.join(TESTS_DIR, 'Inputs_Detailed3_No_cont.xlsx')
+		inputs = pscharmonics.file_io.StudyInputs(pth_file=settings_file)
+
+		inputs.settings.export_folder = target_pth
+
+		# Create projects
+		uid = 'DETAILED_3'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=inputs.cases,
+			uid=uid,
+			lf_settings=inputs.lf_settings,
+			fs_settings=inputs.fs_settings,
+			export_pth=target_pth
+		)
+
+		# Iterate through each project and create the various cases, the includes running a pre-case check but no
+		# output is saved at this point
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
 		if test_delete_excel_outputs:
 			os.remove(target_pth)

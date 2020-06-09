@@ -532,7 +532,6 @@ class TestCombineResults(unittest.TestCase):
 					'produce'
 			)
 
-
 	def test_export_single_results_set(self):
 		""" Tests exporting of a single results set works """
 
@@ -544,6 +543,9 @@ class TestCombineResults(unittest.TestCase):
 			os.remove(target_file)
 
 		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_paths)
+
+		# Confirm file created
+		self.assertTrue(os.path.exists(target_file))
 
 	def test_export_single_results_set2(self):
 		""" Tests exporting of a single results set works """
@@ -557,6 +559,9 @@ class TestCombineResults(unittest.TestCase):
 
 		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_paths)
 
+		# Confirm file created
+		self.assertTrue(os.path.exists(target_file))
+
 	def test_export_combined_results_set(self):
 		""" Tests exporting of a single results set works """
 
@@ -568,3 +573,21 @@ class TestCombineResults(unittest.TestCase):
 			os.remove(target_file)
 
 		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_paths)
+
+	def test_export_single_results_set3_no_contingencies(self):
+		""" Tests exporting of a results set with no contingencies (only the base case) works """
+
+		# Source path to search and confirm exist before continuing
+		src_path = os.path.join(TESTS_DIR, 'Detailed_3')
+		self.assertTrue(os.path.isdir(src_path))
+
+		# Target file for export
+		target_file = os.path.join(TESTS_DIR, 'combined_results_no_cont.xlsx')
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=(src_path, ))
+
+		# Confirm file created
+		self.assertTrue(os.path.exists(target_file))

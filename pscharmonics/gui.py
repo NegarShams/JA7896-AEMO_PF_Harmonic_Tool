@@ -515,7 +515,7 @@ class MainGui:
 				raise RuntimeError('Error running the pre-case checks')
 
 		elif results=='post':
-			if os.path.isfile(self.pre_case_file):
+			if os.path.isfile(self.results_file):
 				# Launch excel with the pre_case file open
 				os.system('start excel.exe "%s"' % (self.results_file, ))
 			else:

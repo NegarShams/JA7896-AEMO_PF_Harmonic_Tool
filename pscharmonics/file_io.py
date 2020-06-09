@@ -599,7 +599,10 @@ class PreviousResultsExport:
 		sc_name, cont_name = self.process_file_name(file_name=filename)
 
 		# Create full name for study
-		full_name = '{}_{}'.format(sc_name, cont_name)
+		if cont_name:
+			full_name = '{}_{}'.format(sc_name, cont_name)
+		else:
+			full_name = sc_name
 
 		columns = list(zip(*df.columns.tolist()))
 		# To manually deal with renaming of mutual impedance values

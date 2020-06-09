@@ -583,6 +583,11 @@ class PFStudyCase:
 		name = '{}_{}'.format(constants.General.cmd_cont_leader, constants.uid)
 		cont_analysis = None
 
+		# Add intact contingency to DataFrame since won't appear in list of outages but a result will
+		# be returned
+		self.df.loc[c.intact, c.cont] = c.intact
+		self.df.loc[c.intact, c.idx] = c.intact_cont_num
+
 		# Confirm load flow and results file has already been defined since needed for output settings
 		if self.ldf is None:
 			self.logger.error(
@@ -631,9 +636,9 @@ class PFStudyCase:
 					)
 					cont_analysis = None
 
-			if fault_cases and not cont_analysis:
-				# Create Contingency Analysis command and add fault cases to it if has not been possible to establish
-				# cont_analysis from the input provided by the user.
+			if not cont_analysis:
+				# Create a contingency analysis function with no contingencies in it so if no fault-cases will
+				# just work without.
 				cont_analysis, _ = create_object(
 					location=self.sc,
 					pfclass=constants.PowerFactory.pf_cont_analysis,
@@ -659,11 +664,39 @@ class PFStudyCase:
 					self.df.loc[cont_name, c.cont] = cont_name
 					counter += 1
 
+			# if fault_cases and not cont_analysis:
+			# 	# Create Contingency Analysis command and add fault cases to it if has not been possible to establish
+			# 	# cont_analysis from the input provided by the user.
+			# 	# cont_analysis, _ = create_object(
+			# 	# 	location=self.sc,
+			# 	# 	pfclass=constants.PowerFactory.pf_cont_analysis,
+			# 	# 	name=name
+			# 	# )
+			#
+			# 	# Loop through each fault case and create a contingency with each contingency being added to the
+			# 	# study case specific dataframe.  The status of each contingency is then updated once the initial
+			# 	# pre-case check is carried out.
+			# 	counter = 1
+			# 	for cont_name, fault in fault_cases.items():
+			# 		outage, _ = create_object(
+			# 			location=cont_analysis,
+			# 			pfclass=constants.PowerFactory.pf_outage,
+			# 			name=cont_name
+			# 		)
+			# 		# Set Outage up to represent this fault case
+			# 		outage.cpCase = fault
+			#
+			# 		# Update DataFrame with details of this contingency
+			# 		outage.number = counter
+			# 		self.df.loc[cont_name, c.idx] = outage.number
+			# 		self.df.loc[cont_name, c.cont] = cont_name
+			# 		counter += 1
+
 			if not cont_analysis:
 				# No command or fault cases provided so raise error to user
 				self.logger.critical(
 					(
-						'No fault cases provided as input and no existing command existed in study case <{}>.'
+						'Error creating a command for running of the contingency analysis in study case <{}>.'
 						' The following inputs were provided:\n\t Fault Cases = {}\n\tCmd = {}'
 					).format(self.sc, fault_cases, cmd)
 				)
@@ -949,6 +982,8 @@ class PFStudyCase:
 			).format(self.sc, self.ldf, self.fs, self.fs_export_cmd, export_pth)
 		)
 
+		return None
+
 	def set_results_export(self, result, res_type):
 		"""
 			Function will create a results export command (.ComRes) to then use to deal with exporting all the results
@@ -1038,45 +1073,48 @@ class PFStudyCase:
 		# Loop through all contingencies in this case which are convergent
 		new_cases = list()
 		for cont_name, cont_case in self.df[self.df[constants.Contingencies.status]==True].iterrows():
-			# Create name for new case as combination of provided name and contingency
-			new_name = '{}{}{}'.format(self.name, constants.Results.joiner, cont_name)
+			# Skips the intact case since don't want to produce an extra test
+			if cont_name != constants.Contingencies.intact:
 
-			# Copy the current study_case and operating scenario
-			new_sc = sc_folder.AddCopy(self.sc, new_name)
-			new_op = op_folder.AddCopy(self.op, new_name)
+				# Create name for new case as combination of provided name and contingency
+				new_name = '{}{}{}'.format(self.name, constants.Results.joiner, cont_name)
 
-			# Create new PFStudyCase instance
-			case = PFStudyCase(
-				name=new_name,
-				sc=new_sc,
-				op=new_op,
-				prj=self.prj,
-				res_pth=res_pth
-			)
+				# Copy the current study_case and operating scenario
+				new_sc = sc_folder.AddCopy(self.sc, new_name)
+				new_op = op_folder.AddCopy(self.op, new_name)
 
-			# Get the contingency specific to this case and apply the outage which is a PowerFactory Cont Outage element
-			cont_outage = self.cont_analysis.GetContents('{}.{}'.format(cont_name, constants.PowerFactory.pf_outage))
-
-			if len(cont_outage) == 0:
-				self.logger.error(
-					(
-						'Unable to find outage {} in contingency analysis {} and therefore study_case {} cannot be run'
-					).format(cont_name, self.cont_analysis, new_name)
+				# Create new PFStudyCase instance
+				case = PFStudyCase(
+					name=new_name,
+					sc=new_sc,
+					op=new_op,
+					prj=self.prj,
+					res_pth=res_pth
 				)
-				continue
-			else:
-				# Apply the outage detailed in this Cont Outage element
-				case.apply_outage(cont_outage[0])
 
-			# Update load flow and frequency sweep commands to reflect relevant locations
-			case.create_studies()
+				# Get the contingency specific to this case and apply the outage which is a PowerFactory Cont Outage element
+				cont_outage = self.cont_analysis.GetContents('{}.{}'.format(cont_name, constants.PowerFactory.pf_outage))
 
-			self.logger.debug(
-				(
-					'New case {} created for Study Case {}, Operating Scenario {} with Contingency {}'
-				).format(new_name, new_sc, new_op, cont_name)
-			)
-			new_cases.append(case)
+				if len(cont_outage) == 0:
+					self.logger.error(
+						(
+							'Unable to find outage {} in contingency analysis {} and therefore study_case {} cannot be run'
+						).format(cont_name, self.cont_analysis, new_name)
+					)
+					continue
+				else:
+					# Apply the outage detailed in this Cont Outage element
+					case.apply_outage(cont_outage[0])
+
+				# Update load flow and frequency sweep commands to reflect relevant locations
+				case.create_studies()
+
+				self.logger.debug(
+					(
+						'New case {} created for Study Case {}, Operating Scenario {} with Contingency {}'
+					).format(new_name, new_sc, new_op, cont_name)
+				)
+				new_cases.append(case)
 
 		return new_cases
 
