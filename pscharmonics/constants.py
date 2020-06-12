@@ -57,7 +57,9 @@ class General:
 	error_log = 'ERROR'
 
 	# TODO: UNITTEST - Check whether this file exists
-	user_guide_reference='JA7896-03:  PSC Harmonics UserGuide.pdf'
+	user_guide_reference='JA7896-03-00 PSC Harmonics User Guide.pdf'
+	user_guide_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'docs'))
+	user_guide_pth = os.path.join(user_guide_folder, user_guide_reference)
 
 	# These are the threshold at which log messages will either be warned about or deleted
 	threshold_warning = 500
@@ -513,7 +515,7 @@ class StudyInputs:
 
 class GuiDefaults:
 	gui_title='PSC - Automated PowerFactory Frequency Scans Tool'
-	color_main_window = '#%02x%02x%02x' % (239, 243, 241)
+
 
 	# Default labels for buttons (only those which get changed during running)
 	button_select_settings_label = 'Select Settings File'
@@ -538,7 +540,9 @@ class GuiDefaults:
 	hyperlink_psc_website = 'https://www.pscconsulting.com/'
 
 	# Colors
-	color_pop_up_window = 'light grey'
+	color_main_window = '#%02x%02x%02x' % (239, 243, 241)
+	# Color of pop-up windows which may be different to main window
+	color_pop_up_window = color_main_window
 	error_color = '#%02x%02x%02x' % (255, 32, 32)
 
 

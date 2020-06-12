@@ -46,4 +46,11 @@ class TestPowerFactoryConstants(unittest.TestCase):
 		self.assertRaises(EnvironmentError, pscharmonics.constants.PowerFactory, mock_python_version='3.1')
 
 
+class TestUserGuideExists(unittest.TestCase):
+	""" Function confirms that the references user guide actually exists in case it gets deleted"""
 
+	def test_existence(self):
+		""" Confirm file exists where it's supposed to """
+		user_guide = pscharmonics.constants.General.user_guide_pth
+
+		self.assertTrue(os.path.isfile(user_guide), msg='User guide {} does not exist'.format(user_guide))

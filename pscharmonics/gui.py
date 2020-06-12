@@ -1,12 +1,6 @@
 """
 	Script to handle production of GUI and returning files to be processed together to user
 
-	TODO: Main GUI needs to have
-	TODO 1. Button for study file
-	TODO 2. Button for review / edit settings (pop-up with another window for each of the settings files being used)
-	TODO 3. Button for pre-case check runner
-	TODO 4. Button for pre-case check status (click to open results)
-	TODO 5. Button to run studies
 """
 import tkinter as tk
 import tkinter.filedialog
@@ -156,6 +150,244 @@ class CustomStyles:
 
 		return None
 
+class CombineFiles:
+	"""
+		Allows the user to select folders which contain previous results to be processed and displays a list of all the files which will be processed
+	"""
+	def __init__(self, master, parent, styles, title='Combine Results', start_directory=str(),
+				 def_ext=constants.Results.extension):
+		"""
+			Initialise GUI
+		:param CustomStyles styles: - Handle to custom styles definition
+		:param str title: (optional) - Title to be used for main window
+		:param str start_directory: (optional) - Path to a directory to use for processing
+		:param str def_ext: (optional) = '.xlsx', extension of files to search for when using a folder selection
+		"""
+		self.logger = logging.getLogger(constants.logger_name)
+
+		# General constants which need to be initialised
+		self._row = 0
+		self._col = 0
+
+		# Custom styles
+		self.styles = styles
+
+		# Parent reference to allow command button to be enabled
+		self.parent = parent
+
+		# Initial results pth assumed to be same as script location and is then updated for when each file is selected
+		if not start_directory:
+			start_directory = os.path.dirname(os.path.abspath(__file__))
+		self.results_pth = start_directory
+
+		# Is populated with a list of file paths to be returned
+		self.results_files_list = list()
+		# Target file to export results to
+		self.export_file = str()
+
+		# Initialise constants and tk window
+		self.master = master
+		self.master.title = title
+
+		# Ensure that on_closing command is processed correctly
+		self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
+		# Set to True if aborted rather then study results processed
+		self.abort = False
+
+		# Default extension for results
+		self.ext = def_ext
+
+		# Add command button for user to select folders
+		self.cmd_add_folder = self.add_cmd(
+			label='Add Previous Results Folder',
+			cmd=self.add_new_folder,
+			tooltip='Click to select a folder of previously produced raw results'
+		)
+
+		# Add label before scroll bar
+		_ = self.add_main_label(row=self.row(1), col=self.col(), label='Results folders to be combined:')
+
+		self.lbl_results_files = tkinter.scrolledtext.ScrolledText(master=self.master)
+		self.lbl_results_files.grid(row=self.row(1), column=self.col())
+		self.lbl_results_files.insert(tk.INSERT, 'No Folders Selected')
+
+		self.cmd_process_results = self.add_cmd(
+			label='Process Results',
+			cmd=self.process,
+			tooltip='Click to combine results shown in folder above',
+			row=self.row(1), col=self.col()
+		)
+
+		self.logger.debug('GUI window created')
+		# Produce GUI window
+		self.master.mainloop()
+
+	def row(self, i=0):
+		"""
+			Returns the current row number + i
+		:param int i: (optional=0) - Will return the current row number + this value
+		:return int _row:
+		"""
+		self._row += i
+		return self._row
+
+	def col(self, i=0):
+		"""
+			Returns the current col number + i
+		:param int i: (optional=0) - Will return the current col number + this value
+		:return int _row:
+		"""
+		self._col += i
+		return self._col
+
+	def add_cmd(self, label, cmd, state=tk.NORMAL, tooltip=str(), row=None, col=None):
+		"""
+			Function just adds the command button to the GUI which is used for loading the SAV case
+		:param int row: (optional) Row number to use
+		:param int col: (optional) Column number to use
+		:param str label:  Label to use for button
+		:param func cmd: Command to use when button is clicked
+		:param int state:  Tkinter state for button initially
+		:param str tooltip:  Message that pops up if hover over button
+		:return None:
+		"""
+		# If no number is provided for row or column then assume to add 1 to row and 0 to column
+		if not row:
+			row = self.row(1)
+		if not col:
+			col = self.col()
+
+		button = ttk.Button(
+			self.master, text=label, command=cmd, style=self.styles.cmd_buttons, state=state)
+		button.grid(row=row, column=col, padx=5, pady=5, sticky=tk.W+tk.E)
+		CreateToolTip(widget=button, text=tooltip)
+
+		return button
+
+	def add_new_folder(self):
+		"""
+			Function to load Tkinter.askopenfilename for the user to select a file and then adds to the
+			self.file_list scrolling text box
+		:return: None
+		"""
+		# User will be able to add folder
+		file_paths = file_selector(
+			initial_pth=self.results_pth, save_dir=True,
+			lbl_folder_select='Select folder containing results files'
+		)
+
+		# Make sure stays on top
+		self.master.lift()
+
+		# User can select multiple and so following loop will add each one
+		for file_pth in file_paths:
+			self.logger.debug('Results folder {} added as input folder'.format(file_pth))
+			self.results_pth = os.path.dirname(file_pth)
+
+			# Add complete file pth to results list
+			if not self.results_files_list:
+				# If initial list is empty then will need to replace with initial string
+				self.lbl_results_files.delete(1.0, tk.END)
+
+			self.results_files_list.append(file_pth)
+			self.lbl_results_files.insert(tk.END,
+										  '{} - {}\n'.format(len(self.results_files_list), file_pth))
+
+
+
+		return None
+
+	def add_main_label(self, row, col, label=constants.GuiDefaults.gui_title):
+		"""
+			Function to add the name to the GUI
+		:param row: Row number to use
+		:param col: Column number to use
+		:param str label: (optional) = Label to use for header
+		:return ttk.Label lbl:  Reference to the newly created label
+		"""
+		# Add label with the name to the GUI
+		lbl = ttk.Label(self.master, text=label, style=self.styles.label_mainheading)
+		lbl.grid(row=row, column=col, columnspan=2, pady=5, padx=10)
+		return lbl
+
+	def process(self):
+		"""
+			Function sorts the files list to remove any duplicates and then closes GUI window
+		:return: None
+		"""
+		# Sort results into a single list and remove any duplicates
+		self.results_files_list = list(set(self.results_files_list))
+
+		# Ask user for file to save results of pre_case check into
+		pth_results = tk.filedialog.asksaveasfilename(
+			initialdir=self.results_pth,
+			initialfile='Results_{}.xlsx'.format(constants.uid),
+			filetypes=constants.GuiDefaults.xlsx_types,
+			title='Select the file to save the combined results to'
+		)
+
+		# Check results correct
+		if not pth_results.endswith(self.ext):
+			pth_results = '{}{}'.format(pth_results, self.ext)
+
+		self.export_file = pth_results
+
+		# Determine whether failed gracefully or not
+		if self.export_file and self.results_files_list:
+			self.logger.debug(
+				(
+					'The user has selected via the GUI to combine the following set of results folders into '
+					'the results file: {}\n\t{}'
+				).format(self.export_file, '\n\t'.join(self.results_files_list))
+			)
+
+			# Combine results
+			pscharmonics.file_io.ExtractResults(
+				target_file=self.export_file,
+				search_paths=tuple(self.results_files_list)
+			)
+
+			# Set results file == export_file so gets popped up when user selects to display results
+			self.parent.results_file = self.export_file
+
+			# Enable button to display combined results
+			self.parent.previous_results.configure(state=tk.NORMAL)
+
+
+		else:
+			self.logger.error(
+				(
+					'An error has occured in that results are trying to be combined but the user has not selected '
+					'either an export file or a results folder.  The following inputs were selected:\n'
+					'Export file = {}\n Previous results folders:\n\t{}'
+				).format(self.export_file, '\n\t'.join(self.results_files_list))
+			)
+
+		# Destroy GUI
+		self.master.destroy()
+
+		return None
+
+	def on_closing(self):
+		"""
+		Function runs when window is closed to determine if user actually wants to cancel the time series interface
+		:return:
+		"""
+		# Ask user to confirm that they actually want to close the window
+		result = messagebox.askquestion(
+			title='Exit time series interface?',
+			message='Are you sure you want to exit the time series interface?',
+			icon='warning'
+		)
+
+		# Test what option the user provided
+		if result == 'yes':
+			# Close window
+			self.master.destroy()
+			self.abort = True
+		else:
+			return None
+
 class MainGui:
 	"""
 		Main class to produce the GUI for user interaction
@@ -180,7 +412,6 @@ class MainGui:
 		# Constants defined later
 		self.pre_case_file = str()
 		self.results_file = str()
-
 
 		# Initial directory that will be used whenever a file selection is necessary
 		self.init_dir = start_directory
@@ -497,7 +728,16 @@ class MainGui:
 			Function to ask the user to select previous results and combine into a single results file
 		:return:
 		"""
-		raise SyntaxError('Not developed yet')
+		# Load pop-up window
+		tk_combine_previous_results = tk.Toplevel(self.master, bg=constants.GuiDefaults.color_pop_up_window)
+		combine_previous_results = CombineFiles(
+			master=tk_combine_previous_results, parent=self,
+			styles=self.styles,
+			start_directory=self.init_dir
+		)
+
+		return None
+
 
 	def load_results(self, results):
 		"""
