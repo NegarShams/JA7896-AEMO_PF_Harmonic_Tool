@@ -22,6 +22,7 @@ class TestPowerFactoryConstants(unittest.TestCase):
 		self.assertFalse(pf_constants.dig_python_path)
 
 		pf_constants = pf_constants()
+		pf_constants.select_power_factory_version()
 
 		self.assertTrue(pf_constants.dig_path)
 		self.assertTrue(pf_constants.dig_python_path)
@@ -29,7 +30,7 @@ class TestPowerFactoryConstants(unittest.TestCase):
 	def test_pf_2019_success(self):
 		""" Test confirms that powerfactory version 2019 can be found successfully """
 
-		pf_constants = pscharmonics.constants.PowerFactory(year='2019', service_pack='')
+		pf_constants = pscharmonics.constants.PowerFactory()
 
 		self.assertEqual(pf_constants.target_power_factory, 'PowerFactory 2019')
 
@@ -37,13 +38,40 @@ class TestPowerFactoryConstants(unittest.TestCase):
 		""" Test confirms that powerfactory version 2019 cannot be found and so loads PowerFactory 2019 """
 		# TODO: Poor test since if newer version installed will still create an error
 
-		pf_constants = pscharmonics.constants.PowerFactory(year='2015', service_pack='5')
+		pf_constants = pscharmonics.constants.PowerFactory()
+		pf_constants.select_power_factory_version()
 		self.assertEqual(pf_constants.target_power_factory, 'PowerFactory 2019')
+
+	def test_pf_version_2018_selectable(self):
+		""" Test that a different version from the default can be selected """
+		pf_constants = pscharmonics.constants.PowerFactory()
+
+		test_pf_version = 'PowerFactory 2018 SP7'
+		pf_constants.select_power_factory_version(pf_version=test_pf_version)
+		self.assertEqual(pf_constants.target_power_factory, test_pf_version)
+
+	def test_pf_version_unavailable_fail(self):
+		""" Test that fails if a version that doesn't exist is declared """
+		pf_constants = pscharmonics.constants.PowerFactory()
+
+		test_pf_version = 'PowerFactory 2025'
+		self.assertRaises(EnvironmentError, pf_constants.select_power_factory_version, pf_version=test_pf_version)
+
 
 	def test_pf_2019_python_version_fail(self):
 		""" Test confirms that if script run from a non-compatible Python version then an exception is thrown """
+		pf_constants = pscharmonics.constants.PowerFactory()
 
-		self.assertRaises(EnvironmentError, pscharmonics.constants.PowerFactory, mock_python_version='3.1')
+		self.assertRaises(EnvironmentError, pf_constants.select_power_factory_version, mock_python_version='3.1')
+
+	def test_non_compatible_python_version(self):
+		"""
+			Test confirms that if script run from a non-compatible Python version then an exception is thrown
+			This is specifically to test python 3.5
+		"""
+		pf_constants = pscharmonics.constants.PowerFactory()
+
+		self.assertRaises(EnvironmentError, pf_constants.select_power_factory_version, mock_python_version='3.5')
 
 
 class TestUserGuideExists(unittest.TestCase):

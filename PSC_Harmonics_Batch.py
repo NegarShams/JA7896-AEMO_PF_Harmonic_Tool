@@ -31,16 +31,20 @@ if __name__ == '__main__':
 	t_start = time.time()
 
 	# Initialise and run log message
-	logger = logging.getLogger(pscharmonics.constants.logger_name)
+	# logger = logging.getLogger(pscharmonics.constants.logger_name)
+	logger = pscharmonics.constants.logger
 	logger.info('Batch Study Run using Input Filename: {}'.format(input_spreadsheet_name))
 
 	# Retrieve inputs
 	pth_inputs = os.path.join(os.path.dirname(__file__), input_spreadsheet_name)
 	inputs = pscharmonics.file_io.StudyInputs(pth_file=pth_inputs)
 
+	# Determine if running from PowerFactory and if so retrieve the current power factory version
+	pf_version = pscharmonics.pf.running_in_powerfactory()
+
 	# Initialise PowerFactory instance
 	pf = pscharmonics.pf.PowerFactory()
-	pf.initialise_power_factory()
+	pf.initialise_power_factory(pf_version=pf_version)
 
 
 	# Create cases based on inputs file

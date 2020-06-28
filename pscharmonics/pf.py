@@ -95,7 +95,7 @@ def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into
 		logger.debug('Processing results: {} into a Dataframe'.format(elmres))
 		df = pd.DataFrame()
 		for i,res in enumerate(results):
-			# TODO: This section is preventing running from PowerFactory directly
+			# Extract the relevant data values into a DataFrame
 			df[res[0]] = res[2:-1]
 		return df
 	else:
@@ -587,6 +587,8 @@ class PFStudyCase:
 		# be returned
 		self.df.loc[c.intact, c.cont] = c.intact
 		self.df.loc[c.intact, c.idx] = c.intact_cont_num
+		# Initially all classed as non-convergent until set to True to ensure column gets added
+		self.df[c.status] = False
 
 		# Confirm load flow and results file has already been defined since needed for output settings
 		if self.ldf is None:
@@ -830,6 +832,8 @@ class PFStudyCase:
 		self.logger.debug('Results retrieved for contingency results {}'.format(self.cont_results))
 
 		# If an empty DataFrame is returned then means all contingencies failed so set status to False
+		# DEBUG TESTING
+		self.df[c.status] = False
 		if df.empty:
 			self.df[c.status] = False
 			self.logger.info(
@@ -839,13 +843,6 @@ class PFStudyCase:
 		else:
 			# Set columns to be based on first index
 			self.logger.debug('Setting columns for DataFrame')
-			self.logger.debug(df)
-			# df.columns = df.iloc[0, :]
-
-			# Drop non-relevant rows
-			# df.drop(labels=[0, 1], axis=0, inplace=True)
-			# Drop last row which also isn't needed
-			# df.drop(df.tail(1).index, inplace=True)
 
 			# Set the index for the DataFrame based on the object number
 			df.set_index(c.col_number, inplace=True)
@@ -854,6 +851,7 @@ class PFStudyCase:
 			for cont_number, series in df.iterrows():
 				# Populate the status of the convergence
 				self.df.loc[self.df[c.idx]==cont_number, c.status] = not bool(series[c.col_nonconvergent])
+
 
 			self.logger.debug(
 				'Processing contingency analysis results for case {}, consisting of sc {} and op {}'.format(
@@ -2040,11 +2038,11 @@ class PowerFactory:
 	"""
 		Class to deal with system level interfacing in PowerFactory
 	"""
-	# TODO: Check correct license exists
 
 	def __init__(self):
 		""" Gets the relevant powerfactory version and initialises """
-		self.c = constants.PowerFactory
+		# Get reference to the constants and carry out a search for all of the available PowerFactory versions
+		self.c = constants.PowerFactory()
 		self.logger = constants.logger
 
 		self.pf_initialised = False
@@ -2060,7 +2058,7 @@ class PowerFactory:
 		self.logger.debug('Searching of paths to PowerFactory and adding the Python search path')
 		# Get the python paths if not already populated
 		if not (self.c.dig_path and self.c.dig_python_path):
-			# Initialise so that the paths are looked for
+			# Initialise so that the paths are looked for and the
 			self.c = self.c()
 
 		# Add the paths to system and the environment and then try and import powerfactory
@@ -2093,15 +2091,18 @@ class PowerFactory:
 
 		return None
 
-	def initialise_power_factory(self):
+	def initialise_power_factory(self, pf_version=None):
 		"""
 			Function initialises powerfactory and provides an object reference to it
+		:param str pf_version:  Will initialise power_factory based on the version provided
 		:return None:
 		"""
+		# Check if already running from PowerFactory and if so then update to use that power factory version
+
 		# Check the paths have already been found and if not call the relevant function
 		if not (self.c.dig_path and self.c.dig_python_path):
-			# Initialise so that the paths are looked for
-			self.c = self.c()
+			# Initialise so that the paths are looked for with the provided pf_version
+			self.c.select_power_factory_version(pf_version=pf_version)
 			self.add_python_paths()
 
 		# Different APIs exist for different PowerFactory versions, if an old version is run then different
@@ -2419,8 +2420,9 @@ class PowerFactory:
 				app.EchoOff()
 			else:
 				self.logger.info('Graphic updating and detailed load flow results will not be shown until script completes')
-				app.SetGraphicUpdate(1)
-				app.EchoOn()
+				app.SetGraphicUpdate(0)
+				# app.SetGuiUpdateEnabled(0)
+				app.EchoOff()
 		else:
 			self.logger.info('Running in debug or Python terminal mode and so all details and progress updates are output')
 
@@ -2601,5 +2603,22 @@ def run_studies(pf_projects, inputs):
 	return None
 
 
+def running_in_powerfactory():
+	"""
+		This function determines whether has been launched from PowerFactory or from a python terminal.
+		If the former then will return the running PowerFactory version otherwise returns None
+	:return str pf_version: Returns running PowerFactory version if applicable
+	"""
 
+	# Determine if this script is being run from PSSE or plain Python.
+	full_path_executable = sys.executable
+	# Remove the folder path and keep only the executable file (in lower case).
+	executable = os.path.basename(full_path_executable).lower()
 
+	if executable in ['python.exe', 'pythonw.exe']:
+		# If the executable was one of the above, it is a Python session.
+		pf_version = None
+	else:
+		pf_version = os.path.basename(os.path.dirname(full_path_executable))
+
+	return pf_version

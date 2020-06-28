@@ -15,10 +15,13 @@
 -------------------------------------------------------------------------------------------------------------------
 
 """
-import logging
 import time
-import pscharmonics
+import importlib
 import sys
+import pscharmonics
+
+# Reload to allow repeat runs from PowerFactory and forcing constant resets
+pscharmonics = importlib.reload(pscharmonics)
 
 if __name__ == '__main__':
 	"""
@@ -35,7 +38,10 @@ if __name__ == '__main__':
 
 	logger.info('Running {} in Graphical User Interface (GUI) Mode'.format(pscharmonics.constants.__title__))
 
-	main_gui = pscharmonics.gui.MainGui()
+	# Determine if running from PowerFactory and if so retrieve the current power factory version
+	pf_version = pscharmonics.pf.running_in_powerfactory()
+
+	main_gui = pscharmonics.gui.MainGui(pf_version=pf_version)
 
 	# Capture final time and report complete
 	t_end = time.time()

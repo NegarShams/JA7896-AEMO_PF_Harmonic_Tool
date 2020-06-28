@@ -58,7 +58,7 @@ def delete_old_files(pth, logger, thresholds=constants.General.file_number_thres
 		Counts the number of files in a folder and if greater than a certain number it will warn the
 		user, if greater than another number it will delete the oldest files.
 	:param str pth:  Folder that contains the files
-	:param logging.getLogger, logger:  Handle to the logger
+	:param logger.Logger, logger:  Handle to the logger
 	:param tuple thresholds: (int, int) (warning, delete) where
 								warning is the number at which a warning message is displayed
 								delete is where deleting of the files starts
@@ -282,14 +282,14 @@ class ExtractResults:
 		# Group the data frame by node name
 		list_dfs = df.groupby(level=c.lbl_Reference_Terminal, axis=1)
 		num_nodes = len(list_dfs)
-		self.logger.info('Exporting results for {} nodes'.format(num_nodes))
+		self.logger.info('\tExporting results for {} nodes'.format(num_nodes))
 
 		# Export to excel with a new sheet for each node
 		i=0
 		try:
 			with pd.ExcelWriter(pth_file, engine='xlsxwriter') as writer:
 				for node_name, _df in list_dfs:
-					self.logger.info(' - \t {}/{} Exporting node {}'.format(i+1, num_nodes, node_name))
+					self.logger.info('\t - \t {}/{} Exporting node {}'.format(i+1, num_nodes, node_name))
 					i += 1
 					col = c.start_col
 					for var in vars_to_export:
@@ -349,6 +349,8 @@ class ExtractResults:
 				).format(pth_file)
 			)
 			raise PermissionError('Unable to write to workbook')
+
+		self.logger.info('Completed exporting of results to {}'.format(pth_file))
 
 		return None
 

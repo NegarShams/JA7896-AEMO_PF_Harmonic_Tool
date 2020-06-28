@@ -9,16 +9,14 @@ import tkinter.messagebox as messagebox
 import tkinter.ttk as ttk
 import sys
 import os
-import logging
 import webbrowser
 from PIL import Image, ImageTk
+import traceback
 
 import pscharmonics
 import pscharmonics.constants as constants
 import pscharmonics.file_io as file_io
 import inspect
-
-logger = logging.getLogger()
 
 def file_selector(initial_pth='', open_file=False, save_dir=False,
 				  save_file=False,
@@ -93,7 +91,10 @@ class CustomStyles:
 				# Constants for styles
 		# Style for Loading the SAV Button
 		self.cmd_buttons = 'General.TButton'
+		self.option_menu = 'TMenubutton'
+
 		self.label_general = 'TLabel'
+		self.label_general_left = 'Left.TLabel'
 		self.label_mainheading = 'MainHeading.TLabel'
 		self.label_version_number = 'Version.TLabel'
 		self.label_psc_info = 'PSCInfo.TLabel'
@@ -123,7 +124,10 @@ class CustomStyles:
 		# General style for all buttons and active color changes
 		s.configure(self.cmd_buttons, height=2, width=25)
 
+		s.configure(self.option_menu, height=2, width=25)
+
 		s.configure(self.label_general, background=bg_color)
+		s.configure(self.label_general_left, background=bg_color, justify=tk.LEFT)
 		s.configure(self.label_mainheading, font=(standard_font, '10', 'bold'), background=bg_color,
 					foreground=constants.GuiDefaults.font_heading_color)
 		s.configure(self.label_version_number, font=(standard_font, '7'), background=bg_color, justify=tk.CENTER)
@@ -163,7 +167,7 @@ class CombineFiles:
 		:param str start_directory: (optional) - Path to a directory to use for processing
 		:param str def_ext: (optional) = '.xlsx', extension of files to search for when using a folder selection
 		"""
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		# General constants which need to be initialised
 		self._row = 0
@@ -400,14 +404,16 @@ class MainGui:
 
 
 	def __init__(
-			self, title=constants.GuiDefaults.gui_title, start_directory=os.path.dirname(os.path.realpath(__file__))
+			self, pf_version, title=constants.GuiDefaults.gui_title, start_directory=os.path.dirname(os.path.realpath(__file__)),
+
 	):
 		"""
 		Initialise GUI
-		:param title: (optional) - Title to be used for main window
-
+		:param str pf_version: - This is the version of the running PowerFactory instance, if none then will populate
+								a drop down list of available PowerFactory versions
+		:param str title: (optional) - Title to be used for main window
 		"""
-		self.logger = logging.getLogger(constants.logger_name)
+		self.logger = constants.logger
 
 		# Constants defined later
 		self.pre_case_file = str()
@@ -419,6 +425,7 @@ class MainGui:
 		self.abort = False
 
 		# Initialise constants and Tk window
+		tk.Tk.report_callback_exception = self.show_error
 		self.master = tk.Tk()
 		self.master.title(title)
 
@@ -439,14 +446,37 @@ class MainGui:
 		# Add GUI title
 		_ = self.add_main_label(row=self.row(1), col=self.col())
 
+		# Get a reference to all PowerFactory versions
+		pf_constants = constants.PowerFactory()
+		if pf_version:
+			# If a PowerFactory version is already running then just display that version and disable the button
+			dropdown_state=tk.DISABLED
+		else:
+			# Set the default value as the most recent version and enable dropdown
+			pf_version = pf_constants.available_power_factory_versions[-1]
+			dropdown_state=tk.NORMAL
+		# Add a label and DropDown box to select the PowerFactory version
+		_ = self.add_minor_label(
+			row=self.row(1), col=self.col(), label='Select PowerFactory version:', columnspan=1,
+			style=self.styles.label_general_left
+		)
+		self.selected_pf_version = self.add_dropdown_list(
+			row=self.row(), col=self.col()+1, values=pf_constants.available_power_factory_versions,
+			def_value=pf_version, state=dropdown_state
+		)
+
+
 		# Add button for selecting Settings file
 		self.button_select_settings = self.add_cmd(
 			label=constants.GuiDefaults.button_select_settings_label,
 			cmd=self.load_settings_file, tooltip='Click to select the file which contains the study settings to be run'
 		)
-		self.lbl_settings_file = self.add_minor_label(row=self.row(), col=self.col()+1, label='No settings file selected')
+		self.lbl_settings_file = self.add_minor_label(
+			row=self.row(), col=self.col()+1, label='No settings file selected',
+			style=self.styles.label_general
+		)
 
-		self.lbl_status = self.add_minor_label(row=self.row(1), col=self.col(), label='')
+		self.lbl_status = self.add_minor_label(row=self.row(1), col=self.col(), label='', style=self.styles.label_general)
 
 		# Add button to run a pre-case check
 		self.button_precase_check = self.add_cmd(
@@ -638,17 +668,19 @@ class MainGui:
 		lbl.grid(row=row, column=col, columnspan=2, pady=5, padx=10)
 		return lbl
 
-	def add_minor_label(self, row, col, label):
+	def add_minor_label(self, row, col, label, style, columnspan=2):
 		"""
 			Function to add the name to the GUI
 		:param row: Row number to use
 		:param col: Column number to use
-		:param str label: (optional) = Label to use for header
+		:param str label: Label to use for header
+		:param sty style: Style to use
+		:param int columnspan:  (optional) - Number of columns to span
 		:return ttk.Label lbl:  Reference to the newly created label
 		"""
 		# Add label with the name to the GUI
-		lbl = ttk.Label(self.master, text=label, style=self.styles.label_general)
-		lbl.grid(row=row, column=col, columnspan=2, pady=5)
+		lbl = ttk.Label(self.master, text=label, style=style)
+		lbl.grid(row=row, column=col, columnspan=columnspan, pady=5)
 		return lbl
 
 	def add_cmd(self, label, cmd, state=tk.NORMAL, tooltip=str(), row=None, col=None):
@@ -674,6 +706,28 @@ class MainGui:
 		CreateToolTip(widget=button, text=tooltip)
 
 		return button
+
+	def add_dropdown_list(self, row, col, values, def_value, state=tk.NORMAL):
+		"""
+			General function just adds the list to the transformer rating (RPF)
+		:param int row: Row number to use
+		:param int col: Column number to use
+		:param list values:  Values to populate dropdown box with
+		:param str def_value:  Default value to initially populate box with
+		:param str state:  Initial state of the dropdown list
+		:return tk.StringVar variable:  Returns a reference to the DropDown box which contains the string variable
+		"""
+		# Declare variable with initial default value
+		variable = tk.StringVar(self.master)
+		variable.set(def_value)
+
+		# Create the drop down list to be shown in the GUI
+		option_menu = ttk.OptionMenu(
+			self.master, variable, def_value, *values, style=self.styles.option_menu
+		)
+		option_menu.grid(row=row, column=col, padx=6)
+		option_menu.configure(state=state)
+		return variable
 
 	def review_edit_settings(self):
 		"""
@@ -730,7 +784,7 @@ class MainGui:
 		"""
 		# Load pop-up window
 		tk_combine_previous_results = tk.Toplevel(self.master, bg=constants.GuiDefaults.color_pop_up_window)
-		combine_previous_results = CombineFiles(
+		_ = CombineFiles(
 			master=tk_combine_previous_results, parent=self,
 			styles=self.styles,
 			start_directory=self.init_dir
@@ -805,7 +859,6 @@ class MainGui:
 				)
 
 				self.styles.command_button_color_change(color=constants.GuiDefaults.error_color)
-
 
 		else:
 			self.logger.warning('No results file selected')
@@ -886,7 +939,11 @@ class MainGui:
 		self.lbl_status.configure(text='Initialising PowerFactory and projects...')
 		self.master.update()
 		self.pf = pscharmonics.pf.PowerFactory()
-		self.pf.initialise_power_factory()
+
+		# Get selected PowerFactory version
+		pf_version = self.selected_pf_version.get()
+
+		self.pf.initialise_power_factory(pf_version=pf_version)
 
 		if self.pf.pf_initialised:
 			msg = 'PowerFactory Initialised, loading cases'
@@ -943,6 +1000,20 @@ class MainGui:
 			return None
 		else:
 			return None
+
+	def show_error(self, *args):
+		"""
+			Function to deal with error handling that occurs when running tkinter
+		:param args:
+		:return:
+		"""
+		# Close all windows and exit Python
+		self.master.destroy()
+		self.logger.exception_handler(*args)
+
+		# Close all tkinter windows
+		sys.exit(1)
+
 
 class CreateToolTip(object):
 	"""
@@ -1008,3 +1079,5 @@ class CreateToolTip(object):
 		self.tw = None
 		if tw:
 			tw.destroy()
+
+

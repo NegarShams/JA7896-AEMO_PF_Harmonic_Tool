@@ -6,7 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/venv3.4" />
       <excludeFolder url="file://$MODULE_DIR$/venv3.5" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.5 (JA7896-AEMO_PF_Harmonic_Tool)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.7" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

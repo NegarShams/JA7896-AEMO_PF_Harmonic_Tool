@@ -30,6 +30,7 @@
       <w>errinc</w>
       <w>errlf</w>
       <w>errmax</w>
+      <w>excepthook</w>
       <w>filelocation</w>
       <w>fltcases</w>
       <w>fnow</w>

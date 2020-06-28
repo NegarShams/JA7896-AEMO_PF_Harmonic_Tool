@@ -242,7 +242,7 @@ class Logger:
 	def debug(self, msg):
 		""" Handler for debug messages """
 		# Only print output to powerfactory if it has been passed to logger
-		if self.app and self.pf_executed:
+		if self.app and self.pf_executed and self.debug_mode:
 			self.app.PrintPlain(msg)
 		self.logger.debug(msg)
 
@@ -293,10 +293,11 @@ class Logger:
 		"""
 		msg = (
 			(
-				'Script failed with the following exception raised by Python: {0}\n\n'
+				'Script failed with the following exception raised by Python: {}\n\n'
 				'Below is the complete traceback that was created by Python: \n{}'
-			).format(value, traceback.format_exception(exception_type, value, tb))
+			).format(value, ''.join(traceback.format_exception(exception_type, value, tb)))
 		)
+
 
 		if self.app and self.pf_executed:
 			try:
@@ -329,12 +330,12 @@ class Logger:
 		self.logger.debug('Logging stopped')
 		logging.shutdown()
 
-	def __del__(self):
-		"""
-			To correctly handle deleting and therefore shutting down of logging module
-		:return None:
-		"""
-		self.logging_final_report_and_closure()
+	# def __del__(self):
+	# 	"""
+	# 		To correctly handle deleting and therefore shutting down of logging module
+	# 	:return None:
+	# 	"""
+	# 	self.logging_final_report_and_closure()
 
 	def __exit__(self):
 		"""

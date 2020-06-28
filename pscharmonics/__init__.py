@@ -7,13 +7,23 @@
 ###																													###
 #######################################################################################################################
 """
+import importlib
+import sys
+
 import pscharmonics.logger as logger
 import pscharmonics.file_io as file_io
 import pscharmonics.pf as pf
 import pscharmonics.constants as constants
 import pscharmonics.gui as gui
+
+# Reload all modules
+logger = importlib.reload(logger)
+file_io = importlib.reload(file_io)
+pf = importlib.reload(pf)
+constants = importlib.reload(constants)
+gui = importlib.reload(gui)
+
 # import pscharmonics.processing as processing
-import sys
 
 if constants.logger is None:
 	constants.logger = logger.Logger()
