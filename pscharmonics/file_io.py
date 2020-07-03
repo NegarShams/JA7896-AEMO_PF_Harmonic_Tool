@@ -12,6 +12,8 @@ import os
 import pscharmonics.constants as constants
 import glob
 import pandas as pd
+import numpy as np
+import scipy.spatial
 import collections
 import math
 import shutil
@@ -116,6 +118,11 @@ def delete_old_files(pth, logger, thresholds=constants.General.file_number_thres
 	return num_deleted
 
 class ExtractResults:
+	"""
+		Values defined during import
+	"""
+	include_convex = False  # type: bool
+
 	def __init__(self, target_file, search_paths):
 		"""
 			Process the extraction of the results
@@ -125,8 +132,22 @@ class ExtractResults:
 		self.logger = constants.logger
 
 		df, extract_vars = self.combine_multiple_runs(search_paths=search_paths)
-		self.extract_results(pth_file=target_file, df=df, vars_to_export=extract_vars)
 
+		# Function will calculate the convex hull for the R and X values at each node in this DataFrame.
+		# Initially False but set to True during importing of multiple runs if appropriate
+		df_convex = pd.DataFrame()
+		if self.include_convex:
+			if constants.PowerFactory.pf_r1 and extract_vars and constants.PowerFactory.pf_x1 in extract_vars:
+				df_convex = calculate_convex_vertices(df=df)
+			else:
+				self.logger.warning(
+					(
+						'Not able to produce ConvexHull because self impedance R ({}) and X ({}) values were not '
+						'collected during the study.  Only the following values were collected:\n\t{}'
+					).format(constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1, '\n\t-'.join(extract_vars))
+				)
+
+		self.extract_results(pth_file=target_file, df=df, vars_to_export=extract_vars, df_convex=df_convex)
 
 	# noinspection PyMethodMayBeStatic
 	def combine_multiple_runs(self, search_paths, drop_duplicates=True):
@@ -159,6 +180,12 @@ class ExtractResults:
 
 			# Include list of variables for export
 			vars_to_export.extend(combined.inputs.settings.get_vars_to_export())
+
+			# Determine whether include_convex is set to True or False and update overall setting accordingly
+			# will latch to True if any of the imported files have include_convex and then any errors during processing
+			# are dealt with accordingly
+			self.include_convex = self.include_convex or combined.inputs.settings.include_convex
+
 
 		# Combine all results together
 		df = pd.concat(all_dfs, axis=1)
@@ -258,12 +285,13 @@ class ExtractResults:
 
 		return df, vars_to_export
 
-	def extract_results(self, pth_file, df, vars_to_export, plot_graphs=True):
+	def extract_results(self, pth_file, df, vars_to_export, df_convex, plot_graphs=True):
 		"""
 			Extract results into workbook with each result on separate worksheet
 		:param str pth_file:  File to save workbook to
 		:param pd.DataFrame df:  Pandas dataframe to be extracted
 		:param list vars_to_export:  List of variables to export based on Inputs class
+		:param pd.DataFrame df_convex:  Pandas DataFrame with the boundaries of the ConvexHull data points
 		:param bool plot_graphs:  (optional=True) - If set to False then graphs will not be exported
 		:return None:
 		"""
@@ -284,6 +312,10 @@ class ExtractResults:
 		num_nodes = len(list_dfs)
 		self.logger.info('\tExporting results for {} nodes'.format(num_nodes))
 
+		# Will only include index and header labels if True
+		# include_index = col <= c.start_col
+		include_index = True
+
 		# Export to excel with a new sheet for each node
 		i=0
 		try:
@@ -293,10 +325,7 @@ class ExtractResults:
 					i += 1
 					col = c.start_col
 					for var in vars_to_export:
-						# Will only include index and header labels if True
-						# include_index = col <= c.start_col
-						include_index = True
-
+						# Extract DataFrame with just these values
 						df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
 						if not df_to_export.empty:
 							# Results are sorted in study case then contingency then filter order
@@ -341,6 +370,35 @@ class ExtractResults:
 							col = col + df_to_export.shape[1] + c.col_spacing
 						else:
 							self.logger.warning('No results imported for variable {} at node {}'.format(var, node_name))
+
+					# Once all main results have been exported ConvexHull points for each node are added
+					if not df_convex.empty:
+						# Determine which row to start the convex hull on, taking into consideration the number of
+						# rows occupied by the DataFrame
+						row_convex = start_row + len(_df) + _df.columns.nlevels + c.row_spacing + 1
+						# Get ConvexValues for this node in particular
+						df_node = df_convex.loc[:, df_convex.columns.get_level_values(level=c.lbl_Reference_Terminal)==node_name]
+
+						# Results are exported
+						df_node.to_excel(writer, merge_cells=True,
+										 sheet_name=node_name,
+										 startrow=row_convex, startcol=c.start_col,
+										 header=include_index, index_label=False)
+
+						# TODO: Write routine to include a graph showing the convex hull data points
+						# Add loci plots
+						self.add_loci_graphs(
+							writer=writer,
+							sheet_name=node_name,
+							plot_names=df_node.columns.get_level_values(level=c.lbl_Harmonic_Order),
+							row_labels=row_convex + 1,
+							row_start=row_convex + df_node.columns.nlevels + 1,
+							num_rows=df_node.shape[0],
+							col_start=c.start_col+1,
+							num_cols=df_node.shape[1]
+						)
+
+
 		except PermissionError:
 			self.logger.critical(
 				(
@@ -420,6 +478,101 @@ class ExtractResults:
 
 			# Add the legend to the chart
 			sht.insert_chart(c.chrt_row+(c.chrt_vert_space*chrt_row_num), c.chrt_col+(c.chrt_space*i), chrt)
+
+		return None
+
+	def add_loci_graphs(self, writer, sheet_name, plot_names, row_labels, row_start, num_rows,
+				  col_start, num_cols):
+		"""
+			Add graphs for ConvexHull to spreadsheet
+		:param pd.ExcelWriter writer:  Handle for the workbook that will be controlling the excel instance
+		:param str sheet_name: Name of sheet to add graph to
+		:param list plot_names: List of names for the plots
+		:param int row_labels: Row which contains series labels
+		:param int row_start: Start row for results to plot
+		:param int num_rows: Number of rows to include
+		:param int col_start:  Column number first set of data is included in
+		:param int num_cols:  Number of columns all data is contained within
+		:return:
+		"""
+		self.logger.debug('Adding impedance loci plots for node: {}'.format(sheet_name))
+
+		c = constants.Results
+		color_map = c().get_color_map()
+
+		# Get handles
+		wkbk = writer.book
+		sht = writer.sheets[sheet_name]
+
+		# Calculate the row number for the end of the dataset
+		max_row = row_start+num_rows
+
+		# Loop through each column and add series
+		charts = []
+
+		# Default colour to use for LOCI plots
+		color_i = 1
+
+		# Create a single chart which contains all values and then an individual chart for each harmonic order
+		chrt_master = wkbk.add_chart(c.chart_type)
+		chrt_master.set_title({'name':'{}'.format(sheet_name),
+							   'name_font':{'size':c.font_size_chart_title}})
+
+		charts.append(chrt_master)
+
+		# Loop through each pair of R / X values and add to excel plot
+		for i, col_r in enumerate(range(col_start, col_start+num_cols, 2)):
+			# Iterate color so a new plot is shown
+			color_i += 1
+
+			# X values are 1 column over from R values
+			col_x = col_r + 1
+
+			# Get chart name from row with description of harmonic order
+			chart_name = plot_names[i]
+			self.logger.debug('\t Creating loci plot for {}-{}'.format(sheet_name, chart_name))
+
+			# Add a new chart to the workbook
+			chrt_individual = wkbk.add_chart(c.chart_type)
+			chrt_individual.set_title({'name':'{} - {}'.format(sheet_name, chart_name),
+							'name_font':{'size':c.font_size_chart_title}})
+
+			charts.append(chrt_individual)
+
+			for chrt in (chrt_individual, chrt_master):
+
+				# Add to plot
+				chrt.add_series({
+					'name': [sheet_name, row_labels, col_r],
+					'categories': [sheet_name, row_start, col_r, max_row, col_r],
+					'values': [sheet_name, row_start, col_x, max_row, col_x],
+					'marker': {'type': 'none'},
+					'line':  {'color': color_map[color_i],
+					 		  'width': c.line_width}
+				})
+
+
+		col_number = 0
+		row_number = 0
+		for i, chrt in enumerate(charts):
+			# Counter to grid the loci plots so they have 4 vertical in each column
+			if row_number > c.loci_plots_vertically-1:
+				row_number = 0
+				col_number += 1
+			elif i > 0:
+				row_number += 1
+
+			# Add axis labels
+			chrt.set_x_axis({'name': c.lbl_Resistance, 'label_position': c.lbl_position,
+							 'major_gridlines': c.grid_lines})
+			chrt.set_y_axis({'name': c.lbl_Reactance, 'label_position': c.lbl_position,
+							 'major_gridlines': c.grid_lines})
+
+			# Set chart size
+			chrt.set_size({'width': c.chrt_loci_width, 'height': c.chrt_loci_height})
+
+			# Add the legend to the chart
+			sht.insert_chart(row_start+(c.chrt_vert_space*row_number), c.chrt_col+(c.loci_chrt_space*col_number), chrt)
 
 		return None
 
@@ -890,6 +1043,8 @@ class StudySettings:
 		self.export_rx = bool()
 		self.export_mutual = bool()
 		self.include_intact = bool()
+		# Option to decide whether to include ConvexHull in excel spreadsheets, default value is False
+		self.include_convex = False
 
 		self.c = constants.StudySettings
 		self.logger = constants.logger
@@ -957,6 +1112,8 @@ class StudySettings:
 		self.export_rx = self.process_booleans(key=self.c.export_rx)
 		self.export_mutual = self.process_booleans(key=self.c.export_mutual)
 		self.include_intact = self.process_booleans(key=self.c.include_intact)
+
+		self.include_convex = self.process_booleans(key=self.c.include_convex)
 
 		# Sanity check for Boolean values
 		self.boolean_sanity_check()
@@ -1056,7 +1213,18 @@ class StudySettings:
 		:return bool value:
 		"""
 		# Get folder from DataFrame, if empty or invalid path then use default folder
-		value = self.df.loc[key]
+		try:
+			value = self.df.loc[key]
+		except KeyError:
+			# If key doesn't exist then use False and let user know they are using an invalid Inputs sheet
+			value = False
+			self.logger.warning(
+				(
+					'The inputs spreadsheet you are using does not have an input value for {} on the {} worksheet.  This'
+					'means it is either an old Inputs worksheet or has been edited.  A value of <{}> has been assumed '
+					'instead'
+				).format(key, self.sht, value)
+			)
 
 		if value == '':
 			value = False
@@ -1852,3 +2020,110 @@ class ResultsExport:
 		return None
 
 
+def find_convex_vertices(x_values, y_values):
+	"""
+		Finds the ConvexHull that bounds around the provided x and y values
+	:param tuple x_values: X axis values to be considered
+	:param tuple y_values: Y axis values to be considered
+	:return tuple corners: (x / y points for each corner
+	"""
+	c = constants.PowerFactory
+
+	# Filter out values which are outside of allowed range
+	x_points = list()
+	y_points = list()
+	for x,y in zip(x_values, y_values):
+		if 0 < abs(x) < c.max_impedance and 0 < abs(y) < c.max_impedance:
+			x_points.append(x)
+			y_points.append(y)
+
+	# Convert provided data points into ndarray
+	points = np.column_stack((x_points, y_points))
+
+	# Confirm the arrays not empty and must be greater than 2 to actually calculate some points
+	if points.shape[0] > 2:
+		# Determines the ConvexHull and extracts the vertices
+		hull = scipy.spatial.ConvexHull(points=points)
+		corners = hull.vertices
+
+		# Convert the vertices to represent the x and y values and include the origin
+		x_corner = list(points[corners, 0])
+		x_corner.append(x_corner[0])
+		y_corner = list(points[corners, 1])
+		y_corner.append(y_corner[0])
+	elif points.shape[0] > 0:
+		# If length of 1 or 2 then just return those points
+		x_corner = x_points
+		y_corner = y_points
+	else:
+		# If no points then return empty list
+		x_corner = list()
+		y_corner = list()
+
+	# Return tuple of R and X values
+	return x_corner, y_corner
+
+def calculate_convex_vertices(df, harm_groups=1, nom_frequency=50.0):
+	"""
+		Will loop through the provided DataFrame and calculate the convex hull that bounds the R and X
+		values for each
+	:param pd.DataFrame df:  This is the DataFrame containing R and X values that will then be processed for extraction
+	:param int harm_groups:  Number of harmonic orders to group the results into
+	:param float nom_frequency:  Nominal frequency = 50.0 Hz
+	:return pd.DataFrame df_convex:  Returns a DataFrame in the same arrangement as the supplied DataFrame but with the
+									corners for each vertice
+	"""
+
+	# Obtain constants
+	c = constants.Results
+
+	# Populated with the Convex Hull points for each node
+	dict_convex = dict()
+
+	# Loop through each node
+	for node_name, df_node in df.groupby(level=c.lbl_Reference_Terminal, axis=1):
+		# Extract r values and x values
+		df_r = df_node.loc[:, df_node.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_r1]
+		df_x = df_node.loc[:, df_node.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_x1]
+
+		# Get a list of the harmonic orders available for this particular node
+		harm_numbers = list(set([int(x/nom_frequency) for x in df_node.index]))
+
+		# Empty Dictionary gets populated with the required harmonic numbers
+		dict_harms = dict()
+
+		# Loop through each harm_number taking steps based on harm_groups and then use the middle of the range
+		for h in range(min(harm_numbers), max(harm_numbers)+1, harm_groups):
+			if h == 1:
+				# No R / X data extracted for fundamental
+				continue
+			target_freq = h * nom_frequency
+			min_f_range = target_freq - (harm_groups*nom_frequency)/2.0
+			max_f_range = target_freq + (harm_groups*nom_frequency)/2.0
+			descriptor = '{} ({} - {} Hz)'.format(h, min_f_range, max_f_range)
+			idx_selection = (df_r.index >= min_f_range) & (df_r.index <= max_f_range)
+			# Extract the 2D DataFrame of values into a 1D numpy array
+			# https://stackoverflow.com/questions/13730468/from-nd-to-1d-arrays
+			r_harm = df_r[idx_selection].values.ravel()
+			x_harm = df_x[idx_selection].values.ravel()
+
+			vertices = find_convex_vertices(x_values=r_harm, y_values=x_harm)
+
+			# Create a new DataFrame with the vertices as columns
+			df_single_harm = pd.DataFrame(data=np.array(vertices).T, columns=(constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1))
+			dict_harms[descriptor] = df_single_harm
+
+		# Combine all into a single DataFrame
+		df_all_harms = pd.concat(dict_harms.values(), keys=dict_harms.keys(), axis=1)
+		dict_convex[node_name] = df_all_harms
+
+	# Combine DataFrames for each node into a single DataFrame
+	df_convex = pd.concat(
+		dict_convex.values(), keys=dict_convex.keys(), axis=1, names=(
+			constants.Results.lbl_Reference_Terminal,
+			constants.Results.lbl_Harmonic_Order,
+			constants.Results.lbl_Result
+		)
+	)
+
+	return df_convex

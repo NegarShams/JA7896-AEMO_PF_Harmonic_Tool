@@ -179,6 +179,9 @@ class PowerFactory:
 	# Number of seconds to allow when waiting for parallel processor response
 	parallel_time_out = 100
 
+	# This is a maximum impedance value, above this and it is assumed to be open circuit and will be ignored
+	max_impedance = 1E6
+
 	class ComRes:
 		# Power Factory class name
 		pf_comres = 'ComRes'
@@ -410,6 +413,7 @@ class Results:
 	lbl_Terminal = 'Terminal Name'
 	lbl_Reference_Terminal = 'Terminal'
 	lbl_Result = 'Result Type'
+	lbl_Harmonic_Order = 'Harmonic Order'
 	idx_nom_voltage = 'Nom Voltage (kV)'
 	# Location of m:R, m:X, m:Z, etc.
 	loc_pf_variable = 4
@@ -425,10 +429,13 @@ class Results:
 	start_row = 31 # (0 referenced so will be Excel row 32)
 	start_col = 0 # (0 referenced so will be Excel col A)
 	col_spacing = 2 # Leaves 1 empty column between results
+	row_spacing = 2 # Leaves empty rows between DataFrame extracts
 
 	# Labels for charts
 	chart_type = {'type': 'scatter'}
 	lbl_Impedance = 'Impedance in Ohms'
+	lbl_Resistance = 'Resistance in Ohms'
+	lbl_Reactance = 'Reactance in Ohms'
 
 	# Positioning of charts in excel workbook
 	chrt_row = 1
@@ -436,6 +443,10 @@ class Results:
 	# Number of columns between each chart
 	chrt_space = 18
 	chrt_vert_space = 30
+
+	# Number of plots to include vertically before resetting counter
+	loci_chrt_space = 9
+	loci_plots_vertically = 4
 
 	# Labels for processing
 	# This label is used for the column headers when an entry should be deleted post processing
@@ -446,6 +457,10 @@ class Results:
 	lbl_position = 'next_to'
 	chrt_width = 960
 	chrt_height = 576
+
+	# Dimensions for loci plots
+	chrt_loci_width = 576
+	chrt_loci_height = 576
 
 	# Based on details here:  https://xlsxwriter.readthedocs.io/chart.html
 	grid_lines = {'visible': True,
@@ -588,6 +603,7 @@ class StudySettings:
 	export_rx = 'Excel_Export_RX'
 	export_mutual = 'Excel_Export_Z12'
 	include_intact = 'Include_Intact'
+	include_convex = 'Include_Convex'
 
 	# Base_Scenario columns
 	name = 'NAME'

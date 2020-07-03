@@ -9,6 +9,9 @@ import math
 import shutil
 import random
 import string
+import shapely.geometry
+import shapely.geometry.polygon
+import matplotlib.pyplot
 
 from tests.context import pscharmonics
 
@@ -17,6 +20,9 @@ def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 
 # Some folders are created during running and these will be deleted
 delete_created_folders = True
+
+# Set to True if figures should be plotted and displated
+PLOT_FIGURES = True
 
 # noinspection PyUnusedLocal
 def mock_process_export_folder(*args, **kwargs):
@@ -35,6 +41,12 @@ def mock_process_export_folder(*args, **kwargs):
 # ----- MOCKS ------
 # Mocks to replace normal functionality
 pscharmonics.file_io.StudySettings.process_export_folder = mock_process_export_folder
+
+class MockExtractResults:
+	""" Mock created to allow independant testing of combine multiple runs """
+	def __init__(self):
+		self.include_convex = True
+		self.combine_multiple_runs = pscharmonics.file_io.ExtractResults.combine_multiple_runs
 
 # ----- UNIT TESTS -----
 class TestInputs(unittest.TestCase):
@@ -203,6 +215,30 @@ class TestStudySettings(unittest.TestCase):
 
 		with pd.ExcelFile(pth_inputs) as wkbk:
 			study_settings = self.test_cls(wkbk=wkbk)
+
+		# Test just confirms that runs correctly
+		self.assertIsNone(study_settings.process_inputs())
+
+	def test_include_convex_handled(self):
+		""" Function confirms that after update to Include ConvexHull it is now correctly detected in the inputs """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+
+		with pd.ExcelFile(pth_inputs) as wkbk:
+			study_settings = self.test_cls(wkbk=wkbk)
+
+		self.assertTrue(study_settings.include_convex)
+
+		# Test just confirms that runs correctly
+		self.assertIsNone(study_settings.process_inputs())
+
+	def test_include_convex_backward_compatibility(self):
+		""" Function confirms that old version of inputs still handled correctly but with convex_hull set to False """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs_v1.0.xlsx')
+
+		with pd.ExcelFile(pth_inputs) as wkbk:
+			study_settings = self.test_cls(wkbk=wkbk)
+
+		self.assertFalse(study_settings.include_convex)
 
 		# Test just confirms that runs correctly
 		self.assertIsNone(study_settings.process_inputs())
@@ -591,3 +627,137 @@ class TestCombineResults(unittest.TestCase):
 
 		# Confirm file created
 		self.assertTrue(os.path.exists(target_file))
+
+class TestCreateConvex(unittest.TestCase):
+	""" Tests that passing R/X data will return ConvexHull around data points """
+
+	def setUp(self):
+		""" Creates a random data set """
+		self.results1 = os.path.join(TESTS_DIR, 'Detailed_4')
+
+		for x in (self.results1, ):
+			self.assertTrue(
+				os.path.isdir(x),
+				msg='The detailed results folder {} does not exist, run <test_pf.py> first to '
+					'produce'
+			)
+
+		self.cls_extract = MockExtractResults()
+
+	def test_convex_points(self):
+		""" Tests can be created """
+		# Upper limit of range
+		upper_limit = int(pscharmonics.constants.PowerFactory.max_impedance - 1)
+		number_points = 50
+
+		x_points = (random.sample(range(upper_limit), number_points))
+		y_points = (random.sample(range(upper_limit), number_points))
+
+		corners = pscharmonics.file_io.find_convex_vertices(x_values=x_points, y_values=y_points)
+
+		# Confirm all points lie within the Polygon returned by the vertices
+		polygon = shapely.geometry.polygon.Polygon(list(zip(*corners)))
+		rand_point = random.randint(0, number_points-1)
+		point = shapely.geometry.Point(x_points[rand_point], y_points[rand_point])
+
+		self.assertTrue(polygon.contains(point))
+
+
+		# If required will produce a plot of the required data
+		if PLOT_FIGURES:
+			matplotlib.pyplot.plot(x_points, y_points, 'o')
+
+			matplotlib.pyplot.plot(corners[0], corners[1], 'r--')
+			matplotlib.pyplot.show()
+
+	def test_convex_points_2_only(self):
+		""" Tests can be created with only 2 points"""
+		# Upper limit of range
+		upper_limit = int(pscharmonics.constants.PowerFactory.max_impedance - 1)
+		number_points = 2
+
+		x_points = (random.sample(range(upper_limit), number_points))
+		y_points = (random.sample(range(upper_limit), number_points))
+
+		corners = pscharmonics.file_io.find_convex_vertices(x_values=x_points, y_values=y_points)
+
+		# Confirm x and y points in list returned
+		self.assertTrue(x_points[0] in corners[0])
+		self.assertTrue(y_points[0] in corners[1])
+
+	def test_convex_points_0_valid_values(self):
+		""" Tests can be created with only 2 points"""
+		# Upper limit of range
+		corners = pscharmonics.file_io.find_convex_vertices(x_values=tuple(), y_values=tuple())
+
+		# Confirm x and y points in list returned
+		self.assertTrue(len(corners[0])==0)
+		self.assertTrue(len(corners[1])==0)
+
+	def test_convex_from_data_for_detailed4_data(self):
+		"""
+			Tests that imported data can be processed and extracted into a suitable DataFrame format
+			Note:  A minimum of 3 different data points are needed for a Convex
+		"""
+
+		# Import the necessary raw data
+		src_paths = (self.results1, )
+		df, extract_vars = self.cls_extract.combine_multiple_runs(self=self.cls_extract, search_paths=src_paths)
+
+		# Pass to function to calculate
+		df_convex = pscharmonics.file_io.calculate_convex_vertices(df=df)
+
+	def test_export_detailed_results4_including_convex(self):
+		""" Tests exporting of a results set with convex hull plots works """
+
+		# Source path to search and confirm exist before continuing
+		src_path = (self.results1, )
+
+		# Target file for export
+		target_file = os.path.join(TESTS_DIR, 'combined_results_4.xlsx')
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		# Force to True so results handled correctly
+		pscharmonics.file_io.ExtractResults.include_convex = True
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_path)
+
+		# Confirm file created
+		self.assertTrue(os.path.exists(target_file))
+
+
+class TestCombineMultiple(unittest.TestCase):
+	"""
+		Class to test that combining multiple runs works as expected
+	"""
+
+	def setUp(self):
+		""" Check previous results already exist """
+
+		self.results1 = os.path.join(TESTS_DIR, 'Detailed_1')
+		self.results2 = os.path.join(TESTS_DIR, 'Detailed_2')
+
+		for x in (self.results1, self.results2):
+			self.assertTrue(
+				os.path.isdir(x),
+				msg='The detailed results folder {} does not exist, run <test_pf.py> first to '
+					'produce'
+			)
+
+		self.cls_extract = MockExtractResults()
+
+	def test_combine_single_results_set(self):
+		""" Tests exporting of a single results set works """
+
+		src_paths = (self.results1, )
+
+		df, extract_vars = self.cls_extract.combine_multiple_runs(self=self.cls_extract, search_paths=src_paths)
+
+		self.assertTrue(df.shape, (10,72))
+		self.assertTrue(len(extract_vars), 6)
+		self.assertTrue(pscharmonics.constants.PowerFactory.pf_x1 in extract_vars)
+
+
+
+

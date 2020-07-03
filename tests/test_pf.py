@@ -1558,6 +1558,44 @@ class TestPFDetailedInputs(unittest.TestCase):
 		if test_delete_excel_outputs:
 			os.remove(target_pth)
 
+	def test_complete_test_produce_outputs_4_small_step_size(self):
+		"""
+			Function runs tests using detailed outputs to produce a set of results that can be used elsewhere
+		:return:
+		"""
+		# Create path for results from detailed tests
+		target_pth = os.path.join(TESTS_DIR, 'Detailed_4')
+		if os.path.isdir(target_pth):
+			print('Existing contents in path: {} will be deleted'.format(target_pth))
+			files = glob.glob(target_pth + '\\*')
+			for f in files:
+				os.remove(f)
+		else:
+			os.mkdir(target_pth)
+
+		# Import settings for Detailed Study
+		settings_file = os.path.join(TESTS_DIR, 'Inputs_Detailed4.xlsx')
+		inputs = pscharmonics.file_io.StudyInputs(pth_file=settings_file)
+
+		inputs.settings.export_folder = target_pth
+
+		# Create projects
+		uid = 'DETAILED_4'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=inputs.cases,
+			uid=uid,
+			lf_settings=inputs.lf_settings,
+			fs_settings=inputs.fs_settings,
+			export_pth=target_pth
+		)
+
+		# Iterate through each project and create the various cases, the includes running a pre-case check but no
+		# output is saved at this point
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
+
+		if test_delete_excel_outputs:
+			os.remove(target_pth)
+
 	@classmethod
 	def tearDownClass(cls):
 		""" Function ensures the deletion of the PowerFactory project """
