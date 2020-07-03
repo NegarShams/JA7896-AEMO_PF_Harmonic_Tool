@@ -22,13 +22,6 @@ import pandas as pd
 powerfactory = None
 app = None
 
-# Meta Data
-__author__ = 'David Mills'
-__version__ = '2.1.2'
-__email__ = 'david.mills@pscconsulting.com'
-__phone__ = '+44 7899 984158'
-__status__ = 'In Development - Beta'
-
 
 def create_object(location, pfclass, name):  # Creates a database object in a specified location of a specified class
 	"""

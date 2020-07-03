@@ -15,14 +15,6 @@ import sys
 import glob
 import time
 
-
-# Meta Data
-__author__ = 'David Mills'
-__version__ = '1.0.0'
-__email__ = 'david.mills@pscconsulting.com'
-__phone__ = '+44 7899 984158'
-__status__ = 'In Development - Beta'
-
 # Label used when displaying messages
 __title__ = 'PSC Automated Frequency Scan Tool'
 

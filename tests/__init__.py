@@ -10,7 +10,7 @@
 
 # Meta Data
 __author__ = 'David Mills'
-__version__ = '1.0'
+__version__ = '1.1'
 __email__ = 'david.mills@PSCconsulting.com'
 __phone__ = '+44 7899 984158'
 __status__ = 'In Development - Beta'
