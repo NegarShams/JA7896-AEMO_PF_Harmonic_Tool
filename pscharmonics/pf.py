@@ -237,7 +237,7 @@ class PFStudyCase:
 		:return None:
 		"""
 
-		if deactivate and self.active:
+		if deactivate:
 			# Confirm this study case is the active study case before trying to deactivate
 			active_sc = app.GetActiveStudyCase()
 			if active_sc == self.sc:
@@ -246,7 +246,7 @@ class PFStudyCase:
 				self.active = False
 			else:
 				err = 0
-		elif not deactivate and not self.active:
+		elif not deactivate:
 			# Activate both study case and operating scenario
 			err1 = self.sc.Activate()
 			# TODO: Confirm correct operating scenario is actually being activated
@@ -863,14 +863,14 @@ class PFStudyCase:
 		self.fs_results, _ = create_object(
 			location=self.sc,
 			pfclass=constants.PowerFactory.pf_results,
-			name='{}{}'.format(constants.General.cmd_fsres_leader, constants.PowerFactory.default_fs_extension)
+			name='{}'.format(constants.General.cmd_fsres_leader)
 		)
 
 		# Update Contingency analysis results file
 		self.cont_results, _ = create_object(
 			location=self.sc,
 			pfclass=constants.PowerFactory.pf_results,
-			name='{}{}'.format(constants.General.cmd_contres_leader, constants.PowerFactory.default_fs_extension)
+			name='{}'.format(constants.General.cmd_contres_leader)
 		)
 		# Set as default results for Freq.Sweep
 		self.fs_results.calTp = constants.PowerFactory.def_results_fs
