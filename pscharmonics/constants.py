@@ -17,6 +17,7 @@ import time
 
 # Label used when displaying messages
 __title__ = 'PSC Automated Frequency Scan Tool'
+__version__ = '1.1'
 
 logger_name = 'PSC'
 logger = None
