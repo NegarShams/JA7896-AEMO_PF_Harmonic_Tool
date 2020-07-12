@@ -158,13 +158,15 @@ def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance b
 class PFStudyCase:
 	""" Class containing the details for each study case contained within a project """
 
-	def __init__(self, name, sc, op, prj, base_case=False, res_pth=str()):
+	def __init__(self, name, sc, op, prj, sc_source_name, op_source_name, base_case=False, res_pth=str()):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str name:  Name of study case
 		:param powerfactory.DataObject sc:  Handle to the study_case
 		:param powerfactory.DataObject op:  Handle to the operating scenario
 		:param powerfactory.DataObject prj: Handle to the project this case belongs to
+		:param str sc_source_name:  Name for the study case used as the basis for this study case
+		:param str op_source_name:  Name of the operating scenario used as the basis for this operating scenario
 		:param bool base_case: (optional=False) - Set to True for the base cases
 		:param str res_pth: (optional=str()) - This is the path that the processed results will be saved in
 		"""
@@ -194,6 +196,10 @@ class PFStudyCase:
 		self.sc = sc
 		self.op = op
 		self.prj = prj
+
+		# References to source sc / os names for reporting
+		self.sc_source_name = sc_source_name
+		self.op_source_name = op_source_name
 
 		self.active = False
 
@@ -713,8 +719,9 @@ class PFStudyCase:
 
 		# Update DataFrame to ensure study case and operating scenario columns match this data
 		self.df[c.prj] = self.prj.loc_name
-		self.df[c.sc] = self.sc.loc_name
-		self.df[c.op] = self.op.loc_name
+		# Changed to now reference the original source study cases and operating scenarios
+		self.df[c.sc] = self.sc_source_name
+		self.df[c.op] = self.op_source_name
 
 		self.cont_analysis = cont_analysis
 		return None
@@ -1079,6 +1086,9 @@ class PFStudyCase:
 					name=new_name,
 					sc=new_sc,
 					op=new_op,
+					# Reference is now added to the original source names used for the study cases and operating scenarios
+					sc_source_name=self.sc_source_name,
+					op_source_name=self.op_source_name,
 					prj=self.prj,
 					res_pth=res_pth
 				)
@@ -1154,7 +1164,8 @@ class PFStudyCase:
 		return None
 
 
-class PFProject:
+class PFProject(object):
+	# type: PFProject
 	""" Class contains reference to a project, results folder and associated task automation file"""
 
 	def __init__(self, name, df_studycases, uid, lf_settings=None, fs_settings=None, res_pth=str()):
@@ -1309,6 +1320,8 @@ class PFProject:
 			# Create a PFStudyCase instance
 			study_case_class = PFStudyCase(
 				name=name, sc=new_sc, op=new_os, prj=self.prj,
+				# study case and operating scenario names added so reference can be made to them in the exported results
+				sc_source_name=sc_name, op_source_name=os_name,
 				base_case=True,
 				res_pth=self.res_pth
 			)
@@ -2423,6 +2436,7 @@ class PowerFactory:
 
 
 def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=None, fs_settings=None, export_pth=str()):
+	# type: (pd.DataFrame, str, file_io.LFSettings, file_io.FSSettings, str) -> dict
 	"""
 		Loops through each of the projects in the DataFrame of study cases and activates them to check they work
 	:param pd.DataFrame df_study_cases:
@@ -2441,7 +2455,7 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 		pf_project = PFProject(
 			name=project, df_studycases=df, uid=uid, lf_settings=lf_settings, fs_settings=fs_settings,
 			res_pth=export_pth
-		)
+		)  # type: PFProject
 
 		# Check that project exists
 		if pf_project.exists:

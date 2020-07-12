@@ -860,7 +860,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		)
 
 		# Get single project
-		pf_project = pf_projects[pf_test_project]
+		pf_project = pf_projects[pf_test_project]  # type: pscharmonics.pf.PFProject
 
 		# Carry out pre-case check using fault cases on what should be two different study_cases
 		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
@@ -880,6 +880,38 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		sc_result = df.loc[(test_case2, self.test_cont), :]
 		self.assertEqual(sc_result[c.cont], self.test_cont)
 		self.assertEqual(sc_result[c.status], True)
+
+		# Tidy up by deleting temporary project folders
+		pf_project.delete_temp_folders()
+
+	def test_sc_and_op_names_match_starting_cases_for_pre_case_check(self):
+		"""
+			Test that when the pre-case check is run for the two study cases
+			the dataframe that is returned now includes the original study case and operating scenario names
+		"""
+		# Test Names (detailed in Inputs spreadsheet)
+		test_case1 = 'BASE'
+		test_case2 = 'BASE(1)'
+
+		expected_sc_name = 'High Load Case.IntCase'
+		expected_op_name = 'HighLoadTap_testing.IntScenario'
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get single project
+		pf_project = pf_projects[pf_test_project]  # type: pscharmonics.pf.PFProject
+
+		# Carry out pre-case check using fault cases on what should be two different study_cases
+		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
+
+		c = pscharmonics.constants.General
+		self.assertTrue(expected_sc_name in list(df[c.sc]))
+		self.assertTrue(expected_op_name in list(df[c.op]))
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
