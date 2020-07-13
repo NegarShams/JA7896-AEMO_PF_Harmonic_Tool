@@ -1,3 +1,31 @@
+"""
+#######################################################################################################################
+###													test_study_validation.py										###
+###		Script runs a number of different studies and then imports the output from previously manually run studies 	###
+###		ensure the same results are achieved.  The manually run studies are detailed below and the input files are 	###
+###		shown in the test_files\validation folder																	###
+###																													###
+###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
+###																													###
+#######################################################################################################################
+
+Validation 1:
+	Self-impedance calculated for the following 5 nodes during intact system conditions:
+		Node A =
+		Node B =
+		Node C =
+		Node D =
+		Node E =
+	Frequency scans are run to calculate the R, X and Z values with frequency scans based around the following settings:
+		Start Frequency = 75 Hz
+		Stop Frequency = 2500 Hz
+		Step Size = 5 Hz
+
+
+Validation 2:
+
+"""
+
 import unittest
 import os
 import sys
@@ -6,7 +34,6 @@ import math
 import random
 import string
 import glob
-import shutil
 
 from tests.context import pscharmonics
 
@@ -28,6 +55,7 @@ include_detailed_tests = True
 
 # Set to True and created excel outputs will be deleted during test run
 test_delete_excel_outputs = False
+
 
 class TestPFInitialisation(unittest.TestCase):
 	""" Tests that the correct python version can be found and then PowerFactory can be initialised """
@@ -374,9 +402,9 @@ class TestPFProject(unittest.TestCase):
 		sc.toggle_state()
 		self.assertTrue(sc.active)
 
-		# Updated because frequency scan is not initially defined, just load flow
-		self.assertFalse(sc.ldf is None)
-		self.assertEqual(sc.ldf.Execute(), 0)
+		# Although no load flow created can run using default, and then confirm correctly executed
+		self.assertFalse(sc.fs is None)
+		self.assertEqual(sc.fs.Execute(), 0)
 		# TODO: Confirm settings match inputs
 
 		# Tidy up by deleting temporary project folders
@@ -418,19 +446,17 @@ class TestPFProject(unittest.TestCase):
 
 		# Set results path for associated study case and check file doesn't already exist
 		sc.res_pth = test_export_pth
-		test_export_file = os.path.join(test_export_pth, '{}{}{}.csv'.format(
-			pscharmonics.constants.Results.study_fs, pscharmonics.constants.Results.joiner, sc.name))
+		test_export_file = os.path.join(test_export_pth, '{}.csv'.format(sc.name))
 		if os.path.isfile(test_export_file):
 			os.remove(test_export_file)
 		# Create results export command
-		export_cmd, res_pth = sc.set_results_export(result=sc.fs_results, res_type=pscharmonics.constants.Results.study_fs)
+		export_cmd, res_pth = sc.set_results_export(result=sc.fs_results)
 
 		# Confirm returned path matches expected value
 		self.assertEqual(test_export_file, res_pth)
 
 		# Run frequency scan and then export results
 		# Although no load flow created can run using default, and then confirm correctly executed
-		sc.create_studies(fs_settings=fs_settings)
 		sc.fs.Execute()
 		# Confirm returns 0 for successful execute
 		self.assertEqual(export_cmd.Execute(), 0)
@@ -477,7 +503,7 @@ class TestPFProject(unittest.TestCase):
 		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
 		pf_project = pscharmonics.pf.PFProject(
 			name=pf_test_project, df_studycases=df_test_project, uid=uid,
-			# res_pth=test_export_pth
+			res_pth=test_export_pth
 		)
 
 		# Get handle for study case
@@ -488,11 +514,7 @@ class TestPFProject(unittest.TestCase):
 
 		# Set results path for associated study case and check file doesn't already exist
 		sc.res_pth = test_export_pth
-		# Expected path and name of results file
-		test_export_file = os.path.join(
-			test_export_pth, '{}{}{}.csv'.format(
-				pscharmonics.constants.Results.study_fs, pscharmonics.constants.Results.joiner, sc.name)
-		)
+		test_export_file = os.path.join(test_export_pth, '{}.csv'.format(sc.name))
 		if os.path.isfile(test_export_file):
 			os.remove(test_export_file)
 
@@ -554,11 +576,9 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Set the index to be based on the unique name
 		cls.df.set_index(pscharmonics.constants.StudySettings.name, inplace=True, drop=False)
 
-	def setUp(self):
-		""" Settings imported fresh in case of any changes """
 		# Import all settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		self.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
+		cls.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
 
 	def test_create_fault_cases(self):
 		"""
@@ -708,19 +728,16 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		sc.ldf = None
 		# Create contingency based on no inputs but shouldn't raise an error since load flow command
 		# has not been defined yet
-		self.assertRaises(SyntaxError, sc.create_cont_analysis)
+		sc.create_cont_analysis()
 		# Should still be none
 		self.assertTrue(sc.cont_analysis is None)
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
-	def test_not_possible_to_run_studies_when_no_loadflow_command_exists(self):
+	def test_create_cont_analysis_fails_with_no_input(self):
 		"""
-			Will attempt to create a load flow command with no settings and no existing commands in the study case.
-			This will therefore through an exception and not be able to define a suitable load flow.
-
-			When then trying to create contingency cases also expect a SyntaxError exception to be created.
+			Tests that fault cases fails if provided with no inputs
 		:return:
 		"""
 		# Create new project instances
@@ -732,19 +749,9 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Get handle to test study case
 		sc = pf_project.base_sc[self.test_name]
 
-		# Clear the existing load flow command if one has been defined.  All other study cases will already have
-		# been deleted during PF Project initialisation.
-		if sc.ldf is not None:
-			sc.ldf.Delete()
-			sc.ldf = None
-
-		# Attempt to create a load flow command with no settings and no existing load flow commands in the study
-		# case.  Can expect an error to be returned
-		self.assertRaises(ValueError, sc.create_load_flow, lf_settings=None)
-
-		sc.ldf = None
-		# Also expect an AttributeError since no FaultCases have been passed as an input SyntaxError to be returned when attempt to create contingency cases and no load flow command
-		# exists
+		# Create contingency based on fault cases
+		sc.create_load_flow(lf_settings=None)
+		# Create load flow command first
 		self.assertRaises(SyntaxError, sc.create_cont_analysis)
 
 		# Tidy up by deleting temporary project folders
@@ -772,8 +779,8 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Create contingency based on fault cases
 		sc.create_cont_analysis(cmd='Contingency Analysis')
 
-		# Confirm cases created correctly which relates to intact + contingency
-		self.assertTrue(len(sc.df.index) == 2)
+		# Confirm cases created correctly
+		self.assertTrue(len(sc.df.index) == 1)
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
@@ -965,8 +972,10 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Carry out pre-case check using fault cases on what should be two different study_cases
 		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
 
+		# Number of intact cases since intact cases will also be included in the output
+		num_intact_cases = len(pf_project.base_sc.keys())
 		# Get number of convergent cases which will then be used to determine the number of files that should exist
-		# in the folder once study completed.  This includes number of intact cases as well as contingency cases
+		# in the folder once study completed
 		num_convergent_cases = len(df[df[pscharmonics.constants.Contingencies.status]==True].index)
 
 		# Create cases
@@ -976,7 +985,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 			contingencies=self.settings.contingencies
 		)
 
-		self.assertEqual(len(pf_project.cases_to_run), num_convergent_cases)
+		self.assertEqual(len(pf_project.cases_to_run), num_convergent_cases + num_intact_cases)
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
@@ -995,9 +1004,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		else:
 			os.mkdir(target_pth)
 
-		# Add the export path to the settings
-		self.settings.settings.export_folder = target_pth
-
 		# Create projects
 		uid = 'TEST_CASE'
 		pf_projects = pscharmonics.pf.create_pf_project_instances(
@@ -1005,7 +1011,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 			uid=uid,
 			lf_settings=self.settings.lf_settings,
 			fs_settings=self.settings.fs_settings,
-			# export_pth=target_pth
+			export_pth=target_pth
 		)
 
 		# Get single project
@@ -1014,8 +1020,10 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Carry out pre-case check using fault cases on what should be two different study_cases
 		df = pf_project.pre_case_check(contingencies=self.settings.contingencies)
 
+		# Number of intact cases since intact cases will also be included in the output
+		num_intact_cases = len(pf_project.base_sc.keys())
 		# Get number of convergent cases which will then be used to determine the number of files that should exist
-		# in the folder once study completed.  This includes intact and contingency cases
+		# in the folder once study completed
 		num_convergent_cases = len(df[df[pscharmonics.constants.Contingencies.status]==True].index)
 
 		# Create cases
@@ -1039,7 +1047,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Confirm number of results matches 1 for each convergent cases
 		self.assertEqual(
-			num_convergent_cases, num_results, msg='Check PQ licenses since no results returned'
+			num_convergent_cases + num_intact_cases, num_results, msg='Check PQ licenses since no results returned'
 		)
 
 		# Tidy up by deleting temporary project folders
@@ -1058,22 +1066,16 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 			raise SyntaxError('Random path {} already exists'.format(target_pth))
 		else:
 			os.mkdir(target_pth)
-		# Add the export folder to the settings
-		self.settings.settings.export_folder = target_pth
-
-		# Expected number of files from running these inputs to confirm runs correctly
-		test_expected_number_files = 4
 
 		# Create projects
 		uid = 'TEST_CASE'
 		pf_projects = pscharmonics.pf.create_pf_project_instances(
 			df_study_cases=self.settings.cases,
-			uid=uid,
-			# export_pth=target_pth
+			uid=uid
 		)
 
 		# Get single project
-		pf_project = pf_projects[pf_test_project]  # type: pscharmonics.pf.PFProject
+		pf_project = pf_projects[pf_test_project]
 
 		# Make sure relevant terminals for project have been found and created
 		_ = pf_project.find_terminals(terminals_to_include=self.settings.terminals, include_mutual=True)
@@ -1095,19 +1097,12 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
 
-		# Count number of files in the export folder to confirm expected number
-		self.assertEqual(len(os.listdir(target_pth)), test_expected_number_files)
-
-		# Delete random folder created and contents
-		shutil.rmtree(target_pth)
-
 	@classmethod
 	def tearDownClass(cls):
 		""" Function ensures the deletion of the PowerFactory project """
 		# Deactivate and then delete the project
-		# cls.pf.deactivate_project()
-		# cls.pf.delete_object(pf_obj=cls.pf_test_project)
-		pass
+		cls.pf.deactivate_project()
+		cls.pf.delete_object(pf_obj=cls.pf_test_project)
 
 @unittest.skipUnless(include_slow_tests, 'Tests that require initialising PowerFactory have been skipped')
 class TestPFProjectTerminals(unittest.TestCase):
@@ -1247,7 +1242,6 @@ class TestPFProjectTerminals(unittest.TestCase):
 		# Create new project instances
 		uid = 'TEST_CASE'
 		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		# raise SyntaxError('To Test')
 		pf_project = pscharmonics.pf.PFProject(
 			name=pf_test_project, df_studycases=df_test_project, uid=uid
 		)
@@ -1301,14 +1295,9 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 
 		cls.pf_test_project = cls.pf.get_active_project()
 
-	def setUp(self):
-		"""
-			Import the settings fresh each time in case any modifications are made during testings
-		:return:
-		"""
 		# Import all settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
-		self.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
+		cls.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
 
 	def test_pre_case_check_no_contingencies(self):
 		"""
@@ -1351,9 +1340,7 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		# Confirm DataFrame is expected length (2 intact cases) and number of non_convergent cases is as expected
 		# (1 non-convergent intact case)
 		self.assertEqual(len(df_summary.index), 2)
-
-		# Confirm that all cases are convergent
-		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 0)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 1)
 
 		# Confirm that excel spreadsheet has been created (and delete if necessary)
 		self.assertTrue(os.path.isfile(excel_pth))
@@ -1395,9 +1382,9 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		# Confirm the returned terminals match the expected length
 		self.assertEqual(len(df_term.index), 7)
 
-		# Confirm DataFrame is expected length and 2 of those cases are non-convergent cases is as expected
+		# Confirm DataFrame is expected length and number of non_convergent cases is as expected
 		self.assertEqual(len(df_summary.index), 6)
-		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 2)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 4)
 
 		# Confirm that excel spreadsheet has been created (and delete if necessary)
 		self.assertTrue(os.path.isfile(excel_pth))
@@ -1418,7 +1405,6 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			raise SyntaxError('Random path {} already exists'.format(target_pth))
 		else:
 			os.mkdir(target_pth)
-		# Set the export folder so that files exported to the correct location
 		self.settings.settings.export_folder = target_pth
 
 		# Create projects
@@ -1428,7 +1414,7 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			uid=uid,
 			lf_settings=self.settings.lf_settings,
 			fs_settings=self.settings.fs_settings,
-			# export_pth=target_pth
+			export_pth=target_pth
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1437,21 +1423,17 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 
 		# Find out how many results produced and then confirm that matches with expected number
 		num_results = len([name for name in os.listdir(target_pth) if os.path.isfile(os.path.join(target_pth, name))])
-		# Expect to have 4 results from the study + a copy of the inputs file
-		self.assertEqual(num_results, 4 + 1)
+		self.assertEqual(num_results, 4)
 
 		if test_delete_excel_outputs:
 			os.remove(target_pth)
 
 	def test_produce_outputs_no_cont(self):
 		"""
-			Function tests that the correct outputs are produced when no contingencies are included in the study
+			Function tests that running studies for a projects correctly reports non-convergent cases
+			and produces a suitable excel export
 		:return:
 		"""
-		# Import different settings file since need the case with no contingencies included
-		inputs_file = os.path.join(TESTS_DIR, 'Inputs_NoContingencies.xlsx')
-		settings = pscharmonics.file_io.StudyInputs(pth_file=inputs_file)
-
 		# Create random path for temporary files
 		target_pth = os.path.join(
 			TESTS_DIR, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
@@ -1460,26 +1442,25 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			raise SyntaxError('Random path {} already exists'.format(target_pth))
 		else:
 			os.mkdir(target_pth)
-		settings.settings.export_folder = target_pth
+		self.settings.settings.export_folder = target_pth
 
 		# Create projects
 		uid = 'TEST_CASE'
 		pf_projects = pscharmonics.pf.create_pf_project_instances(
-			df_study_cases=settings.cases,
+			df_study_cases=self.settings.cases,
 			uid=uid,
-			lf_settings=settings.lf_settings,
-			fs_settings=settings.fs_settings,
-			# export_pth=target_pth
+			lf_settings=self.settings.lf_settings,
+			fs_settings=self.settings.fs_settings,
+			export_pth=target_pth
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
 		# output is saved at this point
-		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=settings)
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=self.settings)
 
 		# Find out how many results produced and then confirm that matches with expected number
 		num_results = len([name for name in os.listdir(target_pth) if os.path.isfile(os.path.join(target_pth, name))])
-		# Expect to have 2 convergent intact cases + the settings file
-		self.assertEqual(num_results, 2 + 1)
+		self.assertEqual(num_results, 4)
 
 		if test_delete_excel_outputs:
 			os.remove(target_pth)
@@ -1543,7 +1524,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			uid=uid,
 			lf_settings=inputs.lf_settings,
 			fs_settings=inputs.fs_settings,
-			# export_pth=target_pth
+			export_pth=target_pth
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1583,7 +1564,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			uid=uid,
 			lf_settings=inputs.lf_settings,
 			fs_settings=inputs.fs_settings,
-			# export_pth=target_pth
+			export_pth=target_pth
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1625,7 +1606,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			uid=uid,
 			lf_settings=inputs.lf_settings,
 			fs_settings=inputs.fs_settings,
-			# export_pth=target_pth
+			export_pth=target_pth
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1663,7 +1644,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			uid=uid,
 			lf_settings=inputs.lf_settings,
 			fs_settings=inputs.fs_settings,
-			# export_pth=target_pth
+			export_pth=target_pth
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no

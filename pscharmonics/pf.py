@@ -1,6 +1,6 @@
 """
 #######################################################################################################################
-###													pf																###
+###													pf.py															###
 ###		Script deals with writing data to PowerFactory and any processing that takes place which requires 			###
 ###		interacting with power factory																				###
 ###																													###
@@ -157,8 +157,10 @@ def create_mutual_elm(location, name, bus1, bus2):		# Creates Mutual Impedance b
 
 class PFStudyCase:
 	""" Class containing the details for each study case contained within a project """
+	# The full path where results will be saved is defined just prior to creating the studies
+	res_pth = str()  # type: str
 
-	def __init__(self, name, sc, op, prj, sc_source_name, op_source_name, base_case=False, res_pth=str()):
+	def __init__(self, name, sc, op, prj, sc_source_name, op_source_name, base_case=False):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str name:  Name of study case
@@ -168,7 +170,6 @@ class PFStudyCase:
 		:param str sc_source_name:  Name for the study case used as the basis for this study case
 		:param str op_source_name:  Name of the operating scenario used as the basis for this operating scenario
 		:param bool base_case: (optional=False) - Set to True for the base cases
-		:param str res_pth: (optional=str()) - This is the path that the processed results will be saved in
 		"""
 
 
@@ -214,14 +215,15 @@ class PFStudyCase:
 		self.cont_results = None
 
 		# If no results path is provided then warn user and saved results to same folder as the script
-		if not res_pth:
-			res_pth = os.path.abspath(os.path.join(os.path.abspath(__file__), '..'))
-			self.logger.debug(
-				'No results path provided for PFStudyCase instance <{}> and so default path of {} assumed'.format(
-					self.name, res_pth
-				)
-			)
-		self.res_pth = res_pth
+		# Removed from here since now only check the path exists at the point the studies are created
+		# if not res_pth:
+		# 	res_pth = os.path.abspath(os.path.join(os.path.abspath(__file__), '..'))
+		# 	self.logger.debug(
+		# 		'No results path provided for PFStudyCase instance <{}> and so default path of {} assumed'.format(
+		# 			self.name, res_pth
+		# 		)
+		# 	)
+		# self.res_pth = res_pth
 
 		# List of paths that contain the export files
 		self.fs_result_exports = list()
@@ -356,7 +358,7 @@ class PFStudyCase:
 
 				# Find busbar in system
 				lf_settings.find_reference_terminal(app=app)
-				ldf.rembar = lf_settings.rembar  # Reference machine
+				# ldf.rembar = lf_settings.rembar  # Reference machine
 
 				ldf.phiini = lf_settings.phiini  # Angle
 
@@ -425,7 +427,20 @@ class PFStudyCase:
 		# If ldf still hasn't been defined then use default load flow
 		if not ldf:
 			# Get default load flow command, copy and rename
-			def_ldf = self.sc.GetContents('*.{}'.format(constants.PowerFactory.ldf_command))[0]
+			def_ldf = self.sc.GetContents('*.{}'.format(constants.PowerFactory.ldf_command))
+			if len(def_ldf)==0:
+				self.logger.critical(
+					(
+						'You have not provided any load flow settings or reference to a load flow command that can be '
+						'found in the Power Factory study case {} (derived from {}) associated with Power Factory '
+						'project {}.  There were also no existing load flow commands found that could be used instead.  '
+						'It is therefore not possible to run any studies on this study case and the script will now fail.'
+					).format(self.sc, self.sc_source_name, self.prj)
+				)
+				raise ValueError('No Load Flow Command for Study Case {}'.format(self.sc))
+			else:
+				def_ldf = def_ldf[0]
+
 			ldf = self.sc.AddCopy(def_ldf, ldf_name)
 			self.logger.warning(
 				(
@@ -591,13 +606,14 @@ class PFStudyCase:
 
 		# Confirm load flow and results file has already been defined since needed for output settings
 		if self.ldf is None:
-			self.logger.error(
+			self.logger.critical(
 				(
 					'Not possible to create contingency analysis for study case {} since no load flow settings have yet '
 					'been determined.  This could be a scripting issue or an error finding a suitable load flow.'
 				).format(self.sc)
 			)
 			cont_analysis = None
+			raise SyntaxError('No load flow command defined for study case {}'.format(self.sc))
 
 		else:
 			if cmd:
@@ -953,7 +969,6 @@ class PFStudyCase:
 
 		return None
 
-
 	def create_studies(self, lf_settings=None, fs_settings=None):
 		"""
 			Function to either create a new command or change the reference of an existing command to results file
@@ -990,6 +1005,7 @@ class PFStudyCase:
 		:param str res_type:  Leading name used for results type
 		:return (powerfactory.DataObject, res_export_pth):  Handle to PF ComRes function, Full path to exported result
 		"""
+
 		res_export_path = os.path.join(self.res_pth, '{}{}{}.csv'.format(res_type, constants.Results.joiner, self.name))
 
 		c = constants.PowerFactory.ComRes
@@ -1001,7 +1017,7 @@ class PFStudyCase:
 
 		# Set type as CSV and define results file
 		h_comres.SetAttribute(c.export_type, 6)
-		h_comres.SetAttribute(c.file, os.path.join(self.res_pth, res_export_path))
+		h_comres.SetAttribute(c.file, res_export_path)
 		h_comres.SetAttribute(c.separators, 1)
 		h_comres.SetAttribute(c.object_head_only, 0)
 
@@ -1064,9 +1080,9 @@ class PFStudyCase:
 		# Confirm case is deactivated
 		self.toggle_state(deactivate=True)
 
-		# If no results path is provided then use default
-		if not res_pth:
-			res_pth = self.res_pth
+		# # If no results path is provided then use default - No longer needed
+		# # if not res_pth:
+		# # 	res_pth = self.res_pth
 
 		# Loop through all contingencies in this case which are convergent
 		new_cases = list()
@@ -1090,8 +1106,10 @@ class PFStudyCase:
 					sc_source_name=self.sc_source_name,
 					op_source_name=self.op_source_name,
 					prj=self.prj,
-					res_pth=res_pth
+					# res_pth=res_pth
 				)
+				# Add the results path that has been established to the results
+				case.res_pth = res_pth
 
 				# Get the contingency specific to this case and apply the outage which is a PowerFactory Cont Outage element
 				cont_outage = self.cont_analysis.GetContents('{}.{}'.format(cont_name, constants.PowerFactory.pf_outage))
@@ -1168,7 +1186,7 @@ class PFProject(object):
 	# type: PFProject
 	""" Class contains reference to a project, results folder and associated task automation file"""
 
-	def __init__(self, name, df_studycases, uid, lf_settings=None, fs_settings=None, res_pth=str()):
+	def __init__(self, name, df_studycases, uid, lf_settings=None, fs_settings=None):
 		"""
 			Initialise class
 		:param str name:  project name
@@ -1179,7 +1197,6 @@ class PFProject(object):
 															used and if not then default Frequency Sweep command will be used
 		:param pd.DataFrame df_studycases:  DataFrame containing all the base study cases associates with this project
 		:param str uid:  Unique identifier given for this study
-		:param str res_pth: (optional=str()) - This is the path that the processed results will be saved in
 		"""
 		self.logger = constants.logger
 		self.logger.info('Study cases associated with PowerFactory project {} being initialised'.format(name))
@@ -1209,7 +1226,8 @@ class PFProject(object):
 		self.prj_active = True
 
 		# Path where all result exports will be saved to
-		self.res_pth =res_pth
+		# TODO: Removed as an input since res_pth only defined at the point the studies are created
+		# self.res_pth = res_pth
 
 		if self.prj is None:
 			self.logger.error(
@@ -1323,10 +1341,15 @@ class PFProject(object):
 				# study case and operating scenario names added so reference can be made to them in the exported results
 				sc_source_name=sc_name, op_source_name=os_name,
 				base_case=True,
-				res_pth=self.res_pth
+				# Removed at this point since not needed until studies are created
+				# res_pth=self.res_pth
 			)
 
-			study_case_class.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
+			# TODO: Do not believe studies need to be created at this point so removing
+			# study_case_class.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
+			# Only need to create the load flow study case and target results files at this point
+			study_case_class.create_load_flow(lf_settings=self.lf_settings)
+			study_case_class.create_results_files()
 
 			self.logger.debug('Duplicated case and associated studies created for intact model with name {}'.format(name))
 			base_study_cases[name] = study_case_class
@@ -1721,6 +1744,24 @@ class PFProject(object):
 
 		df_convergent = self.df_pre_case[self.df_pre_case[constants.Contingencies.status]==True]
 
+		# Check that the target folder for the results to be saved in has been provided, if not then use the default
+		# folder.  Also check the folder exists and if not then create it
+		if not study_settings.export_folder:
+			study_settings.export_folder = os.path.abspath(os.path.join(os.path.abspath(__file__), '..'))
+			self.logger.debug(
+				'No results path provided for PFStudyCase instance <{}> and so default path of {} assumed'.format(
+					self.name, study_settings.export_folder
+				)
+			)
+		elif not os.path.isdir(study_settings.export_folder):
+			# Since the folder does not already exist then create it
+			os.mkdir(study_settings.export_folder)
+			self.logger.debug(
+				(
+					'The results folder <{}> does not already exist and therefore it has been created'
+				).format(study_settings.export_folder)
+			)
+
 		# Check if the intact case should be included and then if so add to cases
 		self.cases_to_run = list()
 		if study_settings.include_intact:
@@ -1752,13 +1793,14 @@ class PFProject(object):
 
 		else:
 			# Loop through each study case to create new cases based on those and the relevant contingencies
-			for sc_name, sc in self.base_sc.items():
+			for sc_name, sc in self.base_sc.items():  # type: str, PFStudyCase
 				# Add the terminals to the results file for each of the base study cases before the new cases are
 				# created which uses them as a starting point
 				sc.add_variables(study_settings=study_settings, terminals=self.terminals, mutuals=self.mutuals)
 
 				# Create cases for all the convergent contingencies associated with this study case and then returns
-				# a list of references to the PFStudyCase class
+				# a list of references to the PFStudyCase class.  The results path is added at this point based on the
+				# location that is either selected by the user or included in the settings
 				new_cases = sc.create_cases(
 					sc_folder=self.sc_folder, op_folder=self.op_folder, res_pth=study_settings.export_folder
 				)
@@ -1811,6 +1853,7 @@ class PFProject(object):
 		# df = pd.DataFrame(columns=c.columns)
 		df = pd.DataFrame()
 		# df.columns = c.columns
+		df[c.status] = False
 
 		# Confirm project is active
 		# TODO: What happens if try to find a terminal that exists in project but not study case
@@ -2064,8 +2107,8 @@ class PowerFactory:
 		self.logger.debug('Searching of paths to PowerFactory and adding the Python search path')
 		# Get the python paths if not already populated
 		if not (self.c.dig_path and self.c.dig_python_path):
-			# Initialise so that the paths are looked for and the
-			self.c = self.c()
+			# Look for PowerFactory based on the most recent PowerFactory version
+			self.c.select_power_factory_version()
 
 		# Add the paths to system and the environment and then try and import powerfactory
 		sys.path.append(self.c.dig_path)
@@ -2435,7 +2478,7 @@ class PowerFactory:
 		return None
 
 
-def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=None, fs_settings=None, export_pth=str()):
+def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=None, fs_settings=None):
 	# type: (pd.DataFrame, str, file_io.LFSettings, file_io.FSSettings, str) -> dict
 	"""
 		Loops through each of the projects in the DataFrame of study cases and activates them to check they work
@@ -2443,7 +2486,6 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 	:param str uid:  Unique identifier for this study
 	:param file_io.LFSettings lf_settings:  Settings for load flow studies
 	:param file_io.FSSettings fs_settings:  Settings for frequency scan studies
-	:param str export_pth:  Path to export all results
 	:return dict pf_projects:  Returns a dictionary of PF project instances
 	"""
 	logger = constants.logger
@@ -2454,7 +2496,7 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 
 		pf_project = PFProject(
 			name=project, df_studycases=df, uid=uid, lf_settings=lf_settings, fs_settings=fs_settings,
-			res_pth=export_pth
+			# res_pth=export_pth
 		)  # type: PFProject
 
 		# Check that project exists
@@ -2574,7 +2616,7 @@ def run_studies(pf_projects, inputs):
 
 	# Iterate through each project and create the various cases, the includes running a pre-case check but no
 	# output is saved at this point
-	for project_name, project in pf_projects.items():
+	for project_name, project in pf_projects.items():  # type: str, PFProject
 		logger.debug('Studies being run for project {}:\t{}'.format(project_name, project.prj))
 		project.create_cases(
 			study_settings=inputs.settings,
