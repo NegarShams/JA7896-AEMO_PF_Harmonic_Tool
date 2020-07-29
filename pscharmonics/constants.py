@@ -17,12 +17,12 @@ import time
 
 # Label used when displaying messages
 __title__ = 'PSC Automated Frequency Scan Tool'
-__version__ = '1.1'
+__version__ = '1.2'
 
 logger_name = 'PSC'
 logger = None
 
-DEBUG = True
+DEBUG = False
 
 # Unique identifier populated for each study run
 uid = time.strftime('%Y%m%d_%H%M%S')
@@ -96,6 +96,7 @@ class PowerFactory:
 				   'High Pass':3}
 	pf_substation = 'ElmSubstat'
 	pf_line = 'ElmLne'
+	pf_branch = 'ElmBranch'
 	pf_terminal =  'ElmTerm'
 	pf_coupler = 'ElmCoup'
 	pf_mutual = 'ElmMut'

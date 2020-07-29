@@ -244,26 +244,34 @@ class PFStudyCase:
 		:param bool deactivate: (optional=False) - Set to True to deactivate
 		:return None:
 		"""
+		# Confirm this study case is the active study case before trying to deactivate
+		active_sc = app.GetActiveStudyCase()
 
-		if deactivate:
-			# Confirm this study case is the active study case before trying to deactivate
-			active_sc = app.GetActiveStudyCase()
-			if active_sc == self.sc:
-				# Deactivate study case
-				err = self.sc.Deactivate()
-				self.active = False
-			else:
-				err = 0
-		elif not deactivate:
+		if deactivate and not active_sc is None:
+			# Force to deactivate what every study case is currently active irrelevant of whether it is the target one
+			# or not
+			# Deactivate study case
+			err = active_sc.Deactivate()
+			self.active = False
+		else:
 			# Activate both study case and operating scenario
-			err1 = self.sc.Activate()
-			# TODO: Confirm correct operating scenario is actually being activated
-			err2 = self.op.Activate()
+			if active_sc != self.sc:
+				err1 = self.sc.Activate()
+			else:
+				err1 = 0
+
+			# Get currently active scenario and then if not this scenario the switch accordingly
+			active_op = app.GetActiveScenario()
+			if active_op != self.op:
+				if not active_op is None:
+					# If not the active one then deactivate and switch
+					active_op.Deactivate()
+				err2 = self.op.Activate()
+			else:
+				err2 = 0
+
 			err = err1 + err2
 			self.active = True
-		else:
-			err = 0
-			self.logger.debug('Study case {} already either deactivated / activated'.format(self.name))
 
 		if err > 0 and deactivate:
 			self.logger.error('Unable to deactivate the study case: {}'.format(self.sc))
@@ -1307,8 +1315,8 @@ class PFProject(object):
 			sc_name = '{}.{}'.format(sc_name, constants.PowerFactory.pf_case)
 			os_name = '{}.{}'.format(os_name, constants.PowerFactory.pf_scenario)
 
-			# Find handle in powerfactory for study_case
-			pf_sc = self.base_sc_folder.GetContents(sc_name)
+			# Find handle in powerfactory for study_case (uses a recursive search in case embedded within folders)
+			pf_sc = self.base_sc_folder.GetContents(sc_name, True)
 			if len(pf_sc) == 0:
 				# Study case doesn't exist so alert user and skip to next
 				self.logger.error(
@@ -1323,8 +1331,8 @@ class PFProject(object):
 				# Get first reference
 				pf_sc = pf_sc[0]
 
-			# Find handle in powerfactory for operating scenario
-			pf_os = self.base_os_folder.GetContents(os_name)
+			# Find handle in powerfactory for operating scenario (uses a recursive search in case embedded within folders)
+			pf_os = self.base_os_folder.GetContents(os_name, True)
 			if len(pf_os) == 0:
 				# Study case doesn't exist so alert user and skip to next
 				self.logger.error(
@@ -1530,25 +1538,26 @@ class PFProject(object):
 
 		return None
 
-	def find_element(self, element_name, ending=constants.PowerFactory.pf_substation, recursive=0):
+	def find_element(self, element_name, ending=(constants.PowerFactory.pf_substation, ), recursive=0):
 		"""
 			Function searches relevant possible locations that the required element could be located and returns
 			the substation or an error message when multiple found
 		:param str element_name:  Name of element to be found
-		:param str ending:  Expecting ending for the provided input value
+		:param tuple ending:  Expecting ending for the provided input value but can be a tuple if different ending types
+								to be tested
 		:param int recursive:  If set to 1 will search recursively (needed for finding lines)
 		:return powerfactory.DataObject element: Reference to the powerfactory substation element
 		"""
-		# Check ends with the substation element ending
-		if not element_name.endswith(ending):
-			element_name = '{}.{}'.format(element_name, ending)
-
 		# Find substation using a recursive search of the network elements folders
 		elements = list()
-		for net_item in self.net_data_items:
-			# Loop through each net_item folder and search for element
-			# TODO: What happens if element embedded within a substation
-			elements.extend(net_item.GetContents(element_name, recursive))
+		# Loop through each element in list of endings
+		for pf_type in ending:
+			# Check ends with the substation element ending
+			element_name_to_find = '{}.{}'.format(element_name, pf_type)
+
+			for net_item in self.net_data_items:
+				# Loop through each net_item folder and search for element
+				elements.extend(net_item.GetContents(element_name_to_find, recursive))
 
 		# Check that only a single substation is found
 		if len(elements) == 0:
@@ -1684,9 +1693,12 @@ class PFProject(object):
 					# Loop through each line and add to fault case
 					# TODO:  How to do this in PowerFactory needs to be checked
 					for line_cont in cont.lines:
-						# Find substation using a recursive search of the network elements folders
+						# Find substation using a recursive search of the network elements folders assuming either a
+						# line or branch type
 						pf_line = self.find_element(
-							element_name=line_cont.line, ending=constants.PowerFactory.pf_line, recursive=1
+							element_name=line_cont.line,
+							ending=(constants.PowerFactory.pf_line, constants.PowerFactory.pf_branch),
+							recursive=1
 						)
 
 						if pf_line is None:
@@ -1959,8 +1971,11 @@ class PFProject(object):
 
 			else:
 				# Check if terminal is contained within substation
-				# Get list of all terminals that match this name
-				terminals_in_substation = pf_sub.GetContents(terminal.terminal)
+				# Get list of all terminals that match this name in substation using a recursive search
+				terminals_in_substation = pf_sub.GetContents(
+					'{}.{}'.format(terminal.terminal, constants.PowerFactory.pf_terminal),
+					1
+				)
 
 				# Confirm that at least 1 terminal with the required named exists in the substation
 
@@ -2546,8 +2561,10 @@ class PowerFactory:
 				app.SetGraphicUpdate(0)
 				# app.SetGuiUpdateEnabled(0)
 				app.EchoOff()
+		elif constants.DEBUG:
+			self.logger.info('Running in debug mode so all details and progress updates are exported')
 		else:
-			self.logger.info('Running in debug or Python terminal mode and so all details and progress updates are output')
+			self.logger.info('Running in Python terminal mode and progress updates will be displayed in output window')
 
 		return None
 

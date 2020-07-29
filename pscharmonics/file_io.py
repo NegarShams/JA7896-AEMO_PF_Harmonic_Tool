@@ -999,7 +999,10 @@ class PreviousResultsExport:
 		if ref_terminal == '':
 			for term in self.inputs.terminals.values():
 				# Find matching substation and terminal
-				if term.substation == var_sub and term.terminal == var_term:
+				if (
+						'{}.{}'.format(term.substation, c.pf_substation) == var_sub and
+						'{}.{}'.format(term.terminal, c.pf_terminal) == var_term
+				):
 					ref_terminal = term.name
 					break
 
@@ -1008,7 +1011,7 @@ class PreviousResultsExport:
 					(
 						'Substation {} in the results does not appear in the inputs list of substations with the '
 						'associated terminal {}.  List of inputs are:\n\t{}'
-					).format(var_sub, '\n\t'.join([term.name for term in self.inputs.terminals]))
+					).format(var_sub, var_term, '\n\t'.join([term.name for term in self.inputs.terminals.values()]))
 				)
 				raise ValueError(
 					(
@@ -1113,6 +1116,7 @@ class StudySettings:
 		# Process results_folder
 		if not self.gui_mode:
 			self.export_folder = self.process_export_folder()
+			self.results_name = self.process_results_name()
 		else:
 			self.logger.debug('Running in GUI mode and therefore export_folder is defined later')
 		# self.results_name = self.process_result_name()
@@ -1160,6 +1164,37 @@ class StudySettings:
 			self.logger.info('The directory for the results {} does not exist but has been created'.format(folder))
 
 		return folder
+
+	def process_results_name(self, def_value=constants.StudySettings.def_results_name):
+		"""
+			Process the results file name that has been provided and if a blank value is provided then use the default
+			value
+		:param str def_value:  Default file name to use
+		:return str res_name:
+		"""
+		# Get folder from DataFrame, if empty or invalid path then use default folder
+		res_name = str(self.df.loc[self.c.results_name])
+
+		# Check if any results file has been provided and then append the correct extension and UID
+		# value
+		if not res_name:
+			# If no folder provided then use default value
+			res_name = '{}_{}.xlsx'.format(def_value, constants.uid)
+		else:
+			res_name = '{}{}.xlsx'.format(res_name, constants.uid)
+
+		# Check if target file already exists and warn user that results will be overwritten
+		overall_res_pth = os.path.join(self.export_folder, res_name)
+		if os.path.isfile(overall_res_pth):
+			# Number of seconds to delay before deleting file
+			delay = 5.0
+			self.logger.warning(
+				'The target results file <{}> already exists and will be deleted in {} seconds'.format(overall_res_pth, delay)
+			)
+			time.sleep(delay)
+			os.remove(overall_res_pth)
+
+		return res_name
 
 	def add_folder(self, pth_results_file):
 		"""
@@ -1645,12 +1680,12 @@ class ContingencyDetails:
 		# Determines whether Contingency relates to lines or circuit breakers
 		self.line_data = line_data
 
-		# Initialise empty lists to be populated with details of the outaged circuits or lines
+		# Initialise empty lists to be populated with details of the outage circuits or lines
 		self.couplers = list()
 		self.lines = list()
 
 		if self.line_data:
-			# Inputs are names of lines to be outaged and so populate lines with details
+			# Inputs are names of lines to be outage and so populate lines with details
 			for line, status in zip(*[iter(list_of_parameters[1:])]*2):
 				if line != '' and not pd.isna(line):
 					new_line = LineDetails(str(line), status)
@@ -1678,13 +1713,15 @@ class CouplerDetails:
 		:param str breaker: Name of breaker
 		:param bool status: Status breaker is changed to
 		"""
-		# Check if substation already has substation type ending and if not add it
-		if not str(substation).endswith(constants.PowerFactory.pf_substation):
-			substation = '{}.{}'.format(substation, constants.PowerFactory.pf_substation)
+		# Check if substation already has substation type ending and if it needs removing since it is added as part of
+		# search algorithm
+		if str(substation).endswith(constants.PowerFactory.pf_substation):
+			substation = substation.replace('.{}'.format(constants.PowerFactory.pf_substation), '')
 
-		# Check if breaker ends in the correct format
-		if not str(breaker).endswith(constants.PowerFactory.pf_coupler):
-			breaker = '{}.{}'.format(breaker, constants.PowerFactory.pf_coupler)
+		# Check if substation already has substation type ending and if it needs removing since it is added as part of
+		# search algorithm
+		if str(breaker).endswith(constants.PowerFactory.pf_coupler):
+			breaker = breaker.replace('.{}'.format(constants.PowerFactory.pf_coupler),'')
 
 		# Confirm that status for operation is either true or false
 		if status == constants.StudyInputs.switch_open:
@@ -1718,9 +1755,11 @@ class LineDetails:
 		:param str status: Status of line (in service or out of service)
 		"""
 		logger = constants.logger
-		# Check if substation already has substation type ending and if not add it
-		if not line.endswith(constants.PowerFactory.pf_line):
-			line = '{}.{}'.format(line, constants.PowerFactory.pf_line)
+		# Check if line already has type ending and if it needs removing since it is added as part of search algorithm
+		if line.endswith(constants.PowerFactory.pf_line):
+			line = line.replace('.{}'.format(constants.PowerFactory.pf_line), '')
+		elif line.endswith(constants.PowerFactory.pf_branch):
+			line = line.replace('.{}'.format(constants.PowerFactory.pf_branch), '')
 
 		# Confirm that status for operation is either true or false
 		if status == constants.StudyInputs.in_service:
@@ -1768,11 +1807,13 @@ class TerminalDetails:
 
 		# Add in the relevant endings if they do not already exist
 		c = constants.PowerFactory
-		if not substation.endswith(c.pf_substation):
-			substation = '{}.{}'.format(substation, c.pf_substation)
+		# Check if substation already has substation type ending and if it needs removing since it is added as part of
+		# search algorithm
+		if str(substation).endswith(c.pf_substation):
+			substation = substation.replace('.{}'.format(c.pf_substation), '')
 
-		if not terminal.endswith(c.pf_terminal):
-			terminal = '{}.{}'.format(terminal, c.pf_terminal)
+		if str(terminal).endswith(c.pf_terminal):
+			terminal = terminal.replace('.{}'.format(c.pf_terminal), '')
 
 		self.name = name
 		self.substation = substation
@@ -1918,26 +1959,26 @@ class LFSettings:
 
 		# Get handle for load flow command from study case
 		# Basic
-		self.iopt_net = load_flow_settings[0]  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
-		self.iopt_at = load_flow_settings[1]  # Automatic Tap Adjustment
-		self.iopt_asht = load_flow_settings[2]  # Automatic Shunt Adjustment
+		self.iopt_net = int(load_flow_settings[0])  # Calculation method (0 Balanced AC, 1 Unbalanced AC, DC)
+		self.iopt_at = int(load_flow_settings[1])  # Automatic Tap Adjustment
+		self.iopt_asht = int(load_flow_settings[2])  # Automatic Shunt Adjustment
 
 		# Added in Automatic Tapping of PSTs with default values
-		self.iPST_at = load_flow_settings[3]  # Automatic Tap Adjustment of Phase Shifters
+		self.iPST_at = int(load_flow_settings[3])  # Automatic Tap Adjustment of Phase Shifters
 
-		self.iopt_lim = load_flow_settings[4]  # Consider Reactive Power Limits
-		self.iopt_limScale = load_flow_settings[5]  # Consider Reactive Power Limits Scaling Factor
-		self.iopt_tem = load_flow_settings[6]  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
-		self.iopt_pq = load_flow_settings[7]  # Consider Voltage Dependency of Loads
-		self.iopt_fls = load_flow_settings[8]  # Feeder Load Scaling
-		self.iopt_sim = load_flow_settings[9]  # Consider Coincidence of Low-Voltage Loads
-		self.scPnight = load_flow_settings[10]  # Scaling Factor for Night Storage Heaters
+		self.iopt_lim = int(load_flow_settings[4])  # Consider Reactive Power Limits
+		self.iopt_limScale = int(load_flow_settings[5])  # Consider Reactive Power Limits Scaling Factor
+		self.iopt_tem = int(load_flow_settings[6])  # Temperature Dependency: Line Cable Resistances (0 ...at 20C, 1 at Maximum Operational Temperature)
+		self.iopt_pq = int(load_flow_settings[7])  # Consider Voltage Dependency of Loads
+		self.iopt_fls = int(load_flow_settings[8])  # Feeder Load Scaling
+		self.iopt_sim = int(load_flow_settings[9])  # Consider Coincidence of Low-Voltage Loads
+		self.scPnight = float(load_flow_settings[10])  # Scaling Factor for Night Storage Heaters
 
 		# Active Power Control
-		self.iopt_apdist = load_flow_settings[11]  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
+		self.iopt_apdist = int(load_flow_settings[11])  # Active Power Control (0 as Dispatched, 1 According to Secondary Control,
 		# 2 According to Primary Control, 3 According Inertia)
-		self.iopt_plim = load_flow_settings[12]  # Consider Active Power Limits
-		self.iPbalancing = load_flow_settings[13]  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
+		self.iopt_plim = int(load_flow_settings[12])  # Consider Active Power Limits
+		self.iPbalancing = int(load_flow_settings[13])  # (0 Ref Machine, 1 Load, Static Gen, Dist slack by loads, Dist slack by Sync,
 
 		# Get DataObject handle for reference busbar
 		ref_machine = load_flow_settings[14]
@@ -1955,59 +1996,59 @@ class LFSettings:
 				self.terminal = '{}.{}'.format(terminal, constants.PowerFactory.pf_terminal)
 
 
-		self.phiini = load_flow_settings[15]  # Angle
+		self.phiini = float(load_flow_settings[15])  # Angle
 
 		# Advanced Options
-		self.i_power = load_flow_settings[16]  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
-		self.iopt_notopo = load_flow_settings[17]  # No Topology Rebuild
-		self.iopt_noinit = load_flow_settings[18]  # No initialisation
-		self.utr_init = load_flow_settings[19]  # Consideration of transformer winding ratio
-		self.maxPhaseShift = load_flow_settings[20]  # Max Transformer Phase Shift
-		self.itapopt = load_flow_settings[21]  # Tap Adjustment ( 0 Direct, 1 Step)
-		self.krelax = load_flow_settings[22]  # Min Controller Relaxation Factor
+		self.i_power = int(load_flow_settings[16])  # Load Flow Method ( NR Current, 1 NR (Power Eqn Classic)
+		self.iopt_notopo = int(load_flow_settings[17])  # No Topology Rebuild
+		self.iopt_noinit = int(load_flow_settings[18])  # No initialisation
+		self.utr_init = int(load_flow_settings[19])  # Consideration of transformer winding ratio
+		self.maxPhaseShift = float(load_flow_settings[20])  # Max Transformer Phase Shift
+		self.itapopt = int(load_flow_settings[21])  # Tap Adjustment ( 0 Direct, 1 Step)
+		self.krelax = float(load_flow_settings[22])  # Min Controller Relaxation Factor
 
-		self.iopt_stamode = load_flow_settings[23]  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
-		self.iopt_igntow = load_flow_settings[24]  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
-		self.initOPF = load_flow_settings[25]  # Use this load flow for initialisation of OPF
-		self.zoneScale = load_flow_settings[26]  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
+		self.iopt_stamode = int(load_flow_settings[23])  # Station Controller (0 Standard, 1 Gen HV, 2 Gen LV
+		self.iopt_igntow = int(load_flow_settings[24])  # Modelling Method of Towers (0 With In/ Output signals, 1 ignore couplings, 2 equation in lines)
+		self.initOPF = int(load_flow_settings[25])  # Use this load flow for initialisation of OPF
+		self.zoneScale = int(load_flow_settings[26])  # Zone Scaling ( 0 Consider all loads, 1 Consider adjustable loads only)
 
 		# Iteration Control
-		self.itrlx = load_flow_settings[27]  # Max No Iterations for Newton-Raphson Iteration
-		self.ictrlx = load_flow_settings[28]  # Max No Iterations for Outer Loop
-		self.nsteps = load_flow_settings[29]  # Max No Iterations for Number of steps
+		self.itrlx = int(load_flow_settings[27])  # Max No Iterations for Newton-Raphson Iteration
+		self.ictrlx = int(load_flow_settings[28])  # Max No Iterations for Outer Loop
+		self.nsteps = int(load_flow_settings[29])  # Max No Iterations for Number of steps
 
-		self.errlf = load_flow_settings[30]  # Max Acceptable Load Flow Error for Nodes
-		self.erreq = load_flow_settings[31]  # Max Acceptable Load Flow Error for Model Equations
-		self.iStepAdapt = load_flow_settings[32]  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
-		self.relax = load_flow_settings[33]  # If Fixed Relaxation factor
-		self.iopt_lev = load_flow_settings[34]  # Automatic Model Adaptation for Convergence
+		self.errlf = float(load_flow_settings[30])  # Max Acceptable Load Flow Error for Nodes
+		self.erreq = float(load_flow_settings[31])  # Max Acceptable Load Flow Error for Model Equations
+		self.iStepAdapt = int(load_flow_settings[32])  # Iteration Step Size ( 0 Automatic, 1 Fixed Relaxation)
+		self.relax = float(load_flow_settings[33])  # If Fixed Relaxation factor
+		self.iopt_lev = int(load_flow_settings[34])  # Automatic Model Adaptation for Convergence
 
 		# Outputs
-		self.iShowOutLoopMsg = load_flow_settings[35]  # Show 'outer Loop' Messages
-		self.iopt_show = load_flow_settings[36]  # Show Convergence Progress Report
-		self.num_conv = load_flow_settings[37]  # Number of reported buses/models per iteration
-		self.iopt_check = load_flow_settings[38]  # Show verification report
-		self.loadmax = load_flow_settings[39]  # Max Loading of Edge Element
-		self.vlmin = load_flow_settings[40]  # Lower Limit of Allowed Voltage
-		self.vlmax = load_flow_settings[41]  # Upper Limit of Allowed Voltage
-		self.iopt_chctr = load_flow_settings[42]  # Check Control Conditions
+		self.iShowOutLoopMsg = int(load_flow_settings[35])  # Show 'outer Loop' Messages
+		self.iopt_show = int(load_flow_settings[36])  # Show Convergence Progress Report
+		self.num_conv = int(load_flow_settings[37])  # Number of reported buses/models per iteration
+		self.iopt_check = int(load_flow_settings[38])  # Show verification report
+		self.loadmax = float(load_flow_settings[39])  # Max Loading of Edge Element
+		self.vlmin = float(load_flow_settings[40])  # Lower Limit of Allowed Voltage
+		self.vlmax = float(load_flow_settings[41])  # Upper Limit of Allowed Voltage
+		self.iopt_chctr = int(load_flow_settings[42])  # Check Control Conditions
 
 		# Load Generation Scaling
-		self.scLoadFac = load_flow_settings[43]  # Load Scaling Factor
-		self.scGenFac = load_flow_settings[44]  # Generation Scaling Factor
-		self.scMotFac = load_flow_settings[45]  # Motor Scaling Factor
+		self.scLoadFac = float(load_flow_settings[43])  # Load Scaling Factor
+		self.scGenFac = float(load_flow_settings[44])  # Generation Scaling Factor
+		self.scMotFac = float(load_flow_settings[45])  # Motor Scaling Factor
 
 		# Low Voltage Analysis
-		self.Sfix = load_flow_settings[46]  # Fixed Load kVA
-		self.cosfix = load_flow_settings[47]  # Power Factor of Fixed Load
-		self.Svar = load_flow_settings[48]  # Max Power Per Customer kVA
-		self.cosvar = load_flow_settings[49]  # Power Factor of Variable Part
-		self.ginf = load_flow_settings[50]  # Coincidence Factor
-		self.i_volt = load_flow_settings[51]  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
+		self.Sfix = float(load_flow_settings[46])  # Fixed Load kVA
+		self.cosfix = float(load_flow_settings[47])  # Power Factor of Fixed Load
+		self.Svar = float(load_flow_settings[48])  # Max Power Per Customer kVA
+		self.cosvar = float(load_flow_settings[49])  # Power Factor of Variable Part
+		self.ginf = float(load_flow_settings[50])  # Coincidence Factor
+		self.i_volt = int(load_flow_settings[51])  # Voltage Drop Analysis (0 Stochastic Evaluation, 1 Maximum Current Estimation)
 
 		# Advanced Simulation Options
-		self.iopt_prot = load_flow_settings[52]  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
-		self.ign_comp = load_flow_settings[53]  # Ignore Composite Elements
+		self.iopt_prot = int(load_flow_settings[52])  # Consider Protection Devices ( 0 None, 1 all, 2 Main, 3 Backup)
+		self.ign_comp = int(load_flow_settings[53])  # Ignore Composite Elements
 
 	def find_reference_terminal(self, app):
 		"""
@@ -2205,7 +2246,7 @@ def calculate_convex_vertices(df, harm_groups=1, nom_frequency=50.0):
 	:param int harm_groups:  Number of harmonic orders to group the results into
 	:param float nom_frequency:  Nominal frequency = 50.0 Hz
 	:return pd.DataFrame df_convex:  Returns a DataFrame in the same arrangement as the supplied DataFrame but with the
-									corners for each vertice
+									corners for each vertices
 	"""
 
 	# Obtain constants

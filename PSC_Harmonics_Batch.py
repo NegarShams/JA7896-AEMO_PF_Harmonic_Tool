@@ -15,7 +15,6 @@
 -------------------------------------------------------------------------------------------------------------------
 
 """
-
 import os
 import logging
 import time
@@ -35,39 +34,22 @@ if __name__ == '__main__':
 	logger = pscharmonics.constants.logger
 	logger.info('Batch Study Run using Input Filename: {}'.format(input_spreadsheet_name))
 
-	# Retrieve inputs
+	# Establish inputs file name
 	pth_inputs = os.path.join(os.path.dirname(__file__), input_spreadsheet_name)
-	inputs = pscharmonics.file_io.StudyInputs(pth_file=pth_inputs)
 
-	# Determine if running from PowerFactory and if so retrieve the current power factory version
-	pf_version = pscharmonics.pf.running_in_powerfactory()
-
-	# Initialise PowerFactory instance
-	pf = pscharmonics.pf.PowerFactory()
-	pf.initialise_power_factory(pf_version=pf_version)
-
-
-	# Create cases based on inputs file
-	pf_projects = pscharmonics.pf.create_pf_project_instances(
-		df_study_cases=inputs.cases,
-		uid=pscharmonics.constants.uid,
-		lf_settings=inputs.lf_settings,
-		fs_settings=inputs.fs_settings,
-		export_pth=inputs.settings.export_folder
-	)
-
-	# Iterate through each project and create the various cases, the includes running a pre-case check but no
-	# output is saved at this point
-	pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
-
-	# Export results
-	target_file = inputs.settings.export_folder+'.xlsx'
-	_ = pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=(inputs.settings.export_folder,))
+	# Run batch study
+	success = pscharmonics.batch_mode.run(pth_inputs=pth_inputs)
 
 	# Capture final time and report complete
 	t_end = time.time()
-	logger.info(
-		'Study completed in {:.0f} seconds with results saved in folder {}'.format(
-			t_end-t_start, inputs.settings.export_folder
+	if success:
+		logger.info(
+			'Study completed in {:.0f} seconds successfully'.format(t_end-t_start)
 		)
-	)
+	else:
+		logger.critical(
+			(
+				'An error has occurred and after {:.0f} seconds results have not been produced as expected.  Check the '
+				'messages displayed above to determine the issue'
+			).format(t_end-t_start)
+		)

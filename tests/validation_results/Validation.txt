@@ -1,0 +1,5 @@
+This folder contains the raw results produced as part of the validation exercise carried out on the AEMO model as part
+of the JA7896 project to produce the Python tools for carrying out the harmonic studies.
+
+This validation activity was carried out in PowerFactory 2019 by David Mills (david.mills@PSCconsulting.com) on the
+29th July 2020.

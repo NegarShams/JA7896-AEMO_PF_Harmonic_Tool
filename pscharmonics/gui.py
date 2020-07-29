@@ -933,8 +933,6 @@ class MainGui:
 			Function will carry out the initial loading of PowerFactory and then create references to all the projects
 		:return None:
 		"""
-		self.logger.info('Initialising PowerFactory')
-
 		# Initialise PowerFactory
 		self.lbl_status.configure(text='Initialising PowerFactory and projects...')
 		self.master.update()
@@ -989,7 +987,7 @@ class MainGui:
 				# Delete the temporary folders created for each project if required as part of the input settings
 				if self.inputs.settings.delete_created_folders:
 					self.logger.debug('Early closure of GUI so deleting temporarily created folders')
-					for project_name, pf_project in self.pf_projects:
+					for project_name, pf_project in self.pf_projects.items():
 						pf_project.delete_temp_folders()
 				else:
 					self.logger.debug('Early closure of GUI but no folders created')

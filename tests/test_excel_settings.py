@@ -5,7 +5,7 @@
 import unittest
 import os
 import pandas as pd
-import math
+import time
 import shutil
 import random
 import string
@@ -268,8 +268,8 @@ class TestContingencies(unittest.TestCase):
 		# Test one couple exactly matches input requirements
 		couplers = contingencies['TEST Cont'].couplers
 		coupler = couplers[0]  # type: pscharmonics.file_io.CouplerDetails
-		self.assertEqual(coupler.substation, 'ALBURY 132KV.{}'.format(pscharmonics.constants.PowerFactory.pf_substation))
-		self.assertEqual(coupler.breaker, 'Switch_213211.{}'.format(pscharmonics.constants.PowerFactory.pf_coupler))
+		self.assertEqual(coupler.substation, 'ALBURY 132KV')
+		self.assertEqual(coupler.breaker, 'Switch_213211')
 		self.assertEqual(coupler.status, False)
 
 class TestContingenciesLineData(unittest.TestCase):
@@ -297,7 +297,7 @@ class TestContingenciesLineData(unittest.TestCase):
 
 		lines = contingencies['TEST Line'].lines  # type: list
 		for line in lines:  # type: pscharmonics.file_io.LineDetails
-			self.assertEqual(line.line, '207586_BATS_TGTS_220.{}'.format(pscharmonics.constants.PowerFactory.pf_line))
+			self.assertEqual(line.line, '207586_BATS_TGTS_220')
 			self.assertEqual(line.status, False)
 
 class TestTerminals(unittest.TestCase):
@@ -580,6 +580,8 @@ class TestDeleteOldFiles(unittest.TestCase):
 
 	def tearDown(self):
 		""" Deletes the entire folder """
+		# Forces a brief wait before attempting to delete file
+		time.sleep(0.5)
 		if os.path.isdir(self.temp_folder):
 			shutil.rmtree(self.temp_folder)
 
