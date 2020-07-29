@@ -612,7 +612,7 @@ class PFStudyCase:
 					'been determined.  This could be a scripting issue or an error finding a suitable load flow.'
 				).format(self.sc)
 			)
-			cont_analysis = None
+			# cont_analysis = None
 			raise SyntaxError('No load flow command defined for study case {}'.format(self.sc))
 
 		else:
@@ -1006,7 +1006,12 @@ class PFStudyCase:
 		:return (powerfactory.DataObject, res_export_pth):  Handle to PF ComRes function, Full path to exported result
 		"""
 
-		res_export_path = os.path.join(self.res_pth, '{}{}{}.csv'.format(res_type, constants.Results.joiner, self.name))
+		if self.base_case:
+			name = '{}_{}'.format(self.name, constants.Contingencies.intact)
+		else:
+			name = self.name
+
+		res_export_path = os.path.join(self.res_pth, '{}{}{}.csv'.format(res_type, constants.Results.joiner, name))
 
 		c = constants.PowerFactory.ComRes
 		# Create com_res file to deal with extracting the results
@@ -1068,13 +1073,15 @@ class PFStudyCase:
 
 		return success
 
-	def create_cases(self, sc_folder, op_folder, res_pth=str()):
+	def create_cases(self, sc_folder, op_folder, res_pth=str(), lf_settings=None, fs_settings=None):
 		"""
 			Function will loop through valid contingencies and create a new case setup to reflect that contingency
 			and that will then be stored in the temporary sc and op folders
 		:param powerfactory.DataObject sc_folder:  Reference to the folder to store temporary study cases in
 		:param powerfactory.DataObject op_folder:  Reference to the folder to store temporary operating scenarios in
 		:param str res_pth:  Path where all the results will be saved when the automatic study cases are run
+		:param file_io.LFSettings lf_settings:  Settings for load flow
+		:param file_io.FSSettings fs_settings:  Settings for frequency scans
 		:return list new_cases:  List of references to the newly created study cases
 		"""
 		# Confirm case is deactivated
@@ -1126,7 +1133,7 @@ class PFStudyCase:
 					case.apply_outage(cont_outage[0])
 
 				# Update load flow and frequency sweep commands to reflect relevant locations
-				case.create_studies()
+				case.create_studies(lf_settings=lf_settings, fs_settings=fs_settings)
 
 				self.logger.debug(
 					(
@@ -1523,39 +1530,42 @@ class PFProject(object):
 
 		return None
 
-	def find_substation(self, sub_name):
+	def find_element(self, element_name, ending=constants.PowerFactory.pf_substation, recursive=0):
 		"""
-			Function searches relevant possible locations that a substation could be located and returns
+			Function searches relevant possible locations that the required element could be located and returns
 			the substation or an error message when multiple found
-		:param str sub_name:  Name of substation to be found
-		:return powerfactory.DataObject substation: Reference to the powerfactory substation element
+		:param str element_name:  Name of element to be found
+		:param str ending:  Expecting ending for the provided input value
+		:param int recursive:  If set to 1 will search recursively (needed for finding lines)
+		:return powerfactory.DataObject element: Reference to the powerfactory substation element
 		"""
 		# Check ends with the substation element ending
-		if not sub_name.endswith(constants.PowerFactory.pf_substation):
-			sub_name = '{}.{}'.format(sub_name, constants.PowerFactory.pf_substation)
+		if not element_name.endswith(ending):
+			element_name = '{}.{}'.format(element_name, ending)
 
 		# Find substation using a recursive search of the network elements folders
-		substation = list()
+		elements = list()
 		for net_item in self.net_data_items:
-			# Loop through each net_item folder and extend substation
-			substation.extend(net_item.GetContents(sub_name))
+			# Loop through each net_item folder and search for element
+			# TODO: What happens if element embedded within a substation
+			elements.extend(net_item.GetContents(element_name, recursive))
 
 		# Check that only a single substation is found
-		if len(substation) == 0:
-			substation = None
-		elif len(substation) > 1:
+		if len(elements) == 0:
+			element = None
+		elif len(elements) > 1:
 			self.logger.error(
 				(
-					'Multiple substations with the name {} have been found across multiple network data folders.'
-					'The following substations where found: \n\t'
+					'Multiple items of type {} with the name {} have been found across multiple network data folders.'
+					'The following elements were found: \n\t'
 					'{}\n'
-				).format(sub_name, '\n\t'.join([str(x) for x in substation]))
+				).format(ending, element_name, '\n\t'.join([str(x) for x in elements]))
 			)
-			substation = None
+			element = None
 		else:
-			substation = substation[0]
+			element = elements[0]
 
-		return substation
+		return element
 
 	def create_fault_cases(self, contingencies):
 		"""
@@ -1563,6 +1573,8 @@ class PFProject(object):
 			all added to a temporary folder.
 			This list of fault cases can then be added to a contingency case and each study case / operating scenario
 			associated with a project tested for convergence.
+
+			Updated to now identify whether dealing with a line or circuit breaker
 		:param dict contingencies:  Reference to the contingencies returned in a dictionary as part of the inputs
 									processing
 		:return dict fault_cases:  Returns a dictionary which contains a reference to all of the fault cases created
@@ -1572,7 +1584,6 @@ class PFProject(object):
 
 		# Find base folder for all fault cases to be stored in
 		faults_folder = app.GetProjectFolder(constants.PowerFactory.pf_faults_folder_type)
-
 
 		# Create temporary folder to store all of the fault cases within and add to list of folders to be deleted
 		# self.fault_case_folder = self.create_folder(
@@ -1586,75 +1597,135 @@ class PFProject(object):
 		)
 		self.temp_folders.append(self.fault_case_folder)
 
-		# Loop through each contingency and look for relevant elements
-		for name, cont in contingencies.items():
-			# Check if status of contingency is set to skip and if so continue
-			if cont.skip:
-				self.logger.debug(
-					'Contingency {} is not considered for analysis and is therefore skipped'.format(cont.name)
-				)
-				continue
+		# Each contingency could contain either a CB outage or a line outage and so both iterate through dictionary
+		# for each contingency name
+		for cont_name, conts in contingencies.items():
+			# Confirm that some circuit outages / contingencies actually apply for this continengy
 
-			# Create new switch event within the network folder
-			fault_event, _ = create_object(
-				location=self.fault_case_folder,
-				pfclass=constants.PowerFactory.pf_fault_event,
-				name=cont.name
-			)
-
-			# Assign as a contingency case
-			fault_event.mod_cnt = 1
-
-			# Loop through each coupler and add switch event to fault case
-			for coupler in cont.couplers:
-				# Find substation using a recursive search of the network elements folders
-				substation = self.find_substation(sub_name=coupler.substation)
-
-				if substation is None:
-					# Not able to find substation and therefore contingency cannot be found
-					self.logger.error(
-						(
-							'For contingency {} the substation named {} cannot be found within the project '
-							'{} and therefore the contingency will not be studied.'
-						).format(cont.name, coupler.substation, self.prj)
+			# Initialise as None
+			fault_event = None
+			fault_case_error = False
+			# Loop through each contingency and look for relevant elements
+			for cont_type, cont in conts.items():
+				# Check if status of contingency is set to skip and if so continue
+				if cont.skip:
+					self.logger.debug(
+						'Contingency {} is not considered for analysis and is therefore skipped'.format(cont.name)
 					)
-					break
+					continue
 
-				# Find the switch within this substation
-				breaker = substation.GetContents(coupler.breaker)
+				elif cont_type == constants.Contingencies.cb:
+					# Defined as a CB type so process those
 
-				# Check that only a single substation is found
-				if len(breaker) == 0:
-					self.logger.error(
-						(
-							'For contingency {} the circuit breaker named {} cannot be found within the substation'
-							'<{}> and therefore this contingency will not be studied'
-						).format(cont.name, coupler.breaker, substation)
+					# Create new switch event within the network folder
+					fault_event, _ = create_object(
+						location=self.fault_case_folder,
+						pfclass=constants.PowerFactory.pf_fault_event,
+						name=cont.name
 					)
-					cont.not_included = True
-					break
-				else:
-					breaker = breaker[0]
 
-				switch_event, _ = create_object(
-					location=fault_event,
-					pfclass=constants.PowerFactory.pf_switch_event,
-					name=breaker.loc_name
-				)
-				# Set target element
-				switch_event.p_target = breaker
-				# Set status and ensure takes place on all phases
-				switch_event.i_switch = coupler.status
-				switch_event.i_allph = 1
+					# Assign as a contingency case
+					fault_event.mod_cnt = 1
+
+					# Loop through each coupler and add switch event to fault case
+					for coupler in cont.couplers:
+						# Find substation using a recursive search of the network elements folders
+						substation = self.find_element(element_name=coupler.substation)
+
+						if substation is None:
+							# Not able to find substation and therefore contingency cannot be found
+							self.logger.error(
+								(
+									'For contingency {} the substation named {} cannot be found within the project '
+									'{} and therefore the contingency will not be studied.'
+								).format(cont.name, coupler.substation, self.prj)
+							)
+							break
+
+						# Find the switch within this substation
+						breaker = substation.GetContents(coupler.breaker)
+
+						# Check that only a single substation is found
+						if len(breaker) == 0:
+							self.logger.error(
+								(
+									'For contingency {} the circuit breaker named {} cannot be found within the substation'
+									'<{}> and therefore this contingency will not be studied'
+								).format(cont.name, coupler.breaker, substation)
+							)
+							fault_case_error = True
+							break
+						else:
+							breaker = breaker[0]
+
+						switch_event, _ = create_object(
+							location=fault_event,
+							pfclass=constants.PowerFactory.pf_switch_event,
+							name=breaker.loc_name
+						)
+						# Set target element
+						switch_event.p_target = breaker
+						# Set status and ensure takes place on all phases
+						switch_event.i_switch = coupler.status
+						switch_event.i_allph = 1
+				elif cont_type == constants.Contingencies.lines:
+					# Process contingencies that relate to line outages
+
+					# Create new switch event within the network folder
+					fault_event, _ = create_object(
+						location=self.fault_case_folder,
+						pfclass=constants.PowerFactory.pf_fault_event,
+						name=cont.name
+					)
+
+					# Assign as a contingency case
+					fault_event.mod_cnt = 1
+
+					# Loop through each line and add to fault case
+					# TODO:  How to do this in PowerFactory needs to be checked
+					for line_cont in cont.lines:
+						# Find substation using a recursive search of the network elements folders
+						pf_line = self.find_element(
+							element_name=line_cont.line, ending=constants.PowerFactory.pf_line, recursive=1
+						)
+
+						if pf_line is None:
+							# Not able to find line and therefore contingency cannot be created
+							self.logger.error(
+								(
+									'For contingency {} the line named {} cannot be found within the project '
+									'{} and therefore the contingency will not be studied.'
+								).format(cont.name, line_cont.line, self.prj)
+							)
+							fault_case_error = True
+							break
+
+						# TODO:  Is this the correct way to create a switch event using PowerFactory fault cases
+						# Create a switch event for this line
+						switch_event, _ = create_object(
+							location=fault_event,
+							pfclass=constants.PowerFactory.pf_switch_event,
+							name=pf_line.loc_name
+						)
+						# Set target element
+						switch_event.p_target = pf_line
+						# Set status and ensure takes place on all phases
+						switch_event.i_switch = line_cont.status
+						switch_event.i_allph = 1
+
+						switch_event.i_what = line_cont.status
 
 			# Check if all events added successfully otherwise delete fault case
-			if cont.not_included:
+			if fault_case_error:
 				fault_event.Delete()
-			else:
+			elif fault_event is not None:
+				# Confirm a fault event has actually been created
 				self.logger.debug('Fault case {} successfully created for contingency {}'.format(fault_event, cont.name))
 				fault_cases[cont.name] = fault_event
 				# Reference to the created fault event added to the contingency record
 				cont.fault_event = fault_event
+			else:
+				self.logger.debug('No fault event created for contingency {}'.format(cont_name))
 
 		# Populate dictionary with Fault Cases
 		self.fault_cases = fault_cases
@@ -1677,9 +1748,11 @@ class PFProject(object):
 			if contingencies:
 				self.create_fault_cases(contingencies=contingencies)
 			else:
-				self.logger.critical('No contingency command or dictionary of contingencies provided, '
-									 'not possible to run analysis')
-				raise SyntaxError('Incomplete inputs, missing contingencies and contingencies_cmd')
+				self.logger.warning('No contingency command or dictionary of contingencies provided, and therefore '
+									'analysis will only be carried out for the intact system if has been requested'
+									'in the inputs')
+				# raise SyntaxError('Incomplete inputs, missing contingencies and contingencies_cmd')
+				self.fault_cases = dict()
 		else:
 			if contingencies:
 				self.logger.warning('Input provided for both contingencies and contingencies_cmd, '
@@ -1769,7 +1842,7 @@ class PFProject(object):
 			# Update export path and results files and then add study case to results
 			for _, sc in self.base_sc.items():
 				sc.res_pth = study_settings.export_folder
-				sc.create_studies()
+				sc.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
 				self.cases_to_run.append(sc)
 		else:
 			self.cases_to_run = list()
@@ -1802,7 +1875,8 @@ class PFProject(object):
 				# a list of references to the PFStudyCase class.  The results path is added at this point based on the
 				# location that is either selected by the user or included in the settings
 				new_cases = sc.create_cases(
-					sc_folder=self.sc_folder, op_folder=self.op_folder, res_pth=study_settings.export_folder
+					sc_folder=self.sc_folder, op_folder=self.op_folder, res_pth=study_settings.export_folder,
+					lf_settings=self.lf_settings, fs_settings=self.fs_settings
 				)
 
 				# Add details of newly created cases to the overall list
@@ -1877,7 +1951,7 @@ class PFProject(object):
 			df.loc[term_name, c.include_mutual] = terminal.include_mutual
 
 			# Find substation which contains this terminal
-			pf_sub = self.find_substation(sub_name=terminal.substation)
+			pf_sub = self.find_element(element_name=terminal.substation)
 
 			if pf_sub is None:
 				# Error message displayed at end for all terminals that cannot be found

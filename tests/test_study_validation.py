@@ -502,8 +502,7 @@ class TestPFProject(unittest.TestCase):
 		uid = 'TEST_CASE'
 		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
 		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid,
-			res_pth=test_export_pth
+			name=pf_test_project, df_studycases=df_test_project, uid=uid
 		)
 
 		# Get handle for study case
@@ -1010,8 +1009,7 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 			df_study_cases=self.settings.cases,
 			uid=uid,
 			lf_settings=self.settings.lf_settings,
-			fs_settings=self.settings.fs_settings,
-			export_pth=target_pth
+			fs_settings=self.settings.fs_settings
 		)
 
 		# Get single project
@@ -1413,8 +1411,7 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			df_study_cases=self.settings.cases,
 			uid=uid,
 			lf_settings=self.settings.lf_settings,
-			fs_settings=self.settings.fs_settings,
-			export_pth=target_pth
+			fs_settings=self.settings.fs_settings
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1450,8 +1447,7 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			df_study_cases=self.settings.cases,
 			uid=uid,
 			lf_settings=self.settings.lf_settings,
-			fs_settings=self.settings.fs_settings,
-			export_pth=target_pth
+			fs_settings=self.settings.fs_settings
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1523,8 +1519,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			df_study_cases=inputs.cases,
 			uid=uid,
 			lf_settings=inputs.lf_settings,
-			fs_settings=inputs.fs_settings,
-			export_pth=target_pth
+			fs_settings=inputs.fs_settings
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1563,8 +1558,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			df_study_cases=inputs.cases,
 			uid=uid,
 			lf_settings=inputs.lf_settings,
-			fs_settings=inputs.fs_settings,
-			export_pth=target_pth
+			fs_settings=inputs.fs_settings
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1605,8 +1599,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			df_study_cases=inputs.cases,
 			uid=uid,
 			lf_settings=inputs.lf_settings,
-			fs_settings=inputs.fs_settings,
-			export_pth=target_pth
+			fs_settings=inputs.fs_settings
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1643,8 +1636,7 @@ class TestPFDetailedInputs(unittest.TestCase):
 			df_study_cases=inputs.cases,
 			uid=uid,
 			lf_settings=inputs.lf_settings,
-			fs_settings=inputs.fs_settings,
-			export_pth=target_pth
+			fs_settings=inputs.fs_settings
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no

@@ -130,7 +130,8 @@ class TestStudySettings(unittest.TestCase):
 		study_settings = self.test_cls(pth_file=pth_inputs)
 		df = study_settings.df
 
-		self.assertEqual(df.shape, (8, ))
+		# Updated because inputs now includes a setting for Include Convex
+		self.assertEqual(df.shape, (9, ))
 
 	def test_dataframe_import_from_wkbk(self):
 		""" Confirm DataFrame imported when loaded using a pandas workbook """
@@ -141,7 +142,8 @@ class TestStudySettings(unittest.TestCase):
 
 		df = study_settings.df
 
-		self.assertEqual(df.shape, (8, ))
+		# Updated because inputs now includes a setting for Include Convex
+		self.assertEqual(df.shape, (9, ))
 
 	def test_dataframe_process_export_folder(self):
 		""" Confirm the file name is correct """
@@ -263,10 +265,40 @@ class TestContingencies(unittest.TestCase):
 		# Confirm contingencies are all base case
 		self.assertTrue('TEST Cont' in contingencies.keys())
 
-		couplers = contingencies['Base_Case'].couplers
-		for coupler in couplers:
-			self.assertTrue(math.isnan(coupler.breaker))
-			self.assertTrue(math.isnan(coupler.status))
+		# Test one couple exactly matches input requirements
+		couplers = contingencies['TEST Cont'].couplers
+		coupler = couplers[0]  # type: pscharmonics.file_io.CouplerDetails
+		self.assertEqual(coupler.substation, 'ALBURY 132KV.{}'.format(pscharmonics.constants.PowerFactory.pf_substation))
+		self.assertEqual(coupler.breaker, 'Switch_213211.{}'.format(pscharmonics.constants.PowerFactory.pf_coupler))
+		self.assertEqual(coupler.status, False)
+
+class TestContingenciesLineData(unittest.TestCase):
+	"""
+		Class to deal with testing the reading and processing of contingencies that relate to names
+		of lines rather than identifying specific circuit breakers
+	"""
+	@classmethod
+	def setUpClass(cls):
+		# Shortening of reference to class and functions under test
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs.xlsx')
+		cls.test_cls = pscharmonics.file_io.StudyInputs(pth_inputs)
+
+	def test_dataframe_import_from_file(self):
+		""" Confirm DataFrame imported when loaded using a file """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs_cont_lines.xlsx')
+
+		contingency_cmd, contingencies = self.test_cls.process_contingencies(pth_file=pth_inputs, line_data=True)
+
+		# Confirm command for contingency analysis is imported correctly
+		self.assertEqual(contingency_cmd, 'Contingency Analysis')
+
+		# Confirm contingencies are all base case
+		self.assertTrue('TEST Line' in contingencies.keys())
+
+		lines = contingencies['TEST Line'].lines  # type: list
+		for line in lines:  # type: pscharmonics.file_io.LineDetails
+			self.assertEqual(line.line, '207586_BATS_TGTS_220.{}'.format(pscharmonics.constants.PowerFactory.pf_line))
+			self.assertEqual(line.status, False)
 
 class TestTerminals(unittest.TestCase):
 	""" Class to deal with testing the reading and processing of terminals """
@@ -633,9 +665,10 @@ class TestCreateConvex(unittest.TestCase):
 
 	def setUp(self):
 		""" Creates a random data set """
-		self.results1 = os.path.join(TESTS_DIR, 'Detailed_4')
+		self.results4 = os.path.join(TESTS_DIR, 'Detailed_4')
+		self.results5 = os.path.join(TESTS_DIR, 'Detailed_5')
 
-		for x in (self.results1, ):
+		for x in (self.results4,):
 			self.assertTrue(
 				os.path.isdir(x),
 				msg='The detailed results folder {} does not exist, run <test_pf.py> first to '
@@ -701,7 +734,7 @@ class TestCreateConvex(unittest.TestCase):
 		"""
 
 		# Import the necessary raw data
-		src_paths = (self.results1, )
+		src_paths = (self.results4,)
 		df, extract_vars = self.cls_extract.combine_multiple_runs(self=self.cls_extract, search_paths=src_paths)
 
 		# Pass to function to calculate
@@ -711,7 +744,7 @@ class TestCreateConvex(unittest.TestCase):
 		""" Tests exporting of a results set with convex hull plots works """
 
 		# Source path to search and confirm exist before continuing
-		src_path = (self.results1, )
+		src_path = (self.results4,)
 
 		# Target file for export
 		target_file = os.path.join(TESTS_DIR, 'combined_results_4.xlsx')
@@ -726,6 +759,24 @@ class TestCreateConvex(unittest.TestCase):
 		# Confirm file created
 		self.assertTrue(os.path.exists(target_file))
 
+	def test_export_detailed_results5_including_convex(self):
+		""" Tests exporting of a results set with convex hull plots works """
+
+		# Source path to search and confirm exist before continuing
+		src_path = (self.results5,)
+
+		# Target file for export
+		target_file = os.path.join(TESTS_DIR, 'combined_results_5.xlsx')
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		# Force to True so results handled correctly
+		pscharmonics.file_io.ExtractResults.include_convex = True
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_path)
+
+		# Confirm file created
+		self.assertTrue(os.path.exists(target_file))
 
 class TestCombineMultiple(unittest.TestCase):
 	"""

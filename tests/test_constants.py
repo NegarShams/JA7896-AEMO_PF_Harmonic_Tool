@@ -46,8 +46,8 @@ class TestPowerFactoryConstants(unittest.TestCase):
 		""" Test that a different version from the default can be selected """
 		pf_constants = pscharmonics.constants.PowerFactory()
 
-		test_pf_version = 'PowerFactory 2018 SP7'
-		pf_constants.select_power_factory_version(pf_version=test_pf_version)
+		test_pf_version = 'PowerFactory 2019'
+		pf_constants.select_power_factory_version(pf_version=test_pf_version, mock_python_version='3.6')
 		self.assertEqual(pf_constants.target_power_factory, test_pf_version)
 
 	def test_pf_version_unavailable_fail(self):

@@ -31,27 +31,32 @@ def update_duplicates(key, df):
 	dfs = list()
 	updated = False
 
-	# Group data frame by key value
-	# TODO: Do we need to ensure the order of the overall DataFrame remains unchanged
-	for _, df_group in df.groupby(key):
-		# Extract all key values into list and then loop through to append new value
-		names = list(df_group.loc[:, key])
-		if len(names) > 1:
-			updated = True
-			# Check if number of entries is greater than 1, i.e. duplicated
-			for i in range(1, len(names)):
-				names[i] = '{}({})'.format(names[i], i)
+	if df.empty:
+		# If DataFrame is empty then just return empty DataFrame and with updated flag = False
+		df_updated = df
+		updated = False
+	else:
+		# Group data frame by key value
 
-		# Produce new DataFrame with updated names and add to list
-		# (copy statement to avoid updating original dataframe during loop)
-		df_updated = df_group.copy()
-		df_updated.loc[:, key] = names
-		dfs.append(df_updated)
+		for _, df_group in df.groupby(key):
+			# Extract all key values into list and then loop through to append new value
+			names = list(df_group.loc[:, key])
+			if len(names) > 1:
+				updated = True
+				# Check if number of entries is greater than 1, i.e. duplicated
+				for i in range(1, len(names)):
+					names[i] = '{}({})'.format(names[i], i)
 
-	# Combine returned DataFrames
-	df_updated = pd.concat(dfs)
-	# Ensure order remains as originally
-	df_updated.sort_index(axis=0, inplace=True)
+			# Produce new DataFrame with updated names and add to list
+			# (copy statement to avoid updating original dataframe during loop)
+			df_updated = df_group.copy()
+			df_updated.loc[:, key] = names
+			dfs.append(df_updated)
+
+		# Combine returned DataFrames
+		df_updated = pd.concat(dfs)
+		# Ensure order remains as originally
+		df_updated.sort_index(axis=0, inplace=True)
 
 	return df_updated, updated
 
@@ -520,6 +525,9 @@ class ExtractResults:
 
 		charts.append(chrt_master)
 
+		# Remove every other element in plot_names since the plot titles are duplicated
+		plot_names = plot_names[::2]
+
 		# Loop through each pair of R / X values and add to excel plot
 		for i, col_r in enumerate(range(col_start, col_start+num_cols, 2)):
 			# Iterate color so a new plot is shown
@@ -914,11 +922,15 @@ class PreviousResultsExport:
 				file_name = file_name.replace('{}{}'.format(sc_name, c.joiner), '')
 				break
 
-		# Find which contingency is considered
-		for cont in self.inputs.contingencies.keys():
-			if cont in file_name:
-				cont_name = cont
-				break
+		# Check if intact contingency being applied
+		if constants.Contingencies.intact in file_name:
+			cont_name = constants.Contingencies.intact
+		else:
+			# Find which contingency is considered
+			for cont in self.inputs.contingencies.keys():
+				if cont in file_name:
+					cont_name = cont
+					break
 
 		return sc_name, cont_name
 
@@ -1294,15 +1306,60 @@ class StudyInputs:
 			# Import StudySettings
 			self.settings = StudySettings(wkbk=wkbk, gui_mode=gui_mode)
 			self.cases = self.process_study_cases(wkbk=wkbk)
-			self.contingency_cmd, self.contingencies = self.process_contingencies(wkbk=wkbk)
+			# TODO: Need to combine these together so a single set of results are produced, also need to ensure names
+			# TODO: are unique across both sets
+			contingency_cmd_breaker, contingencies_breakers = self.process_contingencies(wkbk=wkbk)  # type: str, dict
+			contingency_cmd_lines, contingencies_lines = self.process_contingencies(wkbk=wkbk, line_data=True)  # type: str, dict
 			self.terminals = self.process_terminals(wkbk=wkbk)
 			self.lf_settings = self.process_lf_settings(wkbk=wkbk)
 			self.fs_settings = self.process_fs_settings(wkbk=wkbk)
+
+		# Combine contingencies from breakers and lines into a single dictionary of contingencies that will be used if
+		# a fault case hasn't been defined already
+		if contingency_cmd_breaker and contingency_cmd_lines:
+			self.logger.warning(
+				(
+					'You have provided a contingencies command for both breaker outages and line outages.  However, it'
+					'is assumed that only a single command would have been defined.\nThese commands were input on the '
+					'inputs workbook {} for the worksheets as follows:\n\t{}.\n'
+					'The command {} will be used for this study'
+				).format(self.pth, contingency_cmd_breaker, contingency_cmd_lines, contingency_cmd_breaker)
+			)
+			self.contingency_cmd = contingency_cmd_breaker
+		elif contingency_cmd_breaker:
+			self.logger.debug('Contingencies command based on circuit breaker detailed command {}'.format(contingency_cmd_breaker))
+			self.contingency_cmd = contingency_cmd_breaker
+		elif contingency_cmd_lines:
+			self.logger.debug('Contingencies command based on line outage detailed command {}'.format(contingency_cmd_lines))
+			self.contingency_cmd = contingency_cmd_lines
+		else:
+			self.logger.debug('No command provided for contingency based outages')
+			self.contingency_cmd = None
+
+
+		# Contingencies could relate to either circuit breakers or lines.  The dictionary is populated for both
+		self.contingencies = {k: {constants.Contingencies.cb: v} for k,v in contingencies_breakers.items()}
+
+		# Loop through each of the line contingencies and if the key already exists in self.contingencies then add to
+		# existing contingency otherwise create a new one.
+		existing_contingencies = self.contingencies.keys()
+		for key, line_outage in contingencies_lines.items():
+			# Check if has already been defined
+			if key in existing_contingencies:
+				self.logger.debug(
+					'The contingency {} is defined with both circuit breaker operations and line outages'.format(key)
+				)
+				self.contingencies[key][constants.Contingencies.lines] = line_outage
+			else:
+				# No contingency already exists to just define it with just line outage details
+				self.contingencies[key] = {constants.Contingencies.lines: line_outage}
 
 		if not self.error:
 			self.logger.info('Importing settings from file: {} completed'.format(self.pth))
 		else:
 			self.logger.warning('Error during import of settings from file: {}'.format(self.pth))
+
+
 
 	def load_workbook(self, pth_file=None):
 		"""
@@ -1390,7 +1447,7 @@ class StudyInputs:
 
 		return df
 
-	def process_contingencies(self, sht=constants.StudyInputs.contingencies, wkbk=None, pth_file=None):
+	def process_contingencies(self, sht=None, wkbk=None, pth_file=None, line_data=False) -> (str, dict):
 		"""
 			Function imports the DataFrame of contingencies and then each into its own contingency under a single
 			dictionary key.  Each dictionary item contains the relevant outages to be taken in the form
@@ -1401,54 +1458,78 @@ class StudyInputs:
 		:param str sht:  (optional) Name of worksheet to use
 		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
 		:param str pth_file: (optional) File path to workbook
+		:param bool line_data: (optional) Set to True if processing line data rather than circuit breaker data
 		:return (str, dict) (contingency_cmd, contingencies):  Returns both:
 																The command for all contingencies
 																A dictionary with each of the outages
 		"""
+		if line_data:
+			data_type = 'Line Outages'
+			# If not sheet name has been provided then determine which sheet needs importing
+			if sht is None:
+				sht = constants.StudyInputs.cont_lines
+		else:
+			data_type = 'Circuit Breaker Operations'
+			# If not sheet name has been provided then determine which sheet needs importing
+			if sht is None:
+				sht = constants.StudyInputs.cont_breakers
+
+		self.logger.debug('Importing contingencies data for {} type'.format(data_type))
 
 		# Import workbook as dataframe
 		if wkbk is None:
 			wkbk = self.load_workbook(pth_file=pth_file)
 
-		# Get details of existing contingency command and if exists set the reference command
-		# Squeeze command to ensure converted to a series since only a single row is being imported
-		df = pd.read_excel(
-			wkbk, sheet_name=sht, skiprows=2, nrows=1, usecols=(0,1,2,3), index_col=None, header=None
-		).squeeze(axis=0)
-		cmd = df.iloc[3]
-		# Valid command is a string whereas non-valid commands will be either False or an empty string
-		if cmd:
-			contingency_cmd = cmd
-		else:
-			contingency_cmd = str()
-
-
-		# Import rest of details of contingencies into a DataFrame and process, do not need to worry about unique
-		# columns since done by position
-		df = pd.read_excel(wkbk, sheet_name=sht, skiprows=3, header=(0, 1))
-		cols = df.columns
-
-		# Process df names to confirm unique
-		name_key = cols[0]
-		df, updated = update_duplicates(key=name_key, df=df)
-
-		# Make index of contingencies name after duplicates removed
-		df.set_index(name_key, inplace=True, drop=False)
-
-
-		if updated:
-			self.logger.warning(
+		# Confirm sheet exists in workbook and if not raise a warning and return
+		if sht not in wkbk.sheet_names:
+			self.logger.error(
 				(
-					'Duplicated names for Contingencies provided in the column {} of worksheet <{}> and so some have been '
-					'renamed and the new list of names is:\n\t{}'
-				).format(name_key, sht, '\n\t'.join(df.loc[:, name_key].values))
+					'The worksheet named {} cannot be found in the provided inputs workbook {} and therefore the '
+					'contingencies specified by type {} cannot be processed.  You may be using an old workbook in '
+					'which case this will not be an issue'
+				).format(sht, self.pth, data_type)
 			)
+			# Return an empty string and empty dictionary
+			return str(), dict()
+		else:
+			# Get details of existing contingency command and if exists set the reference command
+			# Squeeze command to ensure converted to a series since only a single row is being imported
+			df = pd.read_excel(
+				wkbk, sheet_name=sht, skiprows=2, nrows=1, usecols=(0,1,2,3), index_col=None, header=None
+			).squeeze(axis=0)
+			cmd = df.iloc[3]
+			# Valid command is a string whereas non-valid commands will be either False or an empty string
+			if cmd:
+				contingency_cmd = cmd
+			else:
+				contingency_cmd = str()
 
-		# Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in order
-		contingencies = collections.OrderedDict()
-		for key, item in df.iterrows():
-			cont = ContingencyDetails(list_of_parameters=item.values)
-			contingencies[cont.name] = cont
+			# Import rest of details of contingencies into a DataFrame and process, do not need to worry about unique
+			# columns since done by position
+			df = pd.read_excel(wkbk, sheet_name=sht, skiprows=3, header=(0, 1))
+			cols = df.columns
+
+			# Process df names to confirm unique
+			name_key = cols[0]
+			df, updated = update_duplicates(key=name_key, df=df)
+
+			# Make index of contingencies name after duplicates removed
+			df.set_index(name_key, inplace=True, drop=False)
+
+			if updated:
+				self.logger.warning(
+					(
+						'Duplicated names for Contingencies provided in the column {} of worksheet <{}> and so some have been '
+						'renamed and the new list of names is:\n\t{}'
+					).format(name_key, sht, '\n\t'.join(df.loc[:, name_key].values))
+				)
+
+			# Iterate through each DataFrame and create a study case instance and OrderedDict used to ensure no change in order
+			contingencies = collections.OrderedDict()
+			for key, item in df.iterrows():
+				# Process contingencies taking into consideration whether processing circuit breakers or lines
+				cont = ContingencyDetails(list_of_parameters=item.values, line_data=line_data)
+				contingencies[cont.name] = cont
 
 		return contingency_cmd, contingencies
 
@@ -1549,24 +1630,42 @@ class StudyCaseDetails:
 		self.scenario = list_of_parameters[3]
 
 class ContingencyDetails:
-	def __init__(self, list_of_parameters):
+	def __init__(self, list_of_parameters, line_data=False):
 		"""
 			Single row of contingency parameters imported from spreadsheet are defined into a class for easy lookup
+			This relates to contingencies which are identified by their breakers rather than names of lines
 		:param list list_of_parameters:  Single row of inputs
+		:param bool line_data:  If being provided with inputs that relate to line names rather than circuit breakers
 		"""
 		# Status flag set to True if cannot be found, contingency fails, etc.
 		self.not_included = False
 
 		self.name = list_of_parameters[0]
-		self.couplers = []
-		for substation, breaker, status in zip(*[iter(list_of_parameters[1:])]*3):
-			if substation != '' and breaker != '' and str(breaker) != 'nan':
-				new_coupler = CouplerDetails(substation, breaker, status)
-				self.couplers.append(new_coupler)
+
+		# Determines whether Contingency relates to lines or circuit breakers
+		self.line_data = line_data
+
+		# Initialise empty lists to be populated with details of the outaged circuits or lines
+		self.couplers = list()
+		self.lines = list()
+
+		if self.line_data:
+			# Inputs are names of lines to be outaged and so populate lines with details
+			for line, status in zip(*[iter(list_of_parameters[1:])]*2):
+				if line != '' and not pd.isna(line):
+					new_line = LineDetails(str(line), status)
+					self.lines.append(new_line)
+
+		else:
+			# Inputs relate to circuit breaker identification
+			for substation, breaker, status in zip(*[iter(list_of_parameters[1:])]*3):
+				if substation != '' and breaker != '' and str(breaker) != 'nan':
+					new_coupler = CouplerDetails(substation, breaker, status)
+					self.couplers.append(new_coupler)
 
 		# If contingency has been defined then needs to be included in results
 		# # Check if this contingency relates to the intact system in which case it will be skipped
-		if len(self.couplers) == 0 or self.name == constants.StudyInputs.base_case:
+		if self.name == constants.StudyInputs.base_case or (len(self.couplers) == 0 and len(self.lines)==0):
 			self.skip = True
 		else:
 			self.skip = False
@@ -1609,6 +1708,41 @@ class CouplerDetails:
 
 		self.substation = substation
 		self.breaker = breaker
+		self.status = status
+
+class LineDetails:
+	def __init__(self, line, status):
+		"""
+			Define the line and status for outages relating to lines
+		:param str line:  Name of line
+		:param str status: Status of line (in service or out of service)
+		"""
+		logger = constants.logger
+		# Check if substation already has substation type ending and if not add it
+		if not line.endswith(constants.PowerFactory.pf_line):
+			line = '{}.{}'.format(line, constants.PowerFactory.pf_line)
+
+		# Confirm that status for operation is either true or false
+		if status == constants.StudyInputs.in_service:
+			status = 1
+		elif status == constants.StudyInputs.out_of_service:
+			status = 0
+		else:
+			# Post a warning message for an unexpected input
+			logger.warning(
+				(
+					'The state requested for the line <{}> has a value of {} which is not an expected value of '
+					'{} or {}.  The operation is assumed to be {} for this study but the user should check '
+					'that is what they intended'
+				).format(
+					line, status,
+					constants.StudyInputs.in_service, constants.StudyInputs.out_of_service,
+					constants.StudyInputs.out_of_service
+				)
+			)
+			status = 0
+
+		self.line = line
 		self.status = status
 
 class TerminalDetails:
@@ -2100,7 +2234,7 @@ def calculate_convex_vertices(df, harm_groups=1, nom_frequency=50.0):
 			target_freq = h * nom_frequency
 			min_f_range = target_freq - (harm_groups*nom_frequency)/2.0
 			max_f_range = target_freq + (harm_groups*nom_frequency)/2.0
-			descriptor = '{} ({} - {} Hz)'.format(h, min_f_range, max_f_range)
+			descriptor = 'h = {}  ({} - {} Hz)'.format(h, min_f_range, max_f_range)
 			idx_selection = (df_r.index >= min_f_range) & (df_r.index <= max_f_range)
 			# Extract the 2D DataFrame of values into a 1D numpy array
 			# https://stackoverflow.com/questions/13730468/from-nd-to-1d-arrays

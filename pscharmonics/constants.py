@@ -95,11 +95,13 @@ class PowerFactory:
 				   'Single':0,
 				   'High Pass':3}
 	pf_substation = 'ElmSubstat'
+	pf_line = 'ElmLne'
 	pf_terminal =  'ElmTerm'
 	pf_coupler = 'ElmCoup'
 	pf_mutual = 'ElmMut'
 	pf_fault_event = 'IntEvt'
 	pf_switch_event = 'EvtSwitch'
+	pf_outage_event = 'EvtOutage'
 	pf_case = 'IntCase'
 	pf_scenario = 'IntScenario'
 	pf_filter = 'ElmShnt'
@@ -348,6 +350,11 @@ class Contingencies:
 	idx = 'Contingency Number'
 	status = 'Convergent'
 
+	# Contingencies are provided for either circuit breakers or lines, these are provided in a dictionary which
+	# uses the following keys to identify them
+	cb = 'CB'
+	lines = 'Lines'
+
 	# Columns that are used for the contingency headers
 	df_columns = [
 		prj, sc, op, cont, idx, status
@@ -539,7 +546,9 @@ class StudyInputs:
 	terminals = 'Terminals'
 	study_settings = 'Study_Settings'
 	study_cases = 'Base_Scenarios'
-	contingencies = 'Contingencies'
+	# Contingencies can be specified by either identifying specific breakers or lines
+	cont_breakers = 'Contingencies_Breakers'
+	cont_lines = 'Contingencies_Lines'
 	lf_settings = 'Loadflow_Settings'
 	fs_settings = 'Frequency_Sweep'
 	# Maximum length of an objects name in PowerFactory 2016 is 40 characters.
@@ -555,6 +564,10 @@ class StudyInputs:
 	# Text use to define an open or close status for a switch
 	switch_open = 'Open'
 	switch_close = 'Close'
+
+	# Text used to define whether a line is in service or out of service
+	in_service = 'In Service'
+	out_of_service = 'Out of Service'
 
 class GuiDefaults:
 	gui_title='PSC - Automated PowerFactory Frequency Scans Tool'
