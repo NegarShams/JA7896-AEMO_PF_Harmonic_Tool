@@ -50,7 +50,7 @@ class General:
 	error_log = 'ERROR'
 
 	# TODO: UNITTEST - Check whether this file exists
-	user_guide_reference='JA7896-03-00 PSC Harmonics User Guide.pdf'
+	user_guide_reference='JA7896-03 PSC Harmonics User Guide.pdf'
 	user_guide_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'docs'))
 	user_guide_pth = os.path.join(user_guide_folder, user_guide_reference)
 
