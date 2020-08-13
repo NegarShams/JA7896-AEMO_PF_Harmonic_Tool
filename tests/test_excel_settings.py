@@ -1,5 +1,11 @@
 """
-	Test module to test importing settings files
+#######################################################################################################################
+###													test_excel_settings.py											###
+###		Script deals with testing of importing settings files and processing combined results 						###
+###																													###
+###		Code developed by David Mills (david.mills@pscconsulting.com, +44 7899 984158) as part of PSC UK Ltd. 		###
+###																													###
+#######################################################################################################################
 """
 
 import unittest
@@ -12,6 +18,7 @@ import string
 import shapely.geometry
 import shapely.geometry.polygon
 import matplotlib.pyplot
+from functools import partial
 
 from tests.context import pscharmonics
 
@@ -37,16 +44,29 @@ def mock_process_export_folder(*args, **kwargs):
 	# Rather than creating a new folder just return reference to the tests directory
 	return TESTS_DIR
 
-
 # ----- MOCKS ------
 # Mocks to replace normal functionality
 pscharmonics.file_io.StudySettings.process_export_folder = mock_process_export_folder
 
 class MockExtractResults:
-	""" Mock created to allow independant testing of combine multiple runs """
+	""" Mock created to allow independent testing of combine multiple runs """
 	def __init__(self):
 		self.include_convex = True
 		self.combine_multiple_runs = pscharmonics.file_io.ExtractResults.combine_multiple_runs
+
+class MockPreviousResultsExport:
+	""" Mock created to allow independent testing of results processing functions """
+	def __init__(self):
+		# Constants to be defined
+		self.logger = pscharmonics.constants.logger
+		self.study_type = 'FS'
+
+		# Functions to be defined
+		self.process_file = partial(pscharmonics.file_io.PreviousResultsExport.process_file, self)
+		self.process_file_name = partial(pscharmonics.file_io.PreviousResultsExport.process_file_name, self)
+		self.extract_var_name = partial(pscharmonics.file_io.PreviousResultsExport.extract_var_name, self)
+		self.extract_var_type = partial(pscharmonics.file_io.PreviousResultsExport.extract_var_type, self)
+
 
 # ----- UNIT TESTS -----
 class TestInputs(unittest.TestCase):
@@ -661,6 +681,54 @@ class TestCombineResults(unittest.TestCase):
 
 		# Confirm file created
 		self.assertTrue(os.path.exists(target_file))
+
+class TestResultsProcessing(unittest.TestCase):
+	"""
+		Tests that results processing of previous raw files works correctly
+
+		Tests carried out on Detailed 1 data processing
+	"""
+	def setUp(self):
+		""" Check previous results already exist """
+
+		test_dir = os.path.join(TESTS_DIR, 'RawResultsFiles')
+		test_results1 = os.path.join(test_dir, 'FS_BASE_Intact.csv')
+		test_inputs = os.path.join(test_dir, 'InputsDetailed_Results.xlsx')
+
+		for x in (test_results1, ):
+			self.assertTrue(
+				os.path.isfile(x),
+				msg='The previous results export <{}> does not exist, run <test_pf.py> first to produce'.format(test_results1)
+			)
+
+		cls_mock = MockPreviousResultsExport()
+
+		cls_mock.inputs = pscharmonics.file_io.StudyInputs(pth_file=test_inputs, gui_mode=True)
+
+		self.df = cls_mock.process_file(pth=test_results1)
+
+	def test_nom_voltage_correct(self):
+		""" Tests that the expected nominal voltages are calculated """
+
+		# For node
+
+		pass
+
+		# Extract all nominal voltages and then convert to a unique list
+		idx = pd.IndexSlice
+		nom_voltages = list()
+		for nom_v in self.df.loc[:, idx[:,:,:,:,:,:,pscharmonics.constants.PowerFactory.pf_nom_voltage]].values:
+			nom_voltages.extend(nom_v)
+		nom_voltages = set(nom_voltages)
+
+		# Confirm number of values returned
+		self.assertEqual(len(nom_voltages), 3)
+		# Confirm expected values appear in lists
+		for value in (11, 220, 330):
+			self.assertTrue(
+				value in nom_voltages, msg='Expected nominal voltage {} kV not found in returned data frame'.format(value)
+			)
+
 
 class TestCreateConvex(unittest.TestCase):
 	""" Tests that passing R/X data will return ConvexHull around data points """

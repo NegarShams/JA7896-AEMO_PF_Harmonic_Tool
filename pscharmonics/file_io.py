@@ -840,7 +840,7 @@ class PreviousResultsExport:
 			idx_filter = idx[:,:,:,:,:,constants.PowerFactory.pf_nom_voltage]
 			try:
 				# Obtain nominal voltage and then set row values appropriately to include in results
-				nom_voltage = df.loc[:,idx_filter].iloc[0,0]
+				nom_voltage = df_sub.loc[:,idx_filter].iloc[0,0]
 				dict_nom_voltage[term] = nom_voltage
 			except KeyError:
 				pass
