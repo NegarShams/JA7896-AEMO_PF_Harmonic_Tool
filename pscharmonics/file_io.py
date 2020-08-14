@@ -18,6 +18,8 @@ import collections
 import math
 import shutil
 import time
+import xlsxwriter
+import xlsxwriter.utility
 
 def update_duplicates(key, df):
 	"""
@@ -143,7 +145,9 @@ class ExtractResults:
 		df_convex = pd.DataFrame()
 		if self.include_convex:
 			if constants.PowerFactory.pf_r1 and extract_vars and constants.PowerFactory.pf_x1 in extract_vars:
-				df_convex = calculate_convex_vertices(df=df)
+				# TODO: Target frequencies should be provided as an input, still to be completed
+				target_freq = LociSettings().freq_bands
+				df_convex = calculate_convex_vertices(df=df, frequency_bounds=target_freq)
 			else:
 				self.logger.warning(
 					(
@@ -329,6 +333,7 @@ class ExtractResults:
 					self.logger.info('\t - \t {}/{} Exporting node {}'.format(i+1, num_nodes, node_name))
 					i += 1
 					col = c.start_col
+
 					for var in vars_to_export:
 						# Extract DataFrame with just these values
 						df_to_export = _df.loc[:, _df.columns.get_level_values(level=c.lbl_Result)==var]
@@ -378,6 +383,16 @@ class ExtractResults:
 
 					# Once all main results have been exported ConvexHull points for each node are added
 					if not df_convex.empty:
+						# Based on the raw dataset, start row and start column determine the Excel row and columns
+						# that cover the raw R and X values for the calculated impedance loci
+						# TODO: Target frequencies should be provided as an input, still to be completed
+						target_freq = LociSettings().freq_bands
+						#
+						raw_x_data, raw_y_data = get_raw_data_excel_references(
+							sht_name=node_name,
+							df=_df, start_row=start_row, start_col=c.start_col,
+							target_frequencies=target_freq)
+
 						# Determine which row to start the convex hull on, taking into consideration the number of
 						# rows occupied by the DataFrame
 						row_convex = start_row + len(_df) + _df.columns.nlevels + c.row_spacing + 1
@@ -400,7 +415,9 @@ class ExtractResults:
 							row_start=row_convex + df_node.columns.nlevels + 1,
 							num_rows=df_node.shape[0],
 							col_start=c.start_col+1,
-							num_cols=df_node.shape[1]
+							num_cols=df_node.shape[1],
+							raw_x_data=raw_x_data,
+							raw_y_data=raw_y_data
 						)
 
 
@@ -487,9 +504,14 @@ class ExtractResults:
 		return None
 
 	def add_loci_graphs(self, writer, sheet_name, plot_names, row_labels, row_start, num_rows,
-				  col_start, num_cols):
+				  col_start, num_cols, raw_x_data, raw_y_data):
 		"""
 			Add graphs for ConvexHull to spreadsheet
+
+			Two plots are produced for each dataset except the overall plot which includes all Loci:
+				Plot 1 = Loci curve + raw data
+				Plot 2 = Loci curve alone
+
 		:param pd.ExcelWriter writer:  Handle for the workbook that will be controlling the excel instance
 		:param str sheet_name: Name of sheet to add graph to
 		:param list plot_names: List of names for the plots
@@ -498,6 +520,8 @@ class ExtractResults:
 		:param int num_rows: Number of rows to include
 		:param int col_start:  Column number first set of data is included in
 		:param int num_cols:  Number of columns all data is contained within
+		:param dict raw_x_data:  Dictionary of excel function for raw R data of points for each plot
+		:param dict raw_y_data:  Dictionary of excel function for raw X data of points for each plot
 		:return:
 		"""
 		self.logger.debug('Adding impedance loci plots for node: {}'.format(sheet_name))
@@ -512,8 +536,10 @@ class ExtractResults:
 		# Calculate the row number for the end of the dataset
 		max_row = row_start+num_rows
 
-		# Loop through each column and add series
-		charts = []
+		# Empty lists are populated with all of the charts so that they can neatly be added to the
+		# excel plots
+		charts = list()
+		charts_raw = list()
 
 		# Default colour to use for LOCI plots
 		color_i = 1
@@ -523,6 +549,7 @@ class ExtractResults:
 		chrt_master.set_title({'name':'{}'.format(sheet_name),
 							   'name_font':{'size':c.font_size_chart_title}})
 
+		# The overall chart does not have the raw data added as it would be too cluttered
 		charts.append(chrt_master)
 
 		# Remove every other element in plot_names since the plot titles are duplicated
@@ -540,14 +567,23 @@ class ExtractResults:
 			chart_name = plot_names[i]
 			self.logger.debug('\t Creating loci plot for {}-{}'.format(sheet_name, chart_name))
 
-			# Add a new chart to the workbook
+			# Add a new chart to the workbook to contain the overall loci plot
 			chrt_individual = wkbk.add_chart(c.chart_type)
 			chrt_individual.set_title({'name':'{} - {}'.format(sheet_name, chart_name),
 							'name_font':{'size':c.font_size_chart_title}})
 
-			charts.append(chrt_individual)
+			# Add a new chart to the workbook to also contain the raw points as well as the loci curve
+			chrt_raw = wkbk.add_chart(c.chart_type)  # type: pd.ExcelWriter.Chart
+			chrt_raw.set_title(
+				{'name':'{} - {} (including raw points)'.format(sheet_name, chart_name),
+				 'name_font':{'size':c.font_size_chart_title}}
+			)
 
-			for chrt in (chrt_individual, chrt_master):
+			# Add charts to list for future processing
+			charts.append(chrt_individual)
+			charts.append(chrt_raw)
+
+			for chrt in (chrt_individual, chrt_master, chrt_raw):
 
 				# Add to plot
 				chrt.add_series({
@@ -558,6 +594,17 @@ class ExtractResults:
 					'line':  {'color': color_map[color_i],
 					 		  'width': c.line_width}
 				})
+
+			# Add raw data points as a new series to the chart if not empty dictionaries
+			if raw_x_data and raw_y_data:
+				chrt_raw.add_series({
+					'name': 'Raw Points',
+					'categories': raw_x_data[chart_name],
+					'values': raw_y_data[chart_name],
+					'marker': {'type': c.marker_type, 'size': c.market_size},
+					'line': {'none': True}
+				})
+
 
 
 		col_number = 0
@@ -1316,6 +1363,23 @@ class StudySettings:
 
 		return None
 
+class LociSettings:
+	"""
+		TODO: Add in worksheet for Loci settings in terms of frequency bandings around nominal
+	"""
+	def __init__(self):
+		nom_freq = constants.General.nominal_frequency
+
+		# TODO: To be replaced with an input from the excel spreadsheet
+		freq_step = 25.0
+
+		# Produces a dictionary to look up frequency bandings for each harmonic number
+		self.freq_bands = dict()
+		for h in range(2, 51):
+			start_freq = h * nom_freq - freq_step
+			stop_freq = h * nom_freq + freq_step
+			self.freq_bands[h] = (start_freq, stop_freq)
+
 class StudyInputs:
 	"""
 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
@@ -1348,6 +1412,9 @@ class StudyInputs:
 			self.terminals = self.process_terminals(wkbk=wkbk)
 			self.lf_settings = self.process_lf_settings(wkbk=wkbk)
 			self.fs_settings = self.process_fs_settings(wkbk=wkbk)
+
+			# Loci setting (TODO: Specific workbook yet to be added)
+			self.loci_settings = LociSettings()
 
 		# Combine contingencies from breakers and lines into a single dictionary of contingencies that will be used if
 		# a fault case hasn't been defined already
@@ -2238,12 +2305,16 @@ def find_convex_vertices(x_values, y_values):
 	# Return tuple of R and X values
 	return x_corner, y_corner
 
-def calculate_convex_vertices(df, harm_groups=1, nom_frequency=50.0):
+def calculate_convex_vertices(df, frequency_bounds, nom_frequency=50.0):
 	"""
 		Will loop through the provided DataFrame and calculate the convex hull that bounds the R and X
-		values for each
+		values for each.
+
+		The minimum and maximum values provided for each frequency bound are included
 	:param pd.DataFrame df:  This is the DataFrame containing R and X values that will then be processed for extraction
-	:param int harm_groups:  Number of harmonic orders to group the results into
+	:param dict frequency_bounds:  For each harmonic number provides the starting and stopping frequency in the format {
+									str harmonic number: (float minimum frequency, float maximum frequency)
+									}
 	:param float nom_frequency:  Nominal frequency = 50.0 Hz
 	:return pd.DataFrame df_convex:  Returns a DataFrame in the same arrangement as the supplied DataFrame but with the
 									corners for each vertices
@@ -2261,32 +2332,32 @@ def calculate_convex_vertices(df, harm_groups=1, nom_frequency=50.0):
 		df_r = df_node.loc[:, df_node.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_r1]
 		df_x = df_node.loc[:, df_node.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_x1]
 
-		# Get a list of the harmonic orders available for this particular node
-		harm_numbers = list(set([int(x/nom_frequency) for x in df_node.index]))
-
 		# Empty Dictionary gets populated with the required harmonic numbers
 		dict_harms = dict()
 
 		# Loop through each harm_number taking steps based on harm_groups and then use the middle of the range
-		for h in range(min(harm_numbers), max(harm_numbers)+1, harm_groups):
-			if h == 1:
+		for h, freq_range in frequency_bounds.items():
+			if max(freq_range) <= nom_frequency:
 				# No R / X data extracted for fundamental
 				continue
-			target_freq = h * nom_frequency
-			min_f_range = target_freq - (harm_groups*nom_frequency)/2.0
-			max_f_range = target_freq + (harm_groups*nom_frequency)/2.0
+			# Get the extremes of the allowable frequency range
+			min_f_range = min(freq_range)
+			max_f_range = max(freq_range)
 			descriptor = 'h = {}  ({} - {} Hz)'.format(h, min_f_range, max_f_range)
 			idx_selection = (df_r.index >= min_f_range) & (df_r.index <= max_f_range)
-			# Extract the 2D DataFrame of values into a 1D numpy array
-			# https://stackoverflow.com/questions/13730468/from-nd-to-1d-arrays
-			r_harm = df_r[idx_selection].values.ravel()
-			x_harm = df_x[idx_selection].values.ravel()
 
-			vertices = find_convex_vertices(x_values=r_harm, y_values=x_harm)
+			# Confirm that there are actually any indexes for this harmonic number and if so extract results
+			if any(idx_selection):
+				# Extract the 2D DataFrame of values into a 1D numpy array
+				# https://stackoverflow.com/questions/13730468/from-nd-to-1d-arrays
+				r_harm = df_r[idx_selection].values.ravel()
+				x_harm = df_x[idx_selection].values.ravel()
 
-			# Create a new DataFrame with the vertices as columns
-			df_single_harm = pd.DataFrame(data=np.array(vertices).T, columns=(constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1))
-			dict_harms[descriptor] = df_single_harm
+				vertices = find_convex_vertices(x_values=r_harm, y_values=x_harm)
+
+				# Create a new DataFrame with the vertices as columns
+				df_single_harm = pd.DataFrame(data=np.array(vertices).T, columns=(constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1))
+				dict_harms[descriptor] = df_single_harm
 
 		# Combine all into a single DataFrame
 		df_all_harms = pd.concat(dict_harms.values(), keys=dict_harms.keys(), axis=1)
@@ -2302,3 +2373,60 @@ def calculate_convex_vertices(df, harm_groups=1, nom_frequency=50.0):
 	)
 
 	return df_convex
+
+def get_raw_data_excel_references(sht_name, df, start_row, start_col, target_frequencies):
+	"""
+		Function returns the cell references which contain all of the raw data points associated with each convex hull
+	:param str, sht_name:  Name of the worksheet being written to
+	:param pd.DataFrame, df:  DataFrame about to be written to excel
+	:param int start_row:  Starting row number that will be plotted
+	:param int start_col:  Starting column number that data will begin in
+	:param dict target_frequencies:  Dictionary of the frequencies associated with each harmonic number
+	:return (dict, dict), (raw_x, raw_y):  Dictionary of the values to be returned
+	"""
+
+	number_of_header_rows = df.columns.nlevels
+	c = constants.Results
+
+	# Get the number of columns associated with the R data
+	number_of_columns = len(df.loc[:, df.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_r1].columns)
+
+	# Start column gets adjusted to account for the Z1 impedance data that is always plotted in the first columns
+	start_col = start_col + number_of_columns + 2
+
+	# Determine the start and end columns for each dataset
+	r_start_col = xlsxwriter.utility.xl_col_to_name(start_col + 1)
+	r_end_col = xlsxwriter.utility.xl_col_to_name(start_col + number_of_columns)
+
+	x_start_col = xlsxwriter.utility.xl_col_to_name(start_col + 2 + number_of_columns + 1)
+	x_end_col = xlsxwriter.utility.xl_col_to_name(start_col + 2 + number_of_columns + number_of_columns)
+
+	raw_x = dict()
+	raw_y = dict()
+
+	# Loop through each harmonic order and find all of the rows within each frequency range
+	for h, freq_limits in target_frequencies.items():
+		# Get rows that correspond to this frequency range
+		idx_selection = (df.index >= min(freq_limits)) & (df.index <= max(freq_limits))
+		row_numbers = np.where(idx_selection==True)[0]
+
+		# Convert to include the start and header row numbers (+2 is to account for index header names and extra rows)
+		row_numbers = [row+2+number_of_header_rows+start_row for row in row_numbers]
+
+		chart_name = 'h = {}  ({} - {} Hz)'.format(h, min(freq_limits), max(freq_limits))
+
+		# Produce a single string which covers all of the R data, brackets are used to pass as a list
+		# of rows into excel so that it handles it as a continuous series
+		raw_x[chart_name] = "(" + ",".join([
+			"'{}'!${}${}:${}${}".format(
+				sht_name, r_start_col, row, r_end_col, row
+			) for row in row_numbers
+		 ]) + ")"
+
+		raw_y[chart_name] = "(" + ",".join([
+			"'{}'!${}${}:${}${}".format(
+				sht_name, x_start_col, row, x_end_col, row
+			) for row in row_numbers
+		]) + ")"
+
+	return raw_x, raw_y

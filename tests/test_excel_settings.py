@@ -52,7 +52,7 @@ class MockExtractResults:
 	""" Mock created to allow independent testing of combine multiple runs """
 	def __init__(self):
 		self.include_convex = True
-		self.combine_multiple_runs = pscharmonics.file_io.ExtractResults.combine_multiple_runs
+		self.combine_multiple_runs = partial(pscharmonics.file_io.ExtractResults.combine_multiple_runs, self)
 
 class MockPreviousResultsExport:
 	""" Mock created to allow independent testing of results processing functions """
@@ -805,10 +805,66 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Import the necessary raw data
 		src_paths = (self.results4,)
-		df, extract_vars = self.cls_extract.combine_multiple_runs(self=self.cls_extract, search_paths=src_paths)
+		df, extract_vars = self.cls_extract.combine_multiple_runs(search_paths=src_paths)
+
+		# Create target frequency range
+		target_freq_range = dict()
+		nom_freq = 50.0
+		for h in range(2, 12):
+			target_freq_range[h] = (h*nom_freq - nom_freq / 2.0, h*nom_freq + nom_freq/2.0)
 
 		# Pass to function to calculate
-		df_convex = pscharmonics.file_io.calculate_convex_vertices(df=df)
+		df_convex = pscharmonics.file_io.calculate_convex_vertices(df=df, frequency_bounds=target_freq_range)
+
+		# Confirm expected values returned (Expect harmonic order 11 to be empty)
+		idx = pd.IndexSlice
+		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 3  (125.0 - 175.0 Hz)', :]].dropna().empty)
+		self.assertTrue(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 11  (525.0 - 575.0 Hz)', :]].dropna().empty)
+
+	def test_convex_from_data_for_detailed4_data_nonlinear_harmonic_numbers(self):
+		"""
+			Tests that imported data can be processed to calculate the convex hull for non-linear harmonic numbers
+		"""
+
+		# Import the necessary raw data
+		src_paths = (self.results4,)
+		df, extract_vars = self.cls_extract.combine_multiple_runs(search_paths=src_paths)
+
+		# Create target frequency range
+		target_freq_range = dict()
+		nom_freq = 50.0
+		# Produce a dataset for the harmonic numbers which is non-linear
+		for h in range(2, 12):
+			target_freq_range[h] = (h*nom_freq - nom_freq / float(h), h*nom_freq + nom_freq/float(h))
+
+		# Pass to function to calculate
+		df_convex = pscharmonics.file_io.calculate_convex_vertices(df=df, frequency_bounds=target_freq_range)
+
+		# Confirm expected values returned (Expect harmonic order 11 to be empty)
+		idx = pd.IndexSlice
+		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 2  (75.0 - 125.0 Hz)', :]].dropna().empty)
+		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 4  (187.5 - 212.5 Hz)', :]].dropna().empty)
+
+		pass
+
+	def test_raw_r_x_values_for_detailed_4(self):
+		"""
+			Confirms that the raw_r and raw_x excel references match up for the data provided
+		"""
+
+		# Import the necessary raw data
+		src_paths = (self.results4,)
+		df, extract_vars = self.cls_extract.combine_multiple_runs(search_paths=src_paths)
+
+		# Create target frequency range
+		target_freq_range = pscharmonics.file_io.LociSettings().freq_bands
+
+		raw_x, raw_y = pscharmonics.file_io.get_raw_data_excel_references(
+			sht_name='TEST',
+			df=df, start_row=1, start_col=1, target_frequencies=target_freq_range
+		)
+
+		pass
 
 	def test_export_detailed_results4_including_convex(self):
 		""" Tests exporting of a results set with convex hull plots works """

@@ -30,6 +30,8 @@ uid = time.strftime('%Y%m%d_%H%M%S')
 # Reference to local directory used by other packages
 local_directory=os.path.abspath(os.path.dirname(__file__))
 
+#
+
 class General:
 	# Value that is used as leading value
 	cmd_lf_leader = 'PSC_LF'
@@ -58,6 +60,9 @@ class General:
 	threshold_warning = 500
 	threshold_delete = 700
 	file_number_thresholds = (threshold_warning, threshold_delete)
+
+	# Nominal frequency assumed for studies
+	nominal_frequency = 50.0
 
 class PowerFactory:
 	"""
@@ -477,6 +482,10 @@ class Results:
 					  'width': 0.75,
 					  'dash_type': 'dash'}
 				  }
+
+	# Marker settings for R and X values
+	marker_type = 'x'
+	market_size = 5
 
 	# Font size for chart title
 	font_size_chart_title = 14
