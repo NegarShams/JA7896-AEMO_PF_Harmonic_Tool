@@ -813,13 +813,17 @@ class TestCreateConvex(unittest.TestCase):
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / 2.0, h*nom_freq + nom_freq/2.0)
 
+		# Create percentage to exclude
+		percentage_to_exclude = 0.0
+
 		# Pass to function to calculate
-		df_convex = pscharmonics.file_io.calculate_convex_vertices(df=df, frequency_bounds=target_freq_range)
+		df_convex = pscharmonics.file_io.calculate_convex_vertices(
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
+		)
 
 		# Confirm expected values returned (Expect harmonic order 11 to be empty)
 		idx = pd.IndexSlice
 		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 3  (125.0 - 175.0 Hz)', :]].dropna().empty)
-		self.assertTrue(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 11  (525.0 - 575.0 Hz)', :]].dropna().empty)
 
 	def test_convex_from_data_for_detailed4_data_nonlinear_harmonic_numbers(self):
 		"""
@@ -837,15 +841,86 @@ class TestCreateConvex(unittest.TestCase):
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / float(h), h*nom_freq + nom_freq/float(h))
 
+		# Percentage to exclude
+		percentage_to_exclude = 0.0
+
 		# Pass to function to calculate
-		df_convex = pscharmonics.file_io.calculate_convex_vertices(df=df, frequency_bounds=target_freq_range)
+		df_convex = pscharmonics.file_io.calculate_convex_vertices(
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude)
 
 		# Confirm expected values returned (Expect harmonic order 11 to be empty)
 		idx = pd.IndexSlice
 		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 2  (75.0 - 125.0 Hz)', :]].dropna().empty)
 		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 4  (187.5 - 212.5 Hz)', :]].dropna().empty)
 
-		pass
+	def test_convex_from_data_for_detailed4_data_percentage_to_exclude(self):
+		"""
+			Tests that processing of data will exclude certain values from ConvexHull
+		"""
+
+		# Import the necessary raw data
+		src_paths = (self.results4,)
+		df, extract_vars = self.cls_extract.combine_multiple_runs(search_paths=src_paths)
+
+		# Create target frequency range
+		target_freq_range = dict()
+		nom_freq = 50.0
+		for h in range(2, 12):
+			target_freq_range[h] = (h*nom_freq - nom_freq / 2.0, h*nom_freq + nom_freq/2.0)
+
+
+		# For the node:  Cranbourne would expect no values greater than 8 for R or X if top 5% excluded for 2nd harmonic
+		r_max = 7.9
+
+		idx = pd.IndexSlice
+		test_node = 'CRANBOURNE 220KV'
+		test_h = 'h = 2  (75.0 - 125.0 Hz)'
+		test_r = pscharmonics.constants.PowerFactory.pf_r1
+		test_x = pscharmonics.constants.PowerFactory.pf_x1
+
+		# Initially calculate with all data
+		df_convex_all = pscharmonics.file_io.calculate_convex_vertices(
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=0.0
+		)
+		# Obtain maximum values from this DataFrame
+		max_values_all = (
+			max(df_convex_all.loc[:, idx[test_node, test_h, test_r]]),
+			max(df_convex_all.loc[:, idx[test_node, test_h, test_x]]),
+		)
+
+		# Confirm that max values exceeds threshold
+		self.assertTrue(max_values_all[0]>r_max)
+
+		# Calculate with top 5% excluded
+		percentage_to_exclude = 0.05
+		df_convex_5 = pscharmonics.file_io.calculate_convex_vertices(
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
+		)
+		# Obtain maximum values from this DataFrame
+		max_values_5 = (
+			max(df_convex_5.loc[:, idx[test_node, test_h, test_r]]),
+			max(df_convex_5.loc[:, idx[test_node, test_h, test_x]]),
+		)
+
+		# Confirm that max values below threshold
+		self.assertTrue(max_values_5[0]<r_max)
+
+
+		# Calculate with top 50% excluded
+		percentage_to_exclude = 0.5
+		df_convex_50 = pscharmonics.file_io.calculate_convex_vertices(
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
+		)
+
+		# Obtain maximum values from this DataFrame
+		max_values_50 = (
+			max(df_convex_50.loc[:, idx[test_node, test_h, test_r]]),
+			max(df_convex_50.loc[:, idx[test_node, test_h, test_x]]),
+		)
+
+		# Confirm that max values are in correct order
+		self.assertTrue(max_values_50[0]<max_values_5[0]<max_values_all[0])
+		self.assertTrue(max_values_50[1]<max_values_5[1]<=max_values_all[1])
 
 	def test_raw_r_x_values_for_detailed_4(self):
 		"""

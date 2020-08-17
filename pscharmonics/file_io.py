@@ -146,8 +146,12 @@ class ExtractResults:
 		if self.include_convex:
 			if constants.PowerFactory.pf_r1 and extract_vars and constants.PowerFactory.pf_x1 in extract_vars:
 				# TODO: Target frequencies should be provided as an input, still to be completed
-				target_freq = LociSettings().freq_bands
-				df_convex = calculate_convex_vertices(df=df, frequency_bounds=target_freq)
+				loci_settings = LociSettings()
+				target_freq = loci_settings.freq_bands
+				percentage_to_exclude = loci_settings.exclude
+				df_convex = calculate_convex_vertices(
+					df=df, frequency_bounds=target_freq, percentage_to_exclude=percentage_to_exclude
+				)
 			else:
 				self.logger.warning(
 					(
@@ -1380,6 +1384,10 @@ class LociSettings:
 			stop_freq = h * nom_freq + freq_step
 			self.freq_bands[h] = (start_freq, stop_freq)
 
+		# TODO: To be replaced with an input from the excel spreadsheet
+		# Percentage of points to exclude
+		self.exclude = 0.1
+
 class StudyInputs:
 	"""
 		Class used to import the Settings from the Input Spreadsheet and convert into a format usable elsewhere
@@ -2305,20 +2313,33 @@ def find_convex_vertices(x_values, y_values):
 	# Return tuple of R and X values
 	return x_corner, y_corner
 
-def calculate_convex_vertices(df, frequency_bounds, nom_frequency=50.0):
+def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_frequency=50.0):
 	"""
 		Will loop through the provided DataFrame and calculate the convex hull that bounds the R and X
 		values for each.
 
 		The minimum and maximum values provided for each frequency bound are included
+
+		A specific percentage of points will be excluded from the impedance loci (i.e. the top 10% of values)
 	:param pd.DataFrame df:  This is the DataFrame containing R and X values that will then be processed for extraction
 	:param dict frequency_bounds:  For each harmonic number provides the starting and stopping frequency in the format {
 									str harmonic number: (float minimum frequency, float maximum frequency)
 									}
+	:param float percentage_to_exclude:  Percentage of maximum points to exclude from the dataset
 	:param float nom_frequency:  Nominal frequency = 50.0 Hz
 	:return pd.DataFrame df_convex:  Returns a DataFrame in the same arrangement as the supplied DataFrame but with the
 									corners for each vertices
 	"""
+	# Confirm that the percentage to exclude value has been provided as a float rather than a percentage
+	if percentage_to_exclude > 1.0:
+		constants.logger.warning(
+			(
+				'The percentage to exclude value ({:.1f}%) is greater than 100 % and therefore has been input as a '
+				'percentage rather than a float.  To resolve this a value of {:.1f} % has been considered instead.'
+			).format(percentage_to_exclude*100.0, percentage_to_exclude)
+		)
+		# Update value to divide by 100.0
+		percentage_to_exclude = percentage_to_exclude / 100.0
 
 	# Obtain constants
 	c = constants.Results
@@ -2328,6 +2349,13 @@ def calculate_convex_vertices(df, frequency_bounds, nom_frequency=50.0):
 
 	# Loop through each node
 	for node_name, df_node in df.groupby(level=c.lbl_Reference_Terminal, axis=1):
+		# Obtain df_z so can extract the largest numbers and exclude them from the filtering
+		df_z = df_node.loc[:, df_node.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_z1]
+
+		# Continue if no data exists for this node or if it is marked for deleting then no need to process any further
+		if node_name == constants.Results.lbl_to_delete or df_z.empty:
+			continue
+
 		# Extract r values and x values
 		df_r = df_node.loc[:, df_node.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_r1]
 		df_x = df_node.loc[:, df_node.columns.get_level_values(level=c.lbl_Result)==constants.PowerFactory.pf_x1]
@@ -2348,16 +2376,32 @@ def calculate_convex_vertices(df, frequency_bounds, nom_frequency=50.0):
 
 			# Confirm that there are actually any indexes for this harmonic number and if so extract results
 			if any(idx_selection):
-				# Extract the 2D DataFrame of values into a 1D numpy array
-				# https://stackoverflow.com/questions/13730468/from-nd-to-1d-arrays
-				r_harm = df_r[idx_selection].values.ravel()
-				x_harm = df_x[idx_selection].values.ravel()
+				# Extract the Z1 values specific to this frequency range and identify the index values for those which
+				# exceeded the allowed percentile
+				z_harm = df_z[idx_selection].values.ravel()
+				percentile_value = np.percentile(a=z_harm, q=(1-percentage_to_exclude)*100.0)
+				# Find index values for all values that are less than the percentile value
+				idx_keep = z_harm<=percentile_value
 
-				vertices = find_convex_vertices(x_values=r_harm, y_values=x_harm)
+				if not any(idx_keep):
+					constants.logger.error(
+						(
+							'For node {} with harmonic number {} covering the frequencies {:.1f} to {:.1f} Hz and '
+							'excluding the top {:.1f} % has resulted in no values being kept.'
+						).format(node_name, h, min_f_range, max_f_range, percentage_to_exclude*100.0)
+					)
+				else:
+					# Extract the 2D DataFrame of values into a 1D numpy array and only keep those values which are less
+					# then the percentile values
+					# https://stackoverflow.com/questions/13730468/from-nd-to-1d-arrays
+					r_harm = df_r[idx_selection].values.ravel()[idx_keep]
+					x_harm = df_x[idx_selection].values.ravel()[idx_keep]
 
-				# Create a new DataFrame with the vertices as columns
-				df_single_harm = pd.DataFrame(data=np.array(vertices).T, columns=(constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1))
-				dict_harms[descriptor] = df_single_harm
+					vertices = find_convex_vertices(x_values=r_harm, y_values=x_harm)
+
+					# Create a new DataFrame with the vertices as columns
+					df_single_harm = pd.DataFrame(data=np.array(vertices).T, columns=(constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1))
+					dict_harms[descriptor] = df_single_harm
 
 		# Combine all into a single DataFrame
 		df_all_harms = pd.concat(dict_harms.values(), keys=dict_harms.keys(), axis=1)
