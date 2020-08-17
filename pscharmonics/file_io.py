@@ -128,7 +128,11 @@ class ExtractResults:
 	"""
 		Values defined during import
 	"""
+	# Default constants used for processing and combining of loci plots
 	include_convex = False  # type: bool
+	freq_bands = dict()  # type: dict
+	exclude = dict()  # type: dict
+	nom_frequency = float()  # type: float
 
 	def __init__(self, target_file, search_paths):
 		"""
@@ -145,12 +149,9 @@ class ExtractResults:
 		df_convex = pd.DataFrame()
 		if self.include_convex:
 			if constants.PowerFactory.pf_r1 and extract_vars and constants.PowerFactory.pf_x1 in extract_vars:
-				# TODO: Target frequencies should be provided as an input, still to be completed
-				loci_settings = LociSettings()
-				target_freq = loci_settings.freq_bands
-				percentage_to_exclude = loci_settings.exclude
 				df_convex = calculate_convex_vertices(
-					df=df, frequency_bounds=target_freq, percentage_to_exclude=percentage_to_exclude
+					df=df, frequency_bounds=self.freq_bands, percentage_to_exclude=self.exclude,
+					nom_frequency=self.nom_frequency
 				)
 			else:
 				self.logger.warning(
@@ -185,6 +186,10 @@ class ExtractResults:
 		all_dfs = []
 		vars_to_export = []
 
+		# These are populated with the polygon banding specified for each harmonic order based on the extremes from
+		# all of the inputs provided
+		self.freq_bands = dict()
+		self.exclude = dict()
 		# Loop through each folder, import the inputs sheet and results files
 		for folder in search_paths:
 			# Import results into a single dataframe
@@ -199,6 +204,40 @@ class ExtractResults:
 			# are dealt with accordingly
 			self.include_convex = self.include_convex or combined.inputs.settings.include_convex
 
+			# Get nominal frequency from input settings
+			nom_frequency = combined.inputs.loci_settings.nom_freq
+			if self.nom_frequency == 0:
+				self.nom_frequency = nom_frequency
+			elif self.nom_frequency != nom_frequency:
+				self.logger.error(
+					(
+						'Nominal frequency {:.0f} Hz declared as an input in <{}> is different to the nominal '
+						'frequency declared in other input files {:.0f} Hz.  The script will continue assuming that '
+						'{:.0f} Hz is correct but this may result in some unexpected results and should be looked '
+						'into closely'
+					).format(nom_frequency, combined.inputs.pth, self.nom_frequency, self.nom_frequency)
+				)
+
+			# Get loci settings based on all inputs and then set frequency bands for each harmonic numbers based on the
+			# minimum and maximum from the provided inputs
+			for h, values in combined.inputs.loci_settings.freq_bands.items():
+				if h in self.freq_bands.keys():
+					# Obtain the start and stop frequencies
+					start_freq = min(values[0], self.freq_bands[h][0])
+					stop_freq = max(values[1], self.freq_bands[h][1])
+					# Replace exisiting dictionary value with new values
+					self.freq_bands[h] = (start_freq, stop_freq)
+				else:
+					# Doesn't already exist so add it
+					self.freq_bands[h] = values
+
+			for h, values in combined.inputs.loci_settings.exclude.items():
+				if h in self.exclude.keys():
+					# Replace existing value with new one
+					self.exclude[h] = min(values, self.exclude[h])
+				else:
+					# Doesn't already exist so add it
+					self.exclude[h] = values
 
 		# Combine all results together
 		df = pd.concat(all_dfs, axis=1)
@@ -389,13 +428,10 @@ class ExtractResults:
 					if not df_convex.empty:
 						# Based on the raw dataset, start row and start column determine the Excel row and columns
 						# that cover the raw R and X values for the calculated impedance loci
-						# TODO: Target frequencies should be provided as an input, still to be completed
-						target_freq = LociSettings().freq_bands
-						#
 						raw_x_data, raw_y_data = get_raw_data_excel_references(
 							sht_name=node_name,
 							df=_df, start_row=start_row, start_col=c.start_col,
-							target_frequencies=target_freq)
+							target_frequencies=self.freq_bands)
 
 						# Determine which row to start the convex hull on, taking into consideration the number of
 						# rows occupied by the DataFrame
@@ -1371,22 +1407,160 @@ class LociSettings:
 	"""
 		TODO: Add in worksheet for Loci settings in terms of frequency bandings around nominal
 	"""
-	def __init__(self):
-		nom_freq = constants.General.nominal_frequency
+	# Establish default values
+	freq_bands = dict()
+	exclude = float()
 
-		# TODO: To be replaced with an input from the excel spreadsheet
-		freq_step = 25.0
+	custom_polygon = False
+	custom_exclude = False
 
-		# Produces a dictionary to look up frequency bandings for each harmonic number
+	def __init__(self, sht=constants.StudyInputs.loci_settings, wkbk=None, pth_file=None):
+		"""
+			Process the worksheet to extract the relevant StudyCase details
+		:param str sht:  (optional) Name of worksheet to use
+		:param pd.ExcelFile wkbk:  (optional) Handle to workbook
+		:param str pth_file: (optional) Handle to workbook
+		"""
+		self.logger = constants.logger
+
+		# Import workbook as dataframe
+		if wkbk is None:
+			if pth_file:
+				wkbk = pd.ExcelFile(pth_file)
+				self.pth = pth_file
+			else:
+				raise IOError('No workbook or path to file provided')
+		else:
+			# Get workbook path in case path has not been provided
+			self.pth = wkbk.io
+
+		# Default values that are used unless a better input is provided
+		polygon_range = constants.LociInputs.def_polygon_range
+		impedance_exclude = constants.LociInputs.def_impedance_exclude
+
+		# Confirm sheet exists in workbook and if not raise a warning and return
+		if sht not in wkbk.sheet_names:
+			self.logger.error(
+				(
+					'The worksheet named {} cannot be found in the provided inputs workbook {} and therefore the '
+					'loci settings will be based on default values.'
+				).format(sht, self.pth)
+			)
+
+			# Empty dataframe since only used if Custom values provided
+			df = pd.DataFrame()
+
+			# Default nominal frequency assumed where no input file has been provided
+			self.nom_freq = constants.General.nominal_frequency
+
+		else:
+			# Get high level settings to confirm whether using custom values or not
+			# Squeeze command to ensure converted to a series since only a single row is being imported
+			df = pd.read_excel(
+				wkbk, sheet_name=sht, skiprows=1, nrows=3, usecols=(0,1,2), index_col=None, header=None
+			)
+			# Extract the nominal frequency, +/- Hz values for each polygon and the impedance values that should be
+			# excluded
+			self.nom_freq = df.iloc[0,2]
+			polygon_range = df.iloc[1,2]
+			impedance_exclude = df.iloc[2,2]
+
+			# Import loci settings into a DataFrame and process
+			df = pd.read_excel(
+				wkbk, sheet_name=sht, index_col=0, usecols=(0, 1, 2, 3, 4), skiprows=5, header=0
+			)
+
+		# Process all inputs
+		self.process_inputs(polygon_range=polygon_range, impedance_exclude=impedance_exclude, df=df)
+
+	def process_inputs(self, polygon_range, impedance_exclude, df):
+		"""
+			Process all of the provided inputs into a suitable format for processing as part of the results and
+			the custom values to use when provided.  If polyfon_range or impedance_exclude == Custom then uses the
+			values defined in the DataFrame
+		:param float polygon_range:  +/- frequency range to use
+		:param float impedance_exclude:  decimal point representing percentage of values to exclude
+		:param pd.DataFrame df:  DataFrame of custom values to use when provided
+		:return None:
+		"""
+		c = constants.LociInputs
+
+		# Calculate the frequency bands that apply for each harmonic
 		self.freq_bands = dict()
-		for h in range(2, 51):
-			start_freq = h * nom_freq - freq_step
-			stop_freq = h * nom_freq + freq_step
-			self.freq_bands[h] = (start_freq, stop_freq)
+		if polygon_range == c.custom_inputs:
+			if df.empty:
+				raise StudyInputs('Provided DataFrame is empty which is not expected, error in inputs or script')
 
-		# TODO: To be replaced with an input from the excel spreadsheet
-		# Percentage of points to exclude
-		self.exclude = 0.1
+			self.custom_polygon = True
+			# Use custom inputs detailed in DataFrame rather than provided values
+			for h, values in df.iterrows():
+				# Extract frequency values and check for any errors
+				start_freq = float(values.loc[c.min_frequency])
+				stop_freq = float(values.loc[c.max_frequency])
+				if pd.isna(start_freq):
+					start_freq = h * self.nom_freq - c.def_polygon_range
+					self.logger.warning(
+						'No suitable minimum frequency provided for harmonic: {} so default of {:.1f} Hz used instead'
+							.format(h, start_freq))
+				if pd.isna(stop_freq):
+					stop_freq = h * self.nom_freq + c.def_polygon_range
+					self.logger.warning(
+						'No suitable maximum frequency provided for harmonic: {} so default of {:.1f} Hz used instead'
+							.format(h, stop_freq))
+
+				self.freq_bands[h] = (start_freq, stop_freq)
+		else:
+			# Use inputs based on general values provided (+1 to account for iterator not including last value)
+			for h in range(2, c.max_harm+1):
+				start_freq = h * self.nom_freq - polygon_range
+				stop_freq = h * self.nom_freq + polygon_range
+				self.freq_bands[h] = (start_freq, stop_freq)
+
+		# Calculate the percentage values to exclude that apply for each harmonic
+		self.exclude = dict()
+		if impedance_exclude == c.custom_inputs:
+			if df.empty:
+				raise StudyInputs('Provided DataFrame is empty which is not expected, error in inputs or script')
+
+			self.custom_exclude = True
+			# Use custom inputs detailed in DataFrame rather than provided values
+			for h, values in df.iterrows():
+				exclude = float(values.loc[c.percentage_to_exclude])
+				if pd.isna(exclude):
+					exclude = c.def_impedance_exclude
+					self.logger.warning(
+						(
+							'Unsuitable value provided for percentage to exclude associated with harmonic: {} and so '
+							'default value of {:.1f} % used instead'
+						).format(h, exclude)
+					)
+
+				elif exclude / 100.0 < 0.001:
+					self.logger.warning(
+						(
+							'For harmonic number: {}, the percentage to exclude value ({:.1f}%) is less than 0.1% and '
+							'therefore it is assumed has been input as a decimal rather than a percentage.  To resolve '
+							'this a value of {:.1f} % has been considered instead.'
+						).format(exclude, exclude * 100.0)
+					)
+					exclude = exclude * 100.0
+
+				self.exclude[h] = exclude / 100.0
+		else:
+			if impedance_exclude / 100.0 < 0.001:
+				self.logger.warning(
+					(
+						'The percentage to exclude value ({:.1f}%) is less than 0.1% and therefore it is assumed has'
+						'been input as a decimal rather than a percentage.  To resolve this a value of {:.1f} % has '
+						'been considered instead.'
+					).format(impedance_exclude, impedance_exclude * 100.0)
+				)
+				impedance_to_exclude = impedance_exclude * 100.0
+			# Use inputs based on general values provided (+1 to account for iterator not including last value)
+			for h in range(2, c.max_harm+1):
+				self.exclude[h] = impedance_exclude / 100.0
+
+		return None
 
 class StudyInputs:
 	"""
@@ -1420,9 +1594,7 @@ class StudyInputs:
 			self.terminals = self.process_terminals(wkbk=wkbk)
 			self.lf_settings = self.process_lf_settings(wkbk=wkbk)
 			self.fs_settings = self.process_fs_settings(wkbk=wkbk)
-
-			# Loci setting (TODO: Specific workbook yet to be added)
-			self.loci_settings = LociSettings()
+			self.loci_settings = LociSettings(wkbk=wkbk)
 
 		# Combine contingencies from breakers and lines into a single dictionary of contingencies that will be used if
 		# a fault case hasn't been defined already
@@ -2325,22 +2497,11 @@ def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_f
 	:param dict frequency_bounds:  For each harmonic number provides the starting and stopping frequency in the format {
 									str harmonic number: (float minimum frequency, float maximum frequency)
 									}
-	:param float percentage_to_exclude:  Percentage of maximum points to exclude from the dataset
+	:param dict percentage_to_exclude:  Percentage of maximum points to exclude from the dataset
 	:param float nom_frequency:  Nominal frequency = 50.0 Hz
 	:return pd.DataFrame df_convex:  Returns a DataFrame in the same arrangement as the supplied DataFrame but with the
 									corners for each vertices
 	"""
-	# Confirm that the percentage to exclude value has been provided as a float rather than a percentage
-	if percentage_to_exclude > 1.0:
-		constants.logger.warning(
-			(
-				'The percentage to exclude value ({:.1f}%) is greater than 100 % and therefore has been input as a '
-				'percentage rather than a float.  To resolve this a value of {:.1f} % has been considered instead.'
-			).format(percentage_to_exclude*100.0, percentage_to_exclude)
-		)
-		# Update value to divide by 100.0
-		percentage_to_exclude = percentage_to_exclude / 100.0
-
 	# Obtain constants
 	c = constants.Results
 
@@ -2379,7 +2540,7 @@ def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_f
 				# Extract the Z1 values specific to this frequency range and identify the index values for those which
 				# exceeded the allowed percentile
 				z_harm = df_z[idx_selection].values.ravel()
-				percentile_value = np.percentile(a=z_harm, q=(1-percentage_to_exclude)*100.0)
+				percentile_value = np.percentile(a=z_harm, q=(1-percentage_to_exclude[h])*100.0)
 				# Find index values for all values that are less than the percentile value
 				idx_keep = z_harm<=percentile_value
 
@@ -2388,7 +2549,7 @@ def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_f
 						(
 							'For node {} with harmonic number {} covering the frequencies {:.1f} to {:.1f} Hz and '
 							'excluding the top {:.1f} % has resulted in no values being kept.'
-						).format(node_name, h, min_f_range, max_f_range, percentage_to_exclude*100.0)
+						).format(node_name, h, min_f_range, max_f_range, percentage_to_exclude[h]*100.0)
 					)
 				else:
 					# Extract the 2D DataFrame of values into a 1D numpy array and only keep those values which are less

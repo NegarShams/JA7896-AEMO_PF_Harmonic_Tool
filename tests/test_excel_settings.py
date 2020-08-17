@@ -54,6 +54,11 @@ class MockExtractResults:
 		self.include_convex = True
 		self.combine_multiple_runs = partial(pscharmonics.file_io.ExtractResults.combine_multiple_runs, self)
 
+		self.nom_frequency = float()
+		# Create target frequency range
+		self.target_freq_range = dict()
+		self.percentage_to_exclude = dict()
+
 class MockPreviousResultsExport:
 	""" Mock created to allow independent testing of results processing functions """
 	def __init__(self):
@@ -505,6 +510,28 @@ class TestFreqSweepSettings(unittest.TestCase):
 		self.assertTrue(fs_settings.cmd is None)
 		self.assertTrue(fs_settings.settings_error)
 
+class TestLociSettings(unittest.TestCase):
+	""" Class to deal with testing the reading and processing of loci settings """
+	def test_import_settings_non_custom(self):
+		""" Confirm DataFrame imported when loaded using a file """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs_Detailed6.xlsx')
+
+		loci_settings = pscharmonics.file_io.LociSettings(pth_file=pth_inputs)
+
+		# Confirm command for contingency analysis is imported correctly
+		self.assertFalse(loci_settings.custom_polygon)
+		self.assertFalse(loci_settings.custom_exclude)
+
+	def test_import_settings_custom(self):
+		""" Confirm DataFrame imported when loaded using a file """
+		pth_inputs = os.path.join(TESTS_DIR, 'Inputs_loci_custom.xlsx')
+
+		loci_settings = pscharmonics.file_io.LociSettings(pth_file=pth_inputs)
+
+		# Confirm command for contingency analysis is imported correctly
+		self.assertTrue(loci_settings.custom_polygon)
+		self.assertTrue(loci_settings.custom_exclude)
+
 class TestDeleteOldFiles(unittest.TestCase):
 	"""
 		Tests the function for deleting of files which are greater than a particular number
@@ -737,8 +764,9 @@ class TestCreateConvex(unittest.TestCase):
 		""" Creates a random data set """
 		self.results4 = os.path.join(TESTS_DIR, 'Detailed_4')
 		self.results5 = os.path.join(TESTS_DIR, 'Detailed_5')
+		self.results6 = os.path.join(TESTS_DIR, 'Detailed_6')
 
-		for x in (self.results4,):
+		for x in (self.results4, self.results5, self.results6):
 			self.assertTrue(
 				os.path.isdir(x),
 				msg='The detailed results folder {} does not exist, run <test_pf.py> first to '
@@ -809,12 +837,11 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Create target frequency range
 		target_freq_range = dict()
+		percentage_to_exclude = dict()
 		nom_freq = 50.0
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / 2.0, h*nom_freq + nom_freq/2.0)
-
-		# Create percentage to exclude
-		percentage_to_exclude = 0.0
+			percentage_to_exclude[h] = 0.0
 
 		# Pass to function to calculate
 		df_convex = pscharmonics.file_io.calculate_convex_vertices(
@@ -836,13 +863,12 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Create target frequency range
 		target_freq_range = dict()
+		percentage_to_exclude = dict()
 		nom_freq = 50.0
 		# Produce a dataset for the harmonic numbers which is non-linear
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / float(h), h*nom_freq + nom_freq/float(h))
-
-		# Percentage to exclude
-		percentage_to_exclude = 0.0
+			percentage_to_exclude[h] = 0.0
 
 		# Pass to function to calculate
 		df_convex = pscharmonics.file_io.calculate_convex_vertices(
@@ -864,9 +890,11 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Create target frequency range
 		target_freq_range = dict()
+		percentage_to_exclude = dict()
 		nom_freq = 50.0
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / 2.0, h*nom_freq + nom_freq/2.0)
+			percentage_to_exclude[h] = 0.0
 
 
 		# For the node:  Cranbourne would expect no values greater than 8 for R or X if top 5% excluded for 2nd harmonic
@@ -880,7 +908,7 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Initially calculate with all data
 		df_convex_all = pscharmonics.file_io.calculate_convex_vertices(
-			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=0.0
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
 		)
 		# Obtain maximum values from this DataFrame
 		max_values_all = (
@@ -892,7 +920,7 @@ class TestCreateConvex(unittest.TestCase):
 		self.assertTrue(max_values_all[0]>r_max)
 
 		# Calculate with top 5% excluded
-		percentage_to_exclude = 0.05
+		percentage_to_exclude = {k: 0.05 for k in percentage_to_exclude.keys()}
 		df_convex_5 = pscharmonics.file_io.calculate_convex_vertices(
 			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
 		)
@@ -907,7 +935,7 @@ class TestCreateConvex(unittest.TestCase):
 
 
 		# Calculate with top 50% excluded
-		percentage_to_exclude = 0.5
+		percentage_to_exclude = {k: 0.5 for k in percentage_to_exclude.keys()}
 		df_convex_50 = pscharmonics.file_io.calculate_convex_vertices(
 			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
 		)
@@ -934,12 +962,10 @@ class TestCreateConvex(unittest.TestCase):
 		# Create target frequency range
 		target_freq_range = pscharmonics.file_io.LociSettings().freq_bands
 
-		raw_x, raw_y = pscharmonics.file_io.get_raw_data_excel_references(
+		pscharmonics.file_io.get_raw_data_excel_references(
 			sht_name='TEST',
 			df=df, start_row=1, start_col=1, target_frequencies=target_freq_range
 		)
-
-		pass
 
 	def test_export_detailed_results4_including_convex(self):
 		""" Tests exporting of a results set with convex hull plots works """
@@ -968,6 +994,25 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Target file for export
 		target_file = os.path.join(TESTS_DIR, 'combined_results_5.xlsx')
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		# Force to True so results handled correctly
+		pscharmonics.file_io.ExtractResults.include_convex = True
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_path)
+
+		# Confirm file created
+		self.assertTrue(os.path.exists(target_file))
+
+	def test_export_detailed_results6_including_convex(self):
+		""" Tests exporting of a results set with convex hull plots works """
+
+		# Source path to search and confirm exist before continuing
+		src_path = (self.results6,)
+
+		# Target file for export
+		target_file = os.path.join(TESTS_DIR, 'combined_results_6.xlsx')
 		# Confirm file doesn't already exist
 		if os.path.isfile(target_file):
 			os.remove(target_file)

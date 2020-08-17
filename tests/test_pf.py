@@ -2071,7 +2071,6 @@ class TestPFDetailedInputs(unittest.TestCase):
 		# output is saved at this point
 		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
-
 	def test_complete_test_produce_outputs_3_no_contingencies(self):
 		"""
 			Function runs tests using detailed outputs to produce a set of results that can be used elsewhere
@@ -2109,7 +2108,6 @@ class TestPFDetailedInputs(unittest.TestCase):
 		# output is saved at this point
 		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
-
 	def test_complete_test_produce_outputs_4_small_step_size(self):
 		"""
 			Function runs tests using detailed outputs to produce a set of results that can be used elsewhere
@@ -2144,7 +2142,6 @@ class TestPFDetailedInputs(unittest.TestCase):
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
 		# output is saved at this point
 		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
-
 
 	def test_complete_test_produce_outputs_5_lines_only(self):
 		"""
@@ -2183,6 +2180,40 @@ class TestPFDetailedInputs(unittest.TestCase):
 		# output is saved at this point
 		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
+	def test_complete_test_produce_outputs_6_different_filtering_size(self):
+		"""
+			Function runs tests using detailed outputs to produce a set of results that can be used elsewhere
+		:return:
+		"""
+		# Create path for results from detailed tests
+		target_pth = os.path.join(TESTS_DIR, 'Detailed_6')
+		if os.path.isdir(target_pth):
+			print('Existing contents in path: {} will be deleted'.format(target_pth))
+			files = glob.glob(target_pth + '\\*')
+			for f in files:
+				os.remove(f)
+		else:
+			os.mkdir(target_pth)
+
+		# Import settings for Detailed Study
+		settings_file = os.path.join(TESTS_DIR, 'Inputs_Detailed6.xlsx')
+		inputs = pscharmonics.file_io.StudyInputs(pth_file=settings_file)
+
+		inputs.settings.export_folder = target_pth
+
+		# Create projects
+		uid = 'DETAILED_6'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=inputs.cases,
+			uid=uid,
+			lf_settings=inputs.lf_settings,
+			fs_settings=inputs.fs_settings,
+			# export_pth=target_pth
+		)
+
+		# Iterate through each project and create the various cases, the includes running a pre-case check but no
+		# output is saved at this point
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
 
 	@classmethod
 	def tearDownClass(cls):

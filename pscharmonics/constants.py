@@ -64,6 +64,7 @@ class General:
 	# Nominal frequency assumed for studies
 	nominal_frequency = 50.0
 
+
 class PowerFactory:
 	"""
 		Constants used in this script
@@ -490,6 +491,8 @@ class Results:
 	# Font size for chart title
 	font_size_chart_title = 14
 
+
+
 	def __init__(self):
 		"""
 			Initial class
@@ -561,6 +564,7 @@ class StudyInputs:
 	cont_lines = 'Contingencies_Lines'
 	lf_settings = 'Loadflow_Settings'
 	fs_settings = 'Frequency_Sweep'
+	loci_settings = 'Loci_Settings'
 	# Maximum length of an objects name in PowerFactory 2016 is 40 characters.
 	# Therefore the maximum name that can be used for a single terminal is 19 characters to allow two terminals to be
 	# joined together
@@ -578,6 +582,23 @@ class StudyInputs:
 	# Text used to define whether a line is in service or out of service
 	in_service = 'In Service'
 	out_of_service = 'Out of Service'
+
+class LociInputs:
+	# Default values to use for impedance loci processing
+	# Defaults to using +/- half of nominal frequency
+	def_polygon_range = General.nominal_frequency / 2.0
+	# Defaults to not excluding any data points
+	def_impedance_exclude = 0.0
+
+	# Maximum harmonic order (no real impact just avoids excessive loops)
+	max_harm = 100
+
+	# Strings defined in inputs
+	custom_inputs = 'Custom'
+	min_frequency = 'Minimum Frequency (Hz)'
+	max_frequency = 'Maximum Frequency (Hz)'
+	percentage_to_exclude = 'Percentage to Exclude (%)'
+
 
 class GuiDefaults:
 	gui_title='PSC - Automated PowerFactory Frequency Scans Tool'
