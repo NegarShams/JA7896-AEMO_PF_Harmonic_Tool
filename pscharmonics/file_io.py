@@ -1555,7 +1555,7 @@ class LociSettings:
 						'been considered instead.'
 					).format(impedance_exclude, impedance_exclude * 100.0)
 				)
-				impedance_to_exclude = impedance_exclude * 100.0
+				impedance_exclude = impedance_exclude * 100.0
 			# Use inputs based on general values provided (+1 to account for iterator not including last value)
 			for h in range(2, c.max_harm+1):
 				self.exclude[h] = impedance_exclude / 100.0
