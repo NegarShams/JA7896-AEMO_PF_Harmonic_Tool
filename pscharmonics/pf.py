@@ -734,8 +734,8 @@ class PFStudyCase:
 			# Ensure results are stored in the results variable
 			cont_analysis.p_recnt = self.cont_results
 
-			# If a large number of contingencies then allow parallel running of cases
-			cont_analysis.iEnableParal = 1
+			# Force contingency analysis to run on a single core since does not seem stable on multiple cores
+			cont_analysis.iEnableParal = 0
 			cont_analysis.minCntcyAC = c.parallel_threshold
 
 			# Delete all other contingency analysis objects
@@ -2708,7 +2708,7 @@ def run_studies(pf_projects, inputs):
 	# Iterate through each project and create the various cases, the includes running a pre-case check but no
 	# output is saved at this point
 	for project_name, project in pf_projects.items():  # type: str, PFProject
-		logger.debug('Studies being run for project {}:\t{}'.format(project_name, project.prj))
+		logger.info('Studies being run for project {}:\t{}'.format(project_name, project.prj))
 		project.create_cases(
 			study_settings=inputs.settings,
 			terminals=inputs.terminals,
