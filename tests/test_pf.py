@@ -2,7 +2,6 @@ import unittest
 import os
 import sys
 import pandas as pd
-import math
 import random
 import string
 import glob
@@ -566,31 +565,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 		self.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
 
-	def test_create_fault_cases(self):
-		"""
-			Tests that fault cases can be created for a contingency command
-		"""
-		# Create new project instances
-		uid = 'TEST_CASE'
-		fc_name = 'TEST Cont'
-		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
-		)
-
-		# Create fault events
-		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-		fc = fault_cases[fc_name]
-
-		switch_name = 'Switch_213211'
-		self.assertEqual(fc.loc_name, fc_name)
-		event = fc.GetContents('{}.{}'.format(switch_name, pscharmonics.constants.PowerFactory.pf_switch_event))[0]
-		self.assertTrue(switch_name in str(event.p_target))
-		self.assertTrue(event.i_switch==0)
-
-		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
-
 	def test_create_results_files_works_correctly(self):
 		"""
 			Tests that appropriate results files are created
@@ -611,86 +585,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 		search_string = pscharmonics.constants.PowerFactory.pf_results
 		self.assertTrue(search_string in str(sc.fs_results))
 		self.assertTrue(search_string in str(sc.cont_results))
-
-		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
-
-	def test_create_cont_analysis_5_fault_cases(self):
-		"""
-			Tests that fault cases can be created and then a suitable contingency command
-			also created.
-		:return:
-		"""
-		# Create new project instances
-		uid = 'Test_fault_analysis'
-		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
-		)
-		# Get handle to test study case
-		sc = pf_project.base_sc[self.test_name]
-
-
-		# Create fault events
-		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-
-		# Create results files for contingency analysis
-		sc.create_results_files()
-		# Create load flow command
-		sc.create_load_flow(lf_settings=None)
-		# Create contingency based on fault cases
-		sc.create_cont_analysis(fault_cases=fault_cases)
-
-		# Carry out validation by firstly confirming the the cont_analysis function has been created and is the
-		# correct type
-		self.assertTrue(pscharmonics.constants.PowerFactory.pf_cont_analysis in str(sc.cont_analysis))
-
-
-		# Then confirm that the sc.df index contains the default contingencies
-		self.assertTrue(self.test_cont in sc.df.index)
-		self.assertTrue(self.test_cont_nc in sc.df.index)
-
-		# Ensure study case is active
-		sc.toggle_state()
-		self.assertEqual(sc.cont_analysis.Execute(), 0)
-
-		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
-
-	def test_create_cont_analysis_non_existent_cmd(self):
-		"""
-			Tests that fault cases can be created and then a suitable contingency command
-			also created.
-		:return:
-		"""
-		# Create new project instances
-		uid = 'Test_fault_analysis'
-		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
-		)
-		# Get handle to test study case
-		sc = pf_project.base_sc[self.test_name]
-
-		# Create fault events
-		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-
-		# Confirm that if runs with a non-existent command still creates the relevant contingency analysis cases
-
-		# Create contingency based on fault cases
-		sc.create_load_flow(lf_settings=None)
-		# Create results files for contingency analysis
-		sc.create_results_files()
-		# Create contingency based on fault cases
-		sc.create_cont_analysis(fault_cases=fault_cases, cmd='A None Existent Command')
-
-		# Carry out validation by firstly confirming the the cont_analysis function has been created and is the
-		# correct type
-		self.assertTrue(pscharmonics.constants.PowerFactory.pf_cont_analysis in str(sc.cont_analysis))
-
-		# Then confirm that the sc.df index contains the default contingencies
-		self.assertTrue('TEST Cont' in sc.df.index)
-		self.assertTrue('TEST Cont NC' in sc.df.index)
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
@@ -780,50 +674,6 @@ class TestPFProjectContingencyCases(unittest.TestCase):
 
 		# Confirm cases created correctly which relates to intact + contingency
 		self.assertTrue(len(sc.df.index) == 2)
-
-		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
-
-	def test_process_cont_results(self):
-		"""
-			TODO: Being developed
-		:return:
-		"""
-		# Create new project instances
-		uid = 'Test_fault_analysis'
-		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
-		)
-		# Get handle to test study case
-		sc = pf_project.base_sc[self.test_name]
-
-
-		# Create fault events
-		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-
-		# Create results files for contingency analysis
-		sc.create_results_files()
-		# Create load flow command
-		sc.create_load_flow(lf_settings=None)
-		# Create contingency based on fault cases
-		sc.create_cont_analysis(fault_cases=fault_cases)
-
-		# Active study case and run cont analysis
-		sc.toggle_state()
-		sc.cont_analysis.Execute()
-
-		# Confirm that initial status is nan
-		c = pscharmonics.constants.Contingencies
-		self.assertTrue(math.isnan(sc.df.loc[self.test_cont, c.status]))
-		self.assertTrue(math.isnan(sc.df.loc[self.test_cont_nc, c.status]))
-
-		# Test results
-		sc.process_cont_results()
-
-		# Confirm that the status for one of the DataFrames is now non-convergent
-		self.assertTrue(sc.df.loc[self.test_cont, c.status])
-		self.assertFalse(sc.df.loc[self.test_cont_nc, c.status])
 
 		# Tidy up by deleting temporary project folders
 		pf_project.delete_temp_folders()
@@ -1156,122 +1006,6 @@ class TestPFProjectContingencyLines(unittest.TestCase):
 		# Import all settings
 		def_inputs_file = os.path.join(TESTS_DIR, 'Inputs_cont_lines.xlsx')
 		self.settings = pscharmonics.file_io.StudyInputs(pth_file=def_inputs_file)
-
-	def test_create_fault_cases(self):
-		"""
-			Tests that fault cases can be created for a contingency command
-		"""
-		# Create new project instances
-		uid = 'TEST_CASE'
-		fc_name = self.test_line
-		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
-		)
-
-		# Create fault events
-		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-		fc = fault_cases[fc_name]
-
-		line_name = '207586_BATS_TGTS_220'
-		self.assertEqual(fc.loc_name, fc_name)
-		event = fc.GetContents('{}.{}'.format(line_name, pscharmonics.constants.PowerFactory.pf_switch_event))[0]
-		self.assertTrue(line_name in str(event.p_target))
-		self.assertTrue(event.i_switch==0)
-
-		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
-
-
-
-	def test_create_cont_analysis_5_fault_cases(self):
-		"""
-			Tests that fault cases can be created and then a suitable contingency command
-			also created.
-		:return:
-		"""
-		# Create new project instances
-		uid = 'Test_fault_analysis'
-		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
-		)
-		# Get handle to test study case
-		sc = pf_project.base_sc[self.test_name]
-
-
-		# Create fault events
-		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-
-		# Create results files for contingency analysis
-		sc.create_results_files()
-		# Create load flow command
-		sc.create_load_flow(lf_settings=None)
-		# Create contingency based on fault cases
-		sc.create_cont_analysis(fault_cases=fault_cases)
-
-		# Carry out validation by firstly confirming the the cont_analysis function has been created and is the
-		# correct type
-		self.assertTrue(pscharmonics.constants.PowerFactory.pf_cont_analysis in str(sc.cont_analysis))
-
-
-		# Then confirm that the sc.df index contains the default contingencies
-		self.assertTrue(self.test_line in sc.df.index)
-		self.assertTrue(self.test_line_nc in sc.df.index)
-		self.assertTrue(self.test_line_switch_in in sc.df.index)
-
-		# Ensure study case is active
-		sc.toggle_state()
-		self.assertEqual(sc.cont_analysis.Execute(), 0)
-
-		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
-
-	def test_process_cont_results(self):
-		"""
-			Confirm that pre_case check for contingency analysis correctly identifies the convergent
-			and non-convergent cases when processing using Lines only
-		:return:
-		"""
-		# Create new project instances
-		uid = 'Test_fault_analysis'
-		df_test_project = self.df[self.df[pscharmonics.constants.StudySettings.name]==self.test_name]
-		pf_project = pscharmonics.pf.PFProject(
-			name=pf_test_project, df_studycases=df_test_project, uid=uid
-		)
-		# Get handle to test study case
-		sc = pf_project.base_sc[self.test_name]
-
-		# Create fault events
-		fault_cases = pf_project.create_fault_cases(contingencies=self.settings.contingencies)
-
-		# Create results files for contingency analysis
-		sc.create_results_files()
-		# Create load flow command
-		sc.create_load_flow(lf_settings=None)
-		# Create contingency based on fault cases
-		sc.create_cont_analysis(fault_cases=fault_cases)
-
-		# Active study case and run cont analysis
-		sc.toggle_state()
-		sc.cont_analysis.Execute()
-
-		# Confirm that initial status is nan
-		c = pscharmonics.constants.Contingencies
-		self.assertTrue(math.isnan(sc.df.loc[self.test_line, c.status]))
-		self.assertTrue(math.isnan(sc.df.loc[self.test_line_nc, c.status]))
-		self.assertTrue(math.isnan(sc.df.loc[self.test_line_switch_in, c.status]))
-
-		# Test results
-		sc.process_cont_results()
-
-		# Confirm that the status for one of the DataFrames is now non-convergent
-		self.assertTrue(sc.df.loc[self.test_line, c.status])
-		self.assertFalse(sc.df.loc[self.test_line_nc, c.status])
-		self.assertTrue(sc.df.loc[self.test_line_switch_in, c.status])
-
-		# Tidy up by deleting temporary project folders
-		pf_project.delete_temp_folders()
 
 	def test_pre_case_check_single_study_case(self):
 		"""
@@ -1828,7 +1562,8 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			terminals=settings.terminals,
 			include_mutual=True,
 			export_pth=excel_pth,
-			contingencies=settings.contingencies
+			contingencies=settings.contingencies,
+			include_intact=True
 		)
 
 		# Confirm the returned terminals match the expected length
@@ -1875,20 +1610,116 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			terminals=self.settings.terminals,
 			include_mutual=True,
 			export_pth=excel_pth,
-			contingencies=self.settings.contingencies
+			contingencies=self.settings.contingencies,
+			include_intact=True
 		)
 
 		# Confirm the returned terminals match the expected length
 		self.assertEqual(len(df_term.index), 7)
 
 		# Confirm DataFrame is expected length and 2 of those cases are non-convergent cases is as expected
-		self.assertEqual(len(df_summary.index), 6)
-		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 2)
+		self.assertEqual(len(df_summary.index), 10)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 4)
 
 		# Confirm that excel spreadsheet has been created (and delete if necessary)
 		self.assertTrue(os.path.isfile(excel_pth))
 		if test_delete_excel_outputs:
 			os.remove(excel_pth)
+
+	def test_pre_case_check_for_all_projects_using_cmd(self):
+		"""
+			Function tests that running pre_case check for all projects correctly reports non-convergent cases
+			and produces a suitable excel export
+		:return:
+		"""
+		c = pscharmonics.constants.Contingencies
+
+		# Define a specific cmd to use instead
+		self.settings.contingency_cmd = 'test_cont_analysis.{}'.format(pscharmonics.constants.PowerFactory.pf_cont_analysis)
+
+		# Target excel path
+		excel_pth = os.path.join(TESTS_DIR, 'pre_case_check_cont.xlsx')
+		# Check doesn't exist initially and if it does then delete
+		if os.path.isfile(excel_pth):
+			os.remove(excel_pth)
+		self.assertFalse(os.path.exists(excel_pth))
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get DataFrame from pre_case check and also ask to create file
+		# Only interested in the pre_case check for the contingencies at this stage
+		df_summary, df_term = pscharmonics.pf.run_pre_case_checks(
+			pf_projects=pf_projects,
+			terminals=self.settings.terminals,
+			include_mutual=True,
+			export_pth=excel_pth,
+			contingencies_cmd=self.settings.contingency_cmd,
+			include_intact=True
+		)
+
+		# Confirm the returned terminals match the expected length
+		self.assertEqual(len(df_term.index), 7)
+
+		# Confirm DataFrame is expected length and 2 of those cases are non-convergent cases is as expected
+		self.assertEqual(len(df_summary.index), 10)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 4)
+
+		# Confirm that excel spreadsheet has been created (and delete if necessary)
+		self.assertTrue(os.path.isfile(excel_pth))
+		if test_delete_excel_outputs:
+			os.remove(excel_pth)
+
+
+	def test_pre_case_check_for_all_projects_exclude_intact(self):
+		"""
+			Function tests that running pre_case check for all projects correctly reports non-convergent cases
+			and produces a suitable excel export
+		:return:
+		"""
+		c = pscharmonics.constants.Contingencies
+
+		# Target excel path
+		excel_pth = os.path.join(TESTS_DIR, 'pre_case_check_no_intact.xlsx')
+		# Check doesn't exist initially and if it does then delete
+		if os.path.isfile(excel_pth):
+			os.remove(excel_pth)
+		self.assertFalse(os.path.exists(excel_pth))
+
+		# Create projects
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=self.settings.cases,
+			uid=uid
+		)
+
+		# Get DataFrame from pre_case check and also ask to create file
+		# Only interested in the pre_case check for the contingencies at this stage
+		df_summary, df_term = pscharmonics.pf.run_pre_case_checks(
+			pf_projects=pf_projects,
+			terminals=self.settings.terminals,
+			include_mutual=True,
+			export_pth=excel_pth,
+			contingencies=self.settings.contingencies,
+			include_intact=False
+		)
+
+		# Confirm the returned terminals match the expected length
+		self.assertEqual(len(df_term.index), 7)
+
+		# Confirm DataFrame is expected length and 2 of those cases are non-convergent cases is as expected
+		self.assertEqual(len(df_summary.index), 8)
+		self.assertEqual(len(df_summary[df_summary[c.status]==False].index), 4)
+
+		# Confirm that excel spreadsheet has been created (and delete if necessary)
+		self.assertTrue(os.path.isfile(excel_pth))
+		if test_delete_excel_outputs:
+			os.remove(excel_pth)
+
 
 	def test_produce_outputs(self):
 		"""
@@ -1913,8 +1744,7 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 			df_study_cases=self.settings.cases,
 			uid=uid,
 			lf_settings=self.settings.lf_settings,
-			fs_settings=self.settings.fs_settings,
-			# export_pth=target_pth
+			fs_settings=self.settings.fs_settings
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no
@@ -1924,7 +1754,7 @@ class TestPFSingleProjectUsingInputs(unittest.TestCase):
 		# Find out how many results produced and then confirm that matches with expected number
 		num_results = len([name for name in os.listdir(target_pth) if os.path.isfile(os.path.join(target_pth, name))])
 		# Expect to have 4 results from the study + a copy of the inputs file
-		self.assertEqual(num_results, 4 + 1)
+		self.assertEqual(num_results, 6 + 1)
 
 		if test_delete_excel_outputs:
 			shutil.rmtree(target_pth)
@@ -2174,6 +2004,43 @@ class TestPFDetailedInputs(unittest.TestCase):
 			lf_settings=inputs.lf_settings,
 			fs_settings=inputs.fs_settings,
 			# export_pth=target_pth
+		)
+
+		# Iterate through each project and create the various cases, the includes running a pre-case check but no
+		# output is saved at this point
+		pscharmonics.pf.run_studies(pf_projects=pf_projects, inputs=inputs)
+
+	def test_complete_test_produce_outputs_5b_lines_only_using_cont_command(self):
+		"""
+			Function runs tests using detailed outputs to produce a set of results that can be used elsewhere.
+
+			This test is run using the outputs which consist of line outages only and are defined using a contingency
+			command
+		:return:
+		"""
+		# Create path for results from detailed tests
+		target_pth = os.path.join(TESTS_DIR, 'Detailed_5b')
+		if os.path.isdir(target_pth):
+			print('Existing contents in path: {} will be deleted'.format(target_pth))
+			files = glob.glob(target_pth + '\\*')
+			for f in files:
+				os.remove(f)
+		else:
+			os.mkdir(target_pth)
+
+		# Import settings for Detailed Study
+		settings_file = os.path.join(TESTS_DIR, 'Inputs_Detailed5b.xlsx')
+		inputs = pscharmonics.file_io.StudyInputs(pth_file=settings_file)
+
+		inputs.settings.export_folder = target_pth
+
+		# Create projects
+		uid = 'DETAILED_5B'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(
+			df_study_cases=inputs.cases,
+			uid=uid,
+			lf_settings=inputs.lf_settings,
+			fs_settings=inputs.fs_settings,
 		)
 
 		# Iterate through each project and create the various cases, the includes running a pre-case check but no

@@ -764,6 +764,7 @@ class TestCreateConvex(unittest.TestCase):
 		""" Creates a random data set """
 		self.results4 = os.path.join(TESTS_DIR, 'Detailed_4')
 		self.results5 = os.path.join(TESTS_DIR, 'Detailed_5')
+		self.results5b = os.path.join(TESTS_DIR, 'Detailed_5b')
 		self.results6 = os.path.join(TESTS_DIR, 'Detailed_6')
 
 		for x in (self.results4, self.results5, self.results6):
@@ -772,6 +773,10 @@ class TestCreateConvex(unittest.TestCase):
 				msg='The detailed results folder {} does not exist, run <test_pf.py> first to '
 					'produce'
 			)
+
+		# Detailed 5 and Detailed 5b compared
+		self.detailed5_export = os.path.join(TESTS_DIR, 'combined_results_5.xlsx')
+		self.detailed5b_export = os.path.join(TESTS_DIR, 'combined_results_5b.xlsx')
 
 		self.cls_extract = MockExtractResults()
 
@@ -993,7 +998,29 @@ class TestCreateConvex(unittest.TestCase):
 		src_path = (self.results5,)
 
 		# Target file for export
-		target_file = os.path.join(TESTS_DIR, 'combined_results_5.xlsx')
+		target_file = self.detailed5_export
+
+		# Confirm file doesn't already exist
+		if os.path.isfile(target_file):
+			os.remove(target_file)
+
+		# Force to True so results handled correctly
+		pscharmonics.file_io.ExtractResults.include_convex = True
+		pscharmonics.file_io.ExtractResults(target_file=target_file, search_paths=src_path)
+
+		# Confirm file created
+		self.assertTrue(os.path.exists(target_file))
+
+	def test_export_detailed_results5b_including_convex(self):
+		""" Tests exporting of a results set which should be the same as detailed_5 but results produced
+			using a contingency command instead
+		"""
+
+		# Source path to search and confirm exist before continuing
+		src_path = (self.results5b,)
+
+		# Target file for export
+		target_file = self.detailed5b_export
 		# Confirm file doesn't already exist
 		if os.path.isfile(target_file):
 			os.remove(target_file)
@@ -1023,6 +1050,46 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Confirm file created
 		self.assertTrue(os.path.exists(target_file))
+
+	def test_results_match(self):
+		"""
+			Test routine to confirm that results produced using either lists of contingencies or the contingencies command
+			will exactly match each other.  This test is performed using:
+				Detailed5 - Results produced using lists of contingencies
+				Detailed5b - Results produced using a pre-determined contingencies command
+			NOTE: These must both exist for this test to be carried out
+		"""
+
+		# Confirm results already exist and if not run study
+		if not os.path.isfile(self.detailed5_export):
+			self.test_export_detailed_results5_including_convex()
+
+		if not os.path.isfile(self.detailed5b_export):
+			self.test_export_detailed_results5b_including_convex()
+
+		# Import dataframe for first worksheet
+		df_lines = pd.read_excel(io=self.detailed5_export)  # type: pd.DataFrame
+		df_cont_command = pd.read_excel(io=self.detailed5b_export)  # type: pd.DataFrame
+
+		# Compare DataFrames to confirm they match
+		# Compares the first column
+		self.assertTrue(df_lines.iloc[:,0].equals(df_cont_command.iloc[:,0]))
+
+		# Compares the second column where only expect small differences due to rounding errors
+		col_num = 1
+		df = pd.concat([df_lines.iloc[:,col_num], df_cont_command.iloc[:,col_num]]).drop_duplicates(keep=False)
+		self.assertTrue(len(df) == 2)
+
+		# Compares the third column where only expect small differences due to rounding errors
+		col_num = 2
+		df = pd.concat([df_lines.iloc[:,col_num], df_cont_command.iloc[:,col_num]]).drop_duplicates(keep=False)
+		self.assertTrue(len(df) == 2)
+
+		# Compares the third column where only expect small differences due to rounding errors
+		col_num = 4
+		df = pd.concat([df_lines.iloc[:,col_num], df_cont_command.iloc[:,col_num]]).drop_duplicates(keep=False)
+		self.assertTrue(len(df) == 0)
+
 
 class TestCombineMultiple(unittest.TestCase):
 	"""
@@ -1054,7 +1121,4 @@ class TestCombineMultiple(unittest.TestCase):
 		self.assertTrue(df.shape, (10,72))
 		self.assertTrue(len(extract_vars), 6)
 		self.assertTrue(pscharmonics.constants.PowerFactory.pf_x1 in extract_vars)
-
-
-
 

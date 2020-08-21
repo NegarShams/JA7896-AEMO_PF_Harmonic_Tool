@@ -225,7 +225,7 @@ class ExtractResults:
 					# Obtain the start and stop frequencies
 					start_freq = min(values[0], self.freq_bands[h][0])
 					stop_freq = max(values[1], self.freq_bands[h][1])
-					# Replace exisiting dictionary value with new values
+					# Replace existing dictionary value with new values
 					self.freq_bands[h] = (start_freq, stop_freq)
 				else:
 					# Doesn't already exist so add it
@@ -579,7 +579,6 @@ class ExtractResults:
 		# Empty lists are populated with all of the charts so that they can neatly be added to the
 		# excel plots
 		charts = list()
-		charts_raw = list()
 
 		# Default colour to use for LOCI plots
 		color_i = 1
@@ -999,8 +998,8 @@ class PreviousResultsExport:
 		cont_name = ''
 
 		# Remove study_type and extension from filename
-		file_name.replace('.csv', '')
-		file_name.replace('{}{}'.format(self.study_type, c.joiner), '')
+		file_name = file_name.replace('.csv', '')
+		file_name = file_name.replace('{}{}'.format(self.study_type, c.joiner), '')
 
 		# Find which study case is shown
 		for sc in self.inputs.cases.index:
@@ -1009,15 +1008,8 @@ class PreviousResultsExport:
 				file_name = file_name.replace('{}{}'.format(sc_name, c.joiner), '')
 				break
 
-		# Check if intact contingency being applied
-		if constants.Contingencies.intact in file_name:
-			cont_name = constants.Contingencies.intact
-		else:
-			# Find which contingency is considered
-			for cont in self.inputs.contingencies.keys():
-				if cont in file_name:
-					cont_name = cont
-					break
+		# At this point all that should be left in the file name is the contingency
+		cont_name = file_name
 
 		return sc_name, cont_name
 
@@ -1405,7 +1397,7 @@ class StudySettings:
 
 class LociSettings:
 	"""
-		TODO: Add in worksheet for Loci settings in terms of frequency bandings around nominal
+		Processes the inputs related to LociSettings
 	"""
 	# Establish default values
 	freq_bands = dict()
@@ -1476,7 +1468,7 @@ class LociSettings:
 	def process_inputs(self, polygon_range, impedance_exclude, df):
 		"""
 			Process all of the provided inputs into a suitable format for processing as part of the results and
-			the custom values to use when provided.  If polyfon_range or impedance_exclude == Custom then uses the
+			the custom values to use when provided.  If polygon_range or impedance_exclude == Custom then uses the
 			values defined in the DataFrame
 		:param float polygon_range:  +/- frequency range to use
 		:param float impedance_exclude:  decimal point representing percentage of values to exclude
@@ -1779,9 +1771,11 @@ class StudyInputs:
 			df = pd.read_excel(
 				wkbk, sheet_name=sht, skiprows=2, nrows=1, usecols=(0,1,2,3), index_col=None, header=None
 			).squeeze(axis=0)
-			cmd = df.iloc[3]
+			cmd = df.iloc[3]  # type: str
 			# Valid command is a string whereas non-valid commands will be either False or an empty string
 			if cmd:
+				if not cmd.endswith(constants.PowerFactory.pf_cont_analysis):
+					'{}.{}'.format(cmd, constants.PowerFactory.pf_cont_analysis)
 				contingency_cmd = cmd
 			else:
 				contingency_cmd = str()
@@ -2533,7 +2527,7 @@ def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_f
 			min_f_range = min(freq_range)
 			max_f_range = max(freq_range)
 			descriptor = 'h = {}  ({} - {} Hz)'.format(h, min_f_range, max_f_range)
-			idx_selection = (df_r.index >= min_f_range) & (df_r.index <= max_f_range)
+			idx_selection = (df_r.index >= min_f_range) & (df_r.index <= max_f_range)  # type: list
 
 			# Confirm that there are actually any indexes for this harmonic number and if so extract results
 			if any(idx_selection):

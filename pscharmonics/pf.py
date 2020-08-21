@@ -160,10 +160,11 @@ class PFStudyCase:
 	# The full path where results will be saved is defined just prior to creating the studies
 	res_pth = str()  # type: str
 
-	def __init__(self, name, sc, op, prj, sc_source_name, op_source_name, base_case=False):
+	def __init__(self, name, cont_name, sc, op, prj, sc_source_name, op_source_name, base_case=False):
 		"""
 			Initialises the class with a list of parameters taken from the Study Settings import
 		:param str name:  Name of study case
+		:param str cont_name:  Name of contingency
 		:param powerfactory.DataObject sc:  Handle to the study_case
 		:param powerfactory.DataObject op:  Handle to the operating scenario
 		:param powerfactory.DataObject prj: Handle to the project this case belongs to
@@ -190,8 +191,14 @@ class PFStudyCase:
 		# Unique name for this studycase
 		self.name = name
 
-		# Status set to False in combination or study_case and operating_scenario not convergent
-		self.ldf_convergent = True
+		# Name of this contingency
+		self.cont_name = cont_name
+
+		# Status set to False in combination or study_case and operating_scenario not convergent (assumed False until
+		# proven otherwise)
+		self.ldf_convergent = False
+		# Set to True if an error occurs to avoid trying to run additional studies
+		self.skip = False
 
 		# Reference to powerfactory handle for study case
 		self.sc = sc
@@ -213,6 +220,11 @@ class PFStudyCase:
 		# Reference to the results file that will be created by the frequency sweep
 		self.fs_results = None
 		self.cont_results = None
+
+		# Get handle for all network data
+		self.net_data = app.GetProjectFolder(constants.PowerFactory.pf_netdata_folder_type)
+		# Get all folders which contain network elements
+		self.net_data_items = self.net_data.GetContents('*.{}'.format(constants.PowerFactory.pf_network_elements))
 
 		# If no results path is provided then warn user and saved results to same folder as the script
 		# Removed from here since now only check the path exists at the point the studies are created
@@ -577,177 +589,7 @@ class PFStudyCase:
 		# Since creating contingency analysis is to confirm that model is convergent for every contingency initially
 		# run a load flow study to confirm the intact condition is convergent.
 		self.run_load_flow()
-		c = constants.Contingencies
 
-		if self.ldf_convergent:
-			# Update dataframe to show intact system is convergent
-			self.df.loc[c.intact, c.status] = True
-		else:
-			self.logger.error(
-				(
-					'The base case for study case <{}> with operating scenario <{}> is not-convergent and therefore no '
-					'studies can be run.  Please check the initial case'
-				).format(self.sc, self.op)
-			)
-			return None
-
-	def create_cont_analysis(self, fault_cases=None, cmd=str()):
-		"""
-			Creates a contingency analysis command in the study case so can iterate through all contingencies
-			and identify those which are not convergent.
-		:param dict fault_cases:  Dictionary of fault_cases as returned by PowerFactory.create_fault_cases
-		:param str cmd:  Name of command if already provided as part of input data
-		:return None:
-		"""
-		c = constants.Contingencies
-
-		# Name that is used for custom ldf command
-		name = '{}_{}'.format(constants.General.cmd_cont_leader, constants.uid)
-		cont_analysis = None
-
-		# Add intact contingency to DataFrame since won't appear in list of outages but a result will
-		# be returned
-		self.df.loc[c.intact, c.cont] = c.intact
-		self.df.loc[c.intact, c.idx] = c.intact_cont_num
-		# Initially all classed as non-convergent until set to True to ensure column gets added
-		self.df[c.status] = False
-
-		# Confirm load flow and results file has already been defined since needed for output settings
-		if self.ldf is None:
-			self.logger.critical(
-				(
-					'Not possible to create contingency analysis for study case {} since no load flow settings have yet '
-					'been determined.  This could be a scripting issue or an error finding a suitable load flow.'
-				).format(self.sc)
-			)
-			# cont_analysis = None
-			raise SyntaxError('No load flow command defined for study case {}'.format(self.sc))
-
-		else:
-			if cmd:
-				# Get existing command from StudyCase and base analysis on that
-				existing = self.sc.GetContents('{}.{}'.format(cmd, constants.PowerFactory.pf_cont_analysis))
-
-				if len(existing) > 0:
-					# Check if already exists and if so duplicate existing one so settings can be changed
-					cont_analysis = self.sc.AddCopy(existing[0], name)
-
-					# Loop through all contingencies within this defined contingency set and update the dataframe with
-					# relevant details.
-					outages = cont_analysis.GetContents('*.{}'.format(constants.PowerFactory.pf_outage))
-					if len(outages) == 0:
-						self.logger.warning(
-							(
-								'No outages have been defined in the provided contingency set {} as part of study case '
-								'<{}>.  If individual outage details have been provided as part of the input these will '
-								'be used instead and otherwise the script will fail.'
-							).format(cmd, self.sc)
-						)
-					else:
-						# Loop through each outage and update DataFrame with some relevant details
-						for outage in outages:
-							cont_name = outage.loc_name
-							self.df.loc[cont_name, c.cont] = cont_name
-							self.df.loc[cont_name, c.idx] = outage.number
-
-				else:
-					# If a command has been provided but cannot be found then display a warning message
-					self.logger.warning(
-						(
-							'The provided contingency set {} does not exist in the study case <{}> and therefore cannot '
-							'be used for contingency analysis.  If individual outage details have been provided they will'
-							'be used instead otherwise the script will fail.'
-						).format(cmd, self.sc)
-					)
-					cont_analysis = None
-
-			if not cont_analysis:
-				# Create a contingency analysis function with no contingencies in it so if no fault-cases will
-				# just work without.
-				cont_analysis, _ = create_object(
-					location=self.sc,
-					pfclass=constants.PowerFactory.pf_cont_analysis,
-					name=name
-				)
-
-				# Loop through each fault case and create a contingency with each contingency being added to the
-				# study case specific dataframe.  The status of each contingency is then updated once the initial
-				# pre-case check is carried out.
-				counter = 1
-				for cont_name, fault in fault_cases.items():
-					outage, _ = create_object(
-						location=cont_analysis,
-						pfclass=constants.PowerFactory.pf_outage,
-						name=cont_name
-					)
-					# Set Outage up to represent this fault case
-					outage.cpCase = fault
-
-					# Update DataFrame with details of this contingency
-					outage.number = counter
-					self.df.loc[cont_name, c.idx] = outage.number
-					self.df.loc[cont_name, c.cont] = cont_name
-					counter += 1
-
-			# if fault_cases and not cont_analysis:
-			# 	# Create Contingency Analysis command and add fault cases to it if has not been possible to establish
-			# 	# cont_analysis from the input provided by the user.
-			# 	# cont_analysis, _ = create_object(
-			# 	# 	location=self.sc,
-			# 	# 	pfclass=constants.PowerFactory.pf_cont_analysis,
-			# 	# 	name=name
-			# 	# )
-			#
-			# 	# Loop through each fault case and create a contingency with each contingency being added to the
-			# 	# study case specific dataframe.  The status of each contingency is then updated once the initial
-			# 	# pre-case check is carried out.
-			# 	counter = 1
-			# 	for cont_name, fault in fault_cases.items():
-			# 		outage, _ = create_object(
-			# 			location=cont_analysis,
-			# 			pfclass=constants.PowerFactory.pf_outage,
-			# 			name=cont_name
-			# 		)
-			# 		# Set Outage up to represent this fault case
-			# 		outage.cpCase = fault
-			#
-			# 		# Update DataFrame with details of this contingency
-			# 		outage.number = counter
-			# 		self.df.loc[cont_name, c.idx] = outage.number
-			# 		self.df.loc[cont_name, c.cont] = cont_name
-			# 		counter += 1
-
-			if not cont_analysis:
-				# No command or fault cases provided so raise error to user
-				self.logger.critical(
-					(
-						'Error creating a command for running of the contingency analysis in study case <{}>.'
-						' The following inputs were provided:\n\t Fault Cases = {}\n\tCmd = {}'
-					).format(self.sc, fault_cases, cmd)
-				)
-				raise SyntaxError('Incorrect inputs')
-
-			# Set default parameters for contingency analysis to ensure aligns with load flow run
-			# Run based on normal AC load flow with previously created load flow settings
-			cont_analysis.iopt_Linear = 0
-			cont_analysis.ldf = self.ldf
-			# Ensure results are stored in the results variable
-			cont_analysis.p_recnt = self.cont_results
-
-			# If a large number of contingencies then allow parallel running of cases
-			cont_analysis.iEnableParal = 1
-			cont_analysis.minCntcyAC = c.parallel_threshold
-
-			# Delete all other contingency analysis objects
-			self.delete_sc_objects(pf_cmd=cont_analysis, pf_type=constants.PowerFactory.pf_cont_analysis)
-
-		# Update DataFrame to ensure study case and operating scenario columns match this data
-		self.df[c.prj] = self.prj.loc_name
-		# Changed to now reference the original source study cases and operating scenarios
-		self.df[c.sc] = self.sc_source_name
-		self.df[c.op] = self.op_source_name
-
-		self.cont_analysis = cont_analysis
 		return None
 
 	def delete_sc_objects(self, pf_cmd, pf_type):
@@ -1081,29 +923,121 @@ class PFStudyCase:
 
 		return success
 
-	def create_cases(self, sc_folder, op_folder, res_pth=str(), lf_settings=None, fs_settings=None):
+	def create_cases_cmd(self, sc_folder, op_folder, lf_settings=None, fs_settings=None, contingencies_cmd=None):
 		"""
-			Function will loop through valid contingencies and create a new case setup to reflect that contingency
-			and that will then be stored in the temporary sc and op folders
+			Function retrieves all of the elements listed in the contingencies command, creates new study cases and
+			runs initial load flow to confirm if they are convergent
 		:param powerfactory.DataObject sc_folder:  Reference to the folder to store temporary study cases in
 		:param powerfactory.DataObject op_folder:  Reference to the folder to store temporary operating scenarios in
-		:param str res_pth:  Path where all the results will be saved when the automatic study cases are run
 		:param file_io.LFSettings lf_settings:  Settings for load flow
 		:param file_io.FSSettings fs_settings:  Settings for frequency scans
-		:return list new_cases:  List of references to the newly created study cases
+		:param str contingencies_cmd:  Name of command to use
+		:return list new_cases:  List of all the new cases that have been created
 		"""
+		new_cases = list()
+
+		# Find contingency command in study case using a recursive search in case located in a folder
+		cont_cmd = self.sc.GetContents(contingencies_cmd, recursive=1)
+		if len(cont_cmd) == 0:
+			self.logger.error(
+				(
+					'Unable to find any contingencies command named <{}> in the study case {} and therefore no '
+					'contingency analysis will be carried out'
+				).format(contingencies_cmd, self.sc)
+			)
+			# Return an empty dictionary
+			return list()
+
+		elif len(cont_cmd) > 1:
+			self.logger.warning(
+				(
+					'In study case {}, more than one contingencies command with the name <{}> have been found.  The '
+					'first one located here <{}> will be used'
+				).format(self.sc, contingencies_cmd, cont_cmd[0])
+			)
+		# List is returned from GetContents so obtain reference to first element
+		cont_cmd = cont_cmd[0]  # type: powerfactory.DataObject
+
+		# Retrieve all fault cases detailed in the cont_cmd
+		fault_cases = cont_cmd.GetContents('*.{}'.format(constants.PowerFactory.pf_outage))
+
+		if len(fault_cases) == 0:
+			self.logger.error(
+				(
+					'There are no fault cases defined within the contingencies command <{}> located in study case {} and'
+					'therefore no contingencies will be included for this study case'
+				).format(cont_cmd, self.sc)
+			)
+			return list()
+
 		# Confirm case is deactivated
 		self.toggle_state(deactivate=True)
 
-		# # If no results path is provided then use default - No longer needed
-		# # if not res_pth:
-		# # 	res_pth = self.res_pth
+		# Loop through all fault cases and create new study cases
+		for fault_case in fault_cases:  # type: powerfactory.DataObject
+			cont_name = fault_case.loc_name
 
-		# Loop through all contingencies in this case which are convergent
+			# Create name for new case as combination of provided name and contingency
+			new_name = '{}{}{}'.format(self.name, constants.Results.joiner, cont_name)
+
+			# Copy the current study_case and operating scenario
+			new_sc = sc_folder.AddCopy(self.sc, new_name)
+			new_op = op_folder.AddCopy(self.op, new_name)
+
+			# Create new PFStudyCase instance
+			case = PFStudyCase(
+				name=new_name,
+				cont_name=cont_name,
+				sc=new_sc,
+				op=new_op,
+				# Reference is now added to the original source names used for the study cases and operating scenarios
+				sc_source_name=self.sc_source_name,
+				op_source_name=self.op_source_name,
+				prj=self.prj
+			)
+
+			# Adjust the operating scenario to represent the identified outage
+			case.apply_fault_case(cont_name=cont_name, fault_case=fault_case)
+
+			# TODO: At this stage still pre-case check so need to confirm whether ldf_settings even need updating
+			# Update load flow and frequency sweep commands to reflect relevant locations
+			case.create_studies(lf_settings=lf_settings, fs_settings=fs_settings)
+
+			# Run load flow to confirm if case convergent
+			case.pre_case_check()
+
+			# Deactivate case
+			self.toggle_state(deactivate=True)
+
+			self.logger.debug(
+				(
+					'New case {} created for Study Case {}, Operating Scenario {} with Contingency {}'
+				).format(new_name, new_sc, new_op, cont_name)
+			)
+			new_cases.append(case)
+
+		return new_cases
+
+	def create_cases(self, sc_folder, op_folder, lf_settings=None, fs_settings=None, contingencies=None):
+		"""
+			Function will loop through every contingency and create a new study case setup to reflect that contingency
+			and that will then be stored in the temporary sc and op folders
+		:param powerfactory.DataObject sc_folder:  Reference to the folder to store temporary study cases in
+		:param powerfactory.DataObject op_folder:  Reference to the folder to store temporary operating scenarios in
+		:param file_io.LFSettings lf_settings:  Settings for load flow
+		:param file_io.FSSettings fs_settings:  Settings for frequency scans
+		:param dict contingencies:  Dictionary of contingencies with elements to consider for this element
+		:return list new_cases:  List of references to the newly created study cases
+		"""
+
+		# Confirm case is deactivated
+		self.toggle_state(deactivate=True)
+
+		# Loop through all contingencies and create new study cases / operating scenarios for them
 		new_cases = list()
-		for cont_name, cont_case in self.df[self.df[constants.Contingencies.status]==True].iterrows():
-			# Skips the intact case since don't want to produce an extra test
-			if cont_name != constants.Contingencies.intact:
+		for cont_name, cont_item in contingencies.items():
+			# Skips the intact case or any which have been flagged for skipping
+			if cont_name != constants.Contingencies.intact and not all([x.skip for x in cont_item.values()]):
 
 				# Create name for new case as combination of provided name and contingency
 				new_name = '{}{}{}'.format(self.name, constants.Results.joiner, cont_name)
@@ -1115,33 +1049,27 @@ class PFStudyCase:
 				# Create new PFStudyCase instance
 				case = PFStudyCase(
 					name=new_name,
+					cont_name=cont_name,
 					sc=new_sc,
 					op=new_op,
 					# Reference is now added to the original source names used for the study cases and operating scenarios
 					sc_source_name=self.sc_source_name,
 					op_source_name=self.op_source_name,
-					prj=self.prj,
-					# res_pth=res_pth
+					prj=self.prj
 				)
-				# Add the results path that has been established to the results
-				case.res_pth = res_pth
 
-				# Get the contingency specific to this case and apply the outage which is a PowerFactory Cont Outage element
-				cont_outage = self.cont_analysis.GetContents('{}.{}'.format(cont_name, constants.PowerFactory.pf_outage))
+				# Adjust the operating scenario to represent the identified outage
+				case.apply_outage(cont_name=cont_name, cont_item=cont_item)
 
-				if len(cont_outage) == 0:
-					self.logger.error(
-						(
-							'Unable to find outage {} in contingency analysis {} and therefore study_case {} cannot be run'
-						).format(cont_name, self.cont_analysis, new_name)
-					)
-					continue
-				else:
-					# Apply the outage detailed in this Cont Outage element
-					case.apply_outage(cont_outage[0])
-
+				# TODO: At this stage still pre-case check so need to confirm whether ldf_settings even need updating
 				# Update load flow and frequency sweep commands to reflect relevant locations
 				case.create_studies(lf_settings=lf_settings, fs_settings=fs_settings)
+
+				# Run load flow to confirm if case convergent
+				case.pre_case_check()
+
+				# Deactivate case
+				self.toggle_state(deactivate=True)
 
 				self.logger.debug(
 					(
@@ -1152,47 +1080,210 @@ class PFStudyCase:
 
 		return new_cases
 
-	def apply_outage(self, cont_outage):
+	def find_element(self, element_name, ending=(constants.PowerFactory.pf_substation, ), recursive=0):
 		"""
-			Function will carry out the switching operations detailed in the cont_outage and set all interrupted
-			components to out of service.  Also ensures the relevant study case and outage scenario are
-			associated together
-		:param powerfactory.DataObject cont_outage:  Handle to the powerfactory DataObject
+			Function searches relevant possible locations that the required element could be located and returns
+			the substation or an error message when multiple found
+		:param str element_name:  Name of element to be found
+		:param tuple ending:  Expecting ending for the provided input value but can be a tuple if different ending types
+								to be tested
+		:param int recursive:  If set to 1 will search recursively (needed for finding lines)
+		:return powerfactory.DataObject element: Reference to the powerfactory substation element
+		"""
+		# Find substation using a recursive search of the network elements folders
+		elements = list()
+		# Loop through each element in list of endings
+		for pf_type in ending:
+			# Check ends with the substation element ending
+			element_name_to_find = '{}.{}'.format(element_name, pf_type)
+
+			for net_item in self.net_data_items:
+				# Loop through each net_item folder and search for element
+				elements.extend(net_item.GetContents(element_name_to_find, recursive))
+
+		# Check that only a single substation is found
+		if len(elements) == 0:
+			element = None
+		elif len(elements) > 1:
+			self.logger.error(
+				(
+					'Multiple items of type {} with the name {} have been found across multiple network data folders.'
+					'The following elements were found: \n\t'
+					'{}\n'
+				).format(ending, element_name, '\n\t'.join([str(x) for x in elements]))
+			)
+			element = None
+		else:
+			element = elements[0]
+
+		return element
+
+	def apply_fault_case(self, cont_name, fault_case):
+		"""
+			Function will apply items detailed in a fault case so the operating scenario represents that condition
+			before then saving operating scenario.  The fault cases are defined as part of the contingencies command
+
+		:param str cont_name:  Name of contingency being applied
+		:param powerfactory.DataObject fault_case:  Specific PowerFactory fault_case to be used
 		:return None:
 		"""
 		# Active study case and operating scenario (also ensures these are combined together for a future activation)
 		self.toggle_state()
 
 		# Get details of all switches considered as part of contingency to Open
-		for switch in cont_outage.Couplers:
+		for switch in fault_case.Couplers:
 			# Open switch
 			switch.on_off = False
 
 		# Close all couplers that should be closed
-		for switch in cont_outage.CouplersClose:
+		for switch in fault_case.CouplersClose:
 			# Open switch
 			switch.on_off = False
 
 		# Set all interrupted elements to out of service
-		# TODO: Confirm if this is necessary
-		for element in cont_outage.Elms:
+		for element in fault_case.Elms:
+			element.outserv = True
+
+		# Set all interrupter terminals to out of service
+		for element in fault_case.Nodes:
 			element.outserv = True
 
 		# Save operating scenario so that it is remembered in this state and if errors then raise error to user
 		err = self.op.Save()
 		if err == 1:
+			self.skip = True
+			self.ldf_convergent = False
 			self.logger.error(
 				(
-					'Unable to save the operating scenario {} after applying the outage {}, this means the results for '
-					'the contingency named {} as part of study case {} will not produce reliable results'
-				).format(self.op, cont_outage, cont_outage.loc_name, self.name)
+					'Unable to save the operating scenario {} after applying the outage {} and so no result for this '
+					'contingency as part of study case {} will be produced'
+				).format(self.op, cont_name, self.name)
 			)
 		else:
 			self.logger.debug(
-				'Successfully applied outage {} for study case {}'.format(
-					cont_outage, self.sc
+				'Successfully saved operating scenario {} for outage {} for study case {}'.format(
+					self.op, cont_name, self.sc
+				))
+
+		return None
+
+	def apply_outage(self, cont_name, cont_item):
+		"""
+			Function will apply outages to the elements detailed in the contingencies inputs which can be of either a
+			type or a branch
+
+		:param str cont_name:  Name of contingency being applied
+		:param dict cont_item:  Dictionary of contingency specific to this outage
+		:return None:
+		"""
+		# Active study case and operating scenario (also ensures these are combined together for a future activation)
+		self.toggle_state()
+
+		fault_case_error = False
+
+		# Loop through each contingency and look for relevant elements
+		for cont_type, cont in cont_item.items():
+			# Check if status of contingency is set to skip and if so continue
+			if cont.skip:
+				self.logger.debug(
+					'Contingency {} of type {} is not considered for analysis and is therefore skipped'.format(
+						cont.name, cont_type
+					)
 				)
+				continue
+
+			elif cont_type == constants.Contingencies.cb:
+				# Defined as a CB type so process those
+
+				# Loop through each coupler and add switch event to fault case
+				for coupler in cont.couplers:
+					# Find substation using a recursive search of the network elements folders
+					substation = self.find_element(element_name=coupler.substation)
+
+					if substation is None:
+						# Not able to find substation and therefore contingency cannot be found
+						self.logger.error(
+							(
+								'For contingency {} the substation named {} cannot be found within the project '
+								'{} and therefore the contingency will not be studied.'
+							).format(cont.name, coupler.substation, self.prj)
+						)
+						break
+
+					# Find the switch within this substation
+					breaker = substation.GetContents(coupler.breaker)
+
+					# Check that only a single breaker is found
+					if len(breaker) == 0:
+						self.logger.error(
+							(
+								'For contingency {} the circuit breaker named {} cannot be found within the substation'
+								'<{}> and therefore this contingency will not be studied'
+							).format(cont.name, coupler.breaker, substation)
+						)
+						fault_case_error = True
+						break
+					else:
+						breaker = breaker[0]
+
+					# Change the status of the breaker
+					breaker.on_off = coupler.status
+
+			elif cont_type == constants.Contingencies.lines:
+				# Process contingencies that relate to line outages
+
+				# Loop through each line and add to fault case
+				for line_cont in cont.lines:
+					# Find substation using a recursive search of the network elements folders assuming either a
+					# line or branch type
+					pf_line = self.find_element(
+						element_name=line_cont.line,
+						ending=(constants.PowerFactory.pf_line, constants.PowerFactory.pf_branch),
+						recursive=1
+					)
+
+					if pf_line is None:
+						# Not able to find line and therefore contingency cannot be created
+						self.logger.error(
+							(
+								'For contingency {} the line named {} cannot be found within the project '
+								'{} and therefore the contingency will not be studied.'
+							).format(cont.name, line_cont.line, self.prj)
+						)
+						fault_case_error = True
+						break
+
+					ierr = pf_line.SwitchOff()
+					if ierr == 1:
+						self.logger.error(
+							'Unable to switch off the circuit {} and so the contingency {} will be skipped'.format(
+								line_cont.line, cont.name
+							)
+						)
+						fault_case_error = True
+						break
+
+			# Check if all events added successfully otherwise mark contingency as failed
+			if fault_case_error:
+				self.skip = True
+				self.ldf_convergent = False
+
+		# Save operating scenario so that it is remembered in this state and if errors then raise error to user
+		err = self.op.Save()
+		if err == 1:
+			self.skip = True
+			self.ldf_convergent = False
+			self.logger.error(
+				(
+					'Unable to save the operating scenario {} after applying the outage {} and so no result for this '
+					'contingency as part of study case {} will be produced'
+				).format(self.op, cont_name, self.name)
 			)
+		else:
+			self.logger.debug(
+				'Successfully saved operating scenario {} for outage {} for study case {}'.format(
+					self.op, cont_name, self.sc
+				))
 
 		return None
 
@@ -1289,6 +1380,8 @@ class PFProject(object):
 		# List is populates with handles for all of the cases run as part of the frequency scan studies
 		self.cases_to_run = list()
 
+		# List is populated with all of the cases within this project
+		self.cont_cases = dict()
 		# Create the command for the auto tasks associated with this project
 		self.task_auto = self.create_task_auto()
 
@@ -1356,12 +1449,9 @@ class PFProject(object):
 				# study case and operating scenario names added so reference can be made to them in the exported results
 				sc_source_name=sc_name, op_source_name=os_name,
 				base_case=True,
-				# Removed at this point since not needed until studies are created
-				# res_pth=self.res_pth
+				cont_name=constants.Contingencies.intact
 			)
 
-			# TODO: Do not believe studies need to be created at this point so removing
-			# study_case_class.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
 			# Only need to create the load flow study case and target results files at this point
 			study_case_class.create_load_flow(lf_settings=self.lf_settings)
 			study_case_class.create_results_files()
@@ -1576,174 +1666,7 @@ class PFProject(object):
 
 		return element
 
-	def create_fault_cases(self, contingencies):
-		"""
-			Function will loop through all of the contingencies and create a fault case for each which are
-			all added to a temporary folder.
-			This list of fault cases can then be added to a contingency case and each study case / operating scenario
-			associated with a project tested for convergence.
-
-			Updated to now identify whether dealing with a line or circuit breaker
-		:param dict contingencies:  Reference to the contingencies returned in a dictionary as part of the inputs
-									processing
-		:return dict fault_cases:  Returns a dictionary which contains a reference to all of the fault cases created
-		"""
-		# Fault cases list initialised to be empty
-		fault_cases = dict()
-
-		# Find base folder for all fault cases to be stored in
-		faults_folder = app.GetProjectFolder(constants.PowerFactory.pf_faults_folder_type)
-
-		# Create temporary folder to store all of the fault cases within and add to list of folders to be deleted
-		# self.fault_case_folder = self.create_folder(
-		# 	name='{}_{}'.format(constants.PowerFactory.temp_faults_folder, constants.uid),
-		# 	location=faults_folder
-		# )
-		self.fault_case_folder, _ = create_object(
-			location=faults_folder,
-			pfclass=constants.PowerFactory.pf_fault_cases_folder,
-			name='{}_{}'.format(constants.PowerFactory.temp_faults_folder, constants.uid)
-		)
-		self.temp_folders.append(self.fault_case_folder)
-
-		# Each contingency could contain either a CB outage or a line outage and so both iterate through dictionary
-		# for each contingency name
-		for cont_name, conts in contingencies.items():
-			# Confirm that some circuit outages / contingencies actually apply for this continengy
-
-			# Initialise as None
-			fault_event = None
-			fault_case_error = False
-			# Loop through each contingency and look for relevant elements
-			for cont_type, cont in conts.items():
-				# Check if status of contingency is set to skip and if so continue
-				if cont.skip:
-					self.logger.debug(
-						'Contingency {} is not considered for analysis and is therefore skipped'.format(cont.name)
-					)
-					continue
-
-				elif cont_type == constants.Contingencies.cb:
-					# Defined as a CB type so process those
-
-					# Create new switch event within the network folder
-					fault_event, _ = create_object(
-						location=self.fault_case_folder,
-						pfclass=constants.PowerFactory.pf_fault_event,
-						name=cont.name
-					)
-
-					# Assign as a contingency case
-					fault_event.mod_cnt = 1
-
-					# Loop through each coupler and add switch event to fault case
-					for coupler in cont.couplers:
-						# Find substation using a recursive search of the network elements folders
-						substation = self.find_element(element_name=coupler.substation)
-
-						if substation is None:
-							# Not able to find substation and therefore contingency cannot be found
-							self.logger.error(
-								(
-									'For contingency {} the substation named {} cannot be found within the project '
-									'{} and therefore the contingency will not be studied.'
-								).format(cont.name, coupler.substation, self.prj)
-							)
-							break
-
-						# Find the switch within this substation
-						breaker = substation.GetContents(coupler.breaker)
-
-						# Check that only a single substation is found
-						if len(breaker) == 0:
-							self.logger.error(
-								(
-									'For contingency {} the circuit breaker named {} cannot be found within the substation'
-									'<{}> and therefore this contingency will not be studied'
-								).format(cont.name, coupler.breaker, substation)
-							)
-							fault_case_error = True
-							break
-						else:
-							breaker = breaker[0]
-
-						switch_event, _ = create_object(
-							location=fault_event,
-							pfclass=constants.PowerFactory.pf_switch_event,
-							name=breaker.loc_name
-						)
-						# Set target element
-						switch_event.p_target = breaker
-						# Set status and ensure takes place on all phases
-						switch_event.i_switch = coupler.status
-						switch_event.i_allph = 1
-				elif cont_type == constants.Contingencies.lines:
-					# Process contingencies that relate to line outages
-
-					# Create new switch event within the network folder
-					fault_event, _ = create_object(
-						location=self.fault_case_folder,
-						pfclass=constants.PowerFactory.pf_fault_event,
-						name=cont.name
-					)
-
-					# Assign as a contingency case
-					fault_event.mod_cnt = 1
-
-					# Loop through each line and add to fault case
-					# TODO:  How to do this in PowerFactory needs to be checked
-					for line_cont in cont.lines:
-						# Find substation using a recursive search of the network elements folders assuming either a
-						# line or branch type
-						pf_line = self.find_element(
-							element_name=line_cont.line,
-							ending=(constants.PowerFactory.pf_line, constants.PowerFactory.pf_branch),
-							recursive=1
-						)
-
-						if pf_line is None:
-							# Not able to find line and therefore contingency cannot be created
-							self.logger.error(
-								(
-									'For contingency {} the line named {} cannot be found within the project '
-									'{} and therefore the contingency will not be studied.'
-								).format(cont.name, line_cont.line, self.prj)
-							)
-							fault_case_error = True
-							break
-
-						# TODO:  Is this the correct way to create a switch event using PowerFactory fault cases
-						# Create a switch event for this line
-						switch_event, _ = create_object(
-							location=fault_event,
-							pfclass=constants.PowerFactory.pf_switch_event,
-							name=pf_line.loc_name
-						)
-						# Set target element
-						switch_event.p_target = pf_line
-						# Set status and ensure takes place on all phases
-						switch_event.i_switch = line_cont.status
-						switch_event.i_allph = 1
-
-						switch_event.i_what = line_cont.status
-
-			# Check if all events added successfully otherwise delete fault case
-			if fault_case_error:
-				fault_event.Delete()
-			elif fault_event is not None:
-				# Confirm a fault event has actually been created
-				self.logger.debug('Fault case {} successfully created for contingency {}'.format(fault_event, cont.name))
-				fault_cases[cont.name] = fault_event
-				# Reference to the created fault event added to the contingency record
-				cont.fault_event = fault_event
-			else:
-				self.logger.debug('No fault event created for contingency {}'.format(cont_name))
-
-		# Populate dictionary with Fault Cases
-		self.fault_cases = fault_cases
-		return fault_cases
-
-	def pre_case_check(self, contingencies=None, contingencies_cmd=str()):
+	def pre_case_check(self, contingencies=None, contingencies_cmd=str(), include_intact=False):
 		"""
 			Function runs through all of the base study cases and checks which contingencies pass
 			the user is then provided with a dataframe summarising for this project all of the study case
@@ -1752,49 +1675,129 @@ class PFProject(object):
 		:param dict contingencies:  (optional) Dictionary of the outages to be considered which will need to be
 									created into fault cases
 		:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
+		:param bool include_intact:  (optional) - Set to True if intact system should be considered
 		:return pd.DataFrame df_status:  Combined DataFrame showing those which are convergent
 		"""
+		c = constants.Contingencies
 
-		# Create fault cases if no command provided
-		if not contingencies_cmd:
-			if contingencies:
-				self.create_fault_cases(contingencies=contingencies)
-			else:
-				self.logger.warning('No contingency command or dictionary of contingencies provided, and therefore '
-									'analysis will only be carried out for the intact system if has been requested'
-									'in the inputs')
-				# raise SyntaxError('Incomplete inputs, missing contingencies and contingencies_cmd')
-				self.fault_cases = dict()
-		else:
+		if contingencies_cmd:
 			if contingencies:
 				self.logger.warning('Input provided for both contingencies and contingencies_cmd, '
-									'contingencies will be used as preference')
-				self.fault_cases = dict()
+									'contingencies_cmd will be used as preference')
 
-		# Loop through each of the base study cases, run the contingency analysis, process the results
-		# and then combine the results into a single dataframe
-		for sc_name, sc in self.base_sc.items():
+			# Loop through all contingencies to create cases
+			for sc_name, sc in self.base_sc.items():  # type: PFStudyCase
+
+				if include_intact:
+					# Run a load flow to update the status flag and add to the list of contingency cases
+					sc.toggle_state()
+					sc.pre_case_check()
+					cont_cases = [sc]
+				else:
+					# Just produce an empty list
+					cont_cases = list()
+
+				self.logger.debug(
+					(
+						'Creating study cases for each outage detailed in the contingencies cmd <{}> for study case {} '
+						'associated with project: {}'
+					).format(contingencies_cmd, sc.sc, self.prj)
+				)
+
+				# Create cases for all the convergent contingencies associated with this study case and then returns
+				# a list of references to the PFStudyCase class.  The results path is added at this point based on the
+				# location that is either selected by the user or included in the settings
+				new_cases = sc.create_cases_cmd(
+					sc_folder=self.sc_folder, op_folder=self.op_folder,
+					lf_settings=self.lf_settings, fs_settings=self.fs_settings,
+					contingencies_cmd=contingencies_cmd
+				)
+				# Add contingency cases to base study case and to project dictionary
+				sc.cont_cases = cont_cases + new_cases
+				self.cont_cases[sc_name] = cont_cases + new_cases
+		# Create fault cases if no command provided
+		elif contingencies:
+			# Loop through all contingencies to create cases
+			for sc_name, sc in self.base_sc.items():  # type: str, PFStudyCase
+
+				if include_intact:
+					# Run a load flow to update the status flag and add to the list of contingency cases
+					sc.toggle_state()
+					sc.pre_case_check()
+					cont_cases = [sc]
+				else:
+					# Just produce an empty list
+					cont_cases = list()
+
+				self.logger.debug(
+					(
+						'Creating study cases for each outage detailed in the contingencies input for study case {} '
+						'associated with project: {}'
+					).format(sc.sc, self.prj)
+				)
+
+				# Create cases for all the convergent contingencies associated with this study case and then returns
+				# a list of references to the PFStudyCase class.  The results path is added at this point based on the
+				# location that is either selected by the user or included in the settings
+				new_cases = sc.create_cases(
+					sc_folder=self.sc_folder, op_folder=self.op_folder,
+					lf_settings=self.lf_settings, fs_settings=self.fs_settings,
+					contingencies=contingencies
+				)
+				# Add contingency cases to base study case and to project dictionary
+				sc.cont_cases = cont_cases + new_cases
+				self.cont_cases[sc_name] = cont_cases + new_cases
+		elif include_intact:
+			# Loop through all contingencies to create cases
+			for sc_name, sc in self.base_sc.items():  # type: str, PFStudyCase
+				if include_intact:
+					# Run a load flow to update the status flag and add to the list of contingency cases
+					sc.toggle_state()
+					sc.pre_case_check()
+					cont_cases = [sc]
+				else:
+					# Just produce an empty list
+					cont_cases = list()
+
+				# Add contingency cases to base study case and to project dictionary
+				sc.cont_cases = cont_cases
+				self.cont_cases[sc_name] = cont_cases
+
 			self.logger.debug(
-				'For ({}, {}, {}) carrying out pre-case check of contingencies'.format(self.prj, sc.sc, sc.op)
+				(
+					'No contingency command or dictionary of contingencies provided and therefore analysis will only be '
+					'included for the intact system'
+				)
 			)
-			# Ensure study case is active in PowerFactory
-			sc.toggle_state()
 
-			# Check if sc has a contingency analysis defined
-			if not sc.cont_analysis:
-				# Contingency analysis function has not been defined so need to create but only possible if
-				# fault cases have been or contingency command provided as an input.
-				sc.create_cont_analysis(fault_cases=self.fault_cases, cmd=contingencies_cmd)
+		else:
+			self.logger.critical('No contingency command or dictionary of contingencies provided, and therefore '
+								'analysis will only be carried out for the intact system if has been requested'
+								'in the inputs')
+			raise ValueError('No results requested for contingencies or the intact system')
 
-			# Run the contingency analysis for this study case
-			sc.cont_analysis.Execute()
+		# Loop through each of the base study cases, create the cases and run a load flow to confirm if convergent.
+		dfs = dict()
+		for sc_name, cont_cases in self.cont_cases.items():  # type: str,list
+			df = pd.DataFrame()
+			for cont in cont_cases:  # type: PFStudyCase
+				cont_name = cont.cont_name
+				self.logger.debug(
+					'For ({}, {}, {}) carrying out pre-case check of contingencies'.format(self.prj, sc.sc, sc.op)
+				)
+				# Populate DataFrame with results
+				df.loc[cont_name, c.cont] = cont.cont_name
+				df.loc[cont_name, c.status] = cont.ldf_convergent
+				df.loc[cont_name, c.prj] = self.name
+				# TODO: May wish to change this to be based on source name rather than resulting name
+				df.loc[cont_name, c.sc] = cont.sc.loc_name
+				df.loc[cont_name, c.op] = cont.op.loc_name
 
-			# Process the results so that the DataFrame is up to date
-			sc.process_cont_results()
+			# Add to dictionary
+			dfs[sc_name] = df
 
 		# Get a dictionary of all of the study_case DataFrames so they can be combined to the project
 		# level
-		dfs = {sc_name: sc.df for sc_name, sc in self.base_sc.items()}
 		df = pd.concat(
 			dfs.values(), axis=0, keys=dfs.keys(),
 			names=(constants.Contingencies.sc, constants.Contingencies.cont))
@@ -1802,15 +1805,14 @@ class PFProject(object):
 		self.logger.debug('Pre case check results combined for project {}'.format(self.prj))
 
 		# Assign the pre_case_check dataframe for this project
-		# TODO: May be better to put this in the same as the df_sc DataFrame
 		self.df_pre_case = df
 
 		return df
 
 	def create_cases(self, study_settings, terminals=None, contingencies=None, contingencies_cmd=str()):
 		"""
-			Function runs the pre_case_check for all of the base study_cases and then creates the study cases for each
-			contingency.
+			Function adjusted so that cases are now created as part of the pre_case_check and that is used to
+			populate the list of contingencies which are convergent / non-convergent.
 		:param file_io.StudySettings study_settings: User selected settings for this input
 		:param dict terminals: Dictionary of the terminals which need to be calculated
 		:param dict contingencies:  (optional) Dictionary of the outages to be considered which will need to be
@@ -1821,7 +1823,8 @@ class PFProject(object):
 		# If pre_case_check has not yet been run then run now
 		if self.df_pre_case.empty:
 			self.logger.debug('Running pre-case check')
-			_ = self.pre_case_check(contingencies=contingencies, contingencies_cmd=contingencies_cmd)
+			_ = self.pre_case_check(contingencies=contingencies, contingencies_cmd=contingencies_cmd,
+									include_intact=study_settings.include_intact)
 
 		# Check terminals have been defined otherwise do that now
 		if not self.terminals:
@@ -1849,16 +1852,16 @@ class PFProject(object):
 
 		# Check if the intact case should be included and then if so add to cases
 		self.cases_to_run = list()
-		if study_settings.include_intact:
-			# TODO: Produce test routine to confirm this works
-			# Update export path and results files and then add study case to results
-			for _, sc in self.base_sc.items():
-				sc.res_pth = study_settings.export_folder
-				sc.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
-				self.cases_to_run.append(sc)
-		else:
-			self.cases_to_run = list()
-
+		# if study_settings.include_intact:
+		# 	# TODO: Produce test routine to confirm this works
+		# 	# Update export path and results files and then add study case to results
+		# 	for _, sc in self.base_sc.items():
+		# 		sc.add_variables(study_settings=study_settings, terminals=self.terminals, mutuals=self.mutuals)
+		# 		sc.res_pth = study_settings.export_folder
+		# 		sc.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
+		# 		self.cases_to_run.append(sc)
+		# else:
+		# 	self.cases_to_run = list()
 
 		if df_convergent.empty:
 			msg = 'No convergent contingencies found for cases in the project {}.\n'.format(self.prj)
@@ -1877,22 +1880,18 @@ class PFProject(object):
 				)
 
 		else:
-			# Loop through each study case to create new cases based on those and the relevant contingencies
-			for sc_name, sc in self.base_sc.items():  # type: str, PFStudyCase
-				# Add the terminals to the results file for each of the base study cases before the new cases are
-				# created which uses them as a starting point
-				sc.add_variables(study_settings=study_settings, terminals=self.terminals, mutuals=self.mutuals)
+			for sc_name, cases in self.cont_cases.items():  # type: str, list
+				for cont_case in cases:
+					if cont_case.ldf_convergent:
+						# Add the terminals to the results file for each of the base study cases before the new cases are
+						# created which uses them as a starting point
+						cont_case.add_variables(study_settings=study_settings, terminals=self.terminals, mutuals=self.mutuals)
+						# Add export path and update studies
+						cont_case.res_pth = study_settings.export_folder
+						cont_case.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
 
-				# Create cases for all the convergent contingencies associated with this study case and then returns
-				# a list of references to the PFStudyCase class.  The results path is added at this point based on the
-				# location that is either selected by the user or included in the settings
-				new_cases = sc.create_cases(
-					sc_folder=self.sc_folder, op_folder=self.op_folder, res_pth=study_settings.export_folder,
-					lf_settings=self.lf_settings, fs_settings=self.fs_settings
-				)
-
-				# Add details of newly created cases to the overall list
-				self.cases_to_run.extend(new_cases)
+				# Add details of newly contingency cases where load flow is convergent
+				self.cases_to_run.extend([cont_case for cont_case in cases if cont_case.ldf_convergent])
 
 		return None
 
@@ -2143,6 +2142,7 @@ class PFProject(object):
 
 		# Execute command
 		ierr = self.task_auto.Execute()
+		# ierr2 is declared initially and then set to a different number if needed
 		ierr2 = 0
 
 		if ierr > 0:
@@ -2170,7 +2170,6 @@ class PFProject(object):
 			raise RuntimeError('Not able to run studies after multiple attempts')
 		else:
 			self.logger.info('Studies completed for project {}'.format(self.prj))
-
 
 class PowerFactory:
 	"""
@@ -2568,7 +2567,6 @@ class PowerFactory:
 
 		return None
 
-
 def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=None, fs_settings=None):
 	# type: (pd.DataFrame, str, file_io.LFSettings, file_io.FSSettings, str) -> dict
 	"""
@@ -2604,7 +2602,9 @@ def create_pf_project_instances(df_study_cases, uid=constants.uid, lf_settings=N
 	return pf_projects
 
 def run_pre_case_checks(
-		pf_projects, terminals, include_mutual=False, export_pth=str(), contingencies=None, contingencies_cmd=str(),
+		pf_projects, terminals, include_mutual=False, export_pth=str(),
+		contingencies=None, contingencies_cmd=str(),
+		include_intact=False
 
 ):
 	"""
@@ -2619,6 +2619,7 @@ def run_pre_case_checks(
 	:param dict contingencies:  (optional) Dictionary of the outages to be considered which will need to be
 									created into fault cases
 	:param str contingencies_cmd: (optional) String of the command to be used for contingency analysis
+	:param bool include_intact: (optional) Where to include intact contingencies
 	:return pd.DataFrame df_case_check: DataFrame showing contingencies which are convergent
 	"""
 	logger = constants.logger
@@ -2628,13 +2629,15 @@ def run_pre_case_checks(
 	# ready to be written to excel
 	dfs_cont = list()
 	dfs_term = dict()
-	for project_name, prj in pf_projects.items():
+	for project_name, prj in pf_projects.items():  # type: str, PFProject
 		# Activate project
 		prj.project_state()
 
 		# Obtain contingency analysis results for all relevant cases in this project
 		logger.info('For project {}, running a check on all of the contingencies'.format(project_name))
-		df_cont = prj.pre_case_check(contingencies=contingencies, contingencies_cmd=contingencies_cmd)
+		df_cont = prj.pre_case_check(
+			contingencies=contingencies, contingencies_cmd=contingencies_cmd, include_intact=include_intact
+		)
 		dfs_cont.append(df_cont)
 
 		logger.info(
@@ -2762,3 +2765,5 @@ def running_in_powerfactory():
 		pf_version = os.path.basename(os.path.dirname(full_path_executable))
 
 	return pf_version
+
+
