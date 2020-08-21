@@ -2711,7 +2711,7 @@ def run_studies(pf_projects, inputs):
 	# Iterate through each project and create the various cases, the includes running a pre-case check but no
 	# output is saved at this point
 	for project_name, project in pf_projects.items():  # type: str, PFProject
-		logger.debug('Studies being run for project {}:\t{}'.format(project_name, project.prj))
+		logger.info('Studies being run for project {}:\t{}'.format(project_name, project.prj))
 		project.create_cases(
 			study_settings=inputs.settings,
 			terminals=inputs.terminals,

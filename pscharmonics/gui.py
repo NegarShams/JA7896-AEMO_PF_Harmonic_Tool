@@ -325,7 +325,7 @@ class CombineFiles:
 		# Ask user for file to save results of pre_case check into
 		pth_results = tk.filedialog.asksaveasfilename(
 			initialdir=self.results_pth,
-			initialfile='Results_{}.xlsx'.format(constants.uid),
+			initialfile='Results_{}{}'.format(constants.uid, self.ext),
 			filetypes=constants.GuiDefaults.xlsx_types,
 			title='Select the file to save the combined results to'
 		)
@@ -749,12 +749,16 @@ class MainGui:
 		# Ask user for file to save results of pre_case check into
 		pth_precase = tk.filedialog.asksaveasfilename(
 			initialdir=self.init_dir,
-			initialfile='Pre Case Check_{}.xlsx'.format(constants.uid),
+			initialfile='Pre Case Check_{}{}'.format(constants.uid, constants.Results.extension),
 			filetypes=constants.GuiDefaults.xlsx_types,
 			title='Select the file to save the results of the pre-case check into'
 		)
 
 		if pth_precase:
+			# Add file extension if one not provided
+			if not pth_precase.endswith(constants.Results.extension):
+				pth_precase = '{}{}'.format(pth_precase, constants.Results.extension)
+
 			self.pre_case_file = pth_precase
 
 			# Run the pre-case check
@@ -843,6 +847,7 @@ class MainGui:
 
 			# Run the pre-case check
 			try:
+				self.logger.info('Starting Power Factory frequency scan studies')
 				_ = pscharmonics.pf.run_studies(
 					pf_projects=self.pf_projects,
 					inputs=self.inputs
