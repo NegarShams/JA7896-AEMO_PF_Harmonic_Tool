@@ -82,3 +82,13 @@ class TestUserGuideExists(unittest.TestCase):
 		user_guide = pscharmonics.constants.General.user_guide_pth
 
 		self.assertTrue(os.path.isfile(user_guide), msg='User guide {} does not exist'.format(user_guide))
+
+	def test_logs(self):
+		""" Confirm file exists where it's supposed to """
+		logos_main = pscharmonics.constants.GuiDefaults.img_pth_psc_main
+		logos_window = pscharmonics.constants.GuiDefaults.img_pth_psc_window
+
+		for logo in (logos_main, logos_window):
+			self.assertTrue(
+				os.path.isfile(logo),
+				msg='Logo for GUI {} does not exist'.format(logo))

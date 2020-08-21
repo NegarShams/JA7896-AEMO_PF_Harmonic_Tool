@@ -44,7 +44,6 @@ def create_object(location, pfclass, name):  # Creates a database object in a sp
 def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into python lists from results file
 	"""
 		Reads results into python lists from results file for processing to add to Excel
-		TODO:  Adjust processing of results to write into a DataFrame for easier extraction to Excel / manipulation
 	:param powerfactory.Results elmres: handle for powerfactory results file
 	:param int res_type: Type of results being dealt with
 	:param bool write_as_df:  (optional=False) If set to True will return results in a DataFrame
@@ -54,7 +53,6 @@ def retrieve_results(elmres, res_type, write_as_df=False):  # Reads results into
 	# The first column is usually the scale ie timestep, frequency etc.
 	# The columns are made up of Objects from left to right (ElmTerm, ElmLne)
 	# The Objects then have sub variables (m:R, m:X etc)
-	# TODO: This processing is slow, 20seconds per study, improve data extraction
 	elmres.Load()
 	cno = elmres.GetNumberOfColumns()  # Returns number of Columns
 	rno = elmres.GetNumberOfRows()  # Returns number of Rows in File
@@ -788,8 +786,6 @@ class PFStudyCase:
 		else:
 			self.logger.debug('No mutual impedance results to be calculated')
 
-		# TODO: At this point want to clear all existing variables from results file
-
 		# Loop through all terminals and add
 		for term_name, term in terminals.items():
 			add_vars_res(
@@ -979,6 +975,7 @@ class PFStudyCase:
 
 			# Create name for new case as combination of provided name and contingency
 			new_name = '{}{}{}'.format(self.name, constants.Results.joiner, cont_name)
+			self.logger.info('Creating case and confirming if convergent for contingency:  {}'.format(new_name))
 
 			# Copy the current study_case and operating scenario
 			new_sc = sc_folder.AddCopy(self.sc, new_name)
@@ -999,7 +996,6 @@ class PFStudyCase:
 			# Adjust the operating scenario to represent the identified outage
 			case.apply_fault_case(cont_name=cont_name, fault_case=fault_case)
 
-			# TODO: At this stage still pre-case check so need to confirm whether ldf_settings even need updating
 			# Update load flow and frequency sweep commands to reflect relevant locations
 			case.create_studies(lf_settings=lf_settings, fs_settings=fs_settings)
 
@@ -1041,6 +1037,7 @@ class PFStudyCase:
 
 				# Create name for new case as combination of provided name and contingency
 				new_name = '{}{}{}'.format(self.name, constants.Results.joiner, cont_name)
+				self.logger.info('Creating case and confirming if convergent for contingency:  {}'.format(new_name))
 
 				# Copy the current study_case and operating scenario
 				new_sc = sc_folder.AddCopy(self.sc, new_name)
@@ -1061,7 +1058,6 @@ class PFStudyCase:
 				# Adjust the operating scenario to represent the identified outage
 				case.apply_outage(cont_name=cont_name, cont_item=cont_item)
 
-				# TODO: At this stage still pre-case check so need to confirm whether ldf_settings even need updating
 				# Update load flow and frequency sweep commands to reflect relevant locations
 				case.create_studies(lf_settings=lf_settings, fs_settings=fs_settings)
 
@@ -1330,10 +1326,6 @@ class PFProject(object):
 		# Activate project to get power_factory instance
 		self.prj = self.pf.activate_project(project_name=name)
 		self.prj_active = True
-
-		# Path where all result exports will be saved to
-		# TODO: Removed as an input since res_pth only defined at the point the studies are created
-		# self.res_pth = res_pth
 
 		if self.prj is None:
 			self.logger.error(
@@ -1689,6 +1681,7 @@ class PFProject(object):
 			for sc_name, sc in self.base_sc.items():  # type: PFStudyCase
 
 				if include_intact:
+					self.logger.info('Confirming intact study case: {} convergent'.format(sc_name))
 					# Run a load flow to update the status flag and add to the list of contingency cases
 					sc.toggle_state()
 					sc.pre_case_check()
@@ -1721,6 +1714,7 @@ class PFProject(object):
 			for sc_name, sc in self.base_sc.items():  # type: str, PFStudyCase
 
 				if include_intact:
+					self.logger.info('Confirming intact study case: {} convergent'.format(sc_name))
 					# Run a load flow to update the status flag and add to the list of contingency cases
 					sc.toggle_state()
 					sc.pre_case_check()
@@ -1789,7 +1783,6 @@ class PFProject(object):
 				df.loc[cont_name, c.cont] = cont.cont_name
 				df.loc[cont_name, c.status] = cont.ldf_convergent
 				df.loc[cont_name, c.prj] = self.name
-				# TODO: May wish to change this to be based on source name rather than resulting name
 				df.loc[cont_name, c.sc] = cont.sc.loc_name
 				df.loc[cont_name, c.op] = cont.op.loc_name
 
@@ -1852,16 +1845,6 @@ class PFProject(object):
 
 		# Check if the intact case should be included and then if so add to cases
 		self.cases_to_run = list()
-		# if study_settings.include_intact:
-		# 	# TODO: Produce test routine to confirm this works
-		# 	# Update export path and results files and then add study case to results
-		# 	for _, sc in self.base_sc.items():
-		# 		sc.add_variables(study_settings=study_settings, terminals=self.terminals, mutuals=self.mutuals)
-		# 		sc.res_pth = study_settings.export_folder
-		# 		sc.create_studies(lf_settings=self.lf_settings, fs_settings=self.fs_settings)
-		# 		self.cases_to_run.append(sc)
-		# else:
-		# 	self.cases_to_run = list()
 
 		if df_convergent.empty:
 			msg = 'No convergent contingencies found for cases in the project {}.\n'.format(self.prj)
@@ -1881,8 +1864,9 @@ class PFProject(object):
 
 		else:
 			for sc_name, cases in self.cont_cases.items():  # type: str, list
-				for cont_case in cases:
+				for cont_case in cases:  # type: PFStudyCase
 					if cont_case.ldf_convergent:
+						self.logger.info('Preparing case: {}'.format(cont_case.name))
 						# Add the terminals to the results file for each of the base study cases before the new cases are
 						# created which uses them as a starting point
 						cont_case.add_variables(study_settings=study_settings, terminals=self.terminals, mutuals=self.mutuals)
@@ -1942,7 +1926,6 @@ class PFProject(object):
 
 		# Confirm project is active
 		# TODO: What happens if try to find a terminal that exists in project but not study case
-		# TODO: What happens if no study case active
 		self.project_state()
 
 		# Input dictionary is duplicated since the pf_reference is project specific
@@ -2065,7 +2048,6 @@ class PFProject(object):
 
 			# Create temporary folder to store the mutual impedance elements
 			# Folder has to be in one of the network element folders for results to be calculated
-			# TODO: Confirm if it matters which one
 			mutual_folder = self.create_folder(
 				name='{}_{}'.format(constants.PowerFactory.temp_mutual_folder, self.uid),
 				location=self.net_data,

@@ -51,7 +51,6 @@ class General:
 	progress_log = 'INFO'
 	error_log = 'ERROR'
 
-	# TODO: UNITTEST - Check whether this file exists
 	user_guide_reference='JA7896-03 PSC Harmonics User Guide.pdf'
 	user_guide_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'docs'))
 	user_guide_pth = os.path.join(user_guide_folder, user_guide_reference)
@@ -555,7 +554,6 @@ class StudyInputs:
 						  hldf_term_variables +
 						  res_values)
 	# Names of worksheets which contain the relevant inputs
-	# TODO: Lock worksheets so names can't be changed
 	terminals = 'Terminals'
 	study_settings = 'Study_Settings'
 	study_cases = 'Base_Scenarios'
@@ -619,11 +617,9 @@ class GuiDefaults:
 	font_heading_color = '#%02x%02x%02x' % (0, 0, 255)
 	img_size_psc = (120, 120)
 
-	# TODO: Test logos exist
 	img_pth_psc_main = os.path.join(local_directory, 'PSC Logo RGB Vertical.png')
 	img_pth_psc_window = os.path.join(local_directory, 'PSC Logo no tag-1200.gif')
 
-	# TODO: Test hyperlink works
 	hyperlink_psc_website = 'https://www.pscconsulting.com/'
 
 	# Colors
@@ -638,7 +634,6 @@ class GuiDefaults:
 
 class StudySettings:
 	# Names for index in Inputs spreadsheet
-	# TODO: Ensure first column is locked to prevent any changes.
 	export_folder = 'Results_Export_Folder'
 	results_name = 'Excel_Results'
 	pf_network_elm = 'Net_Elm'

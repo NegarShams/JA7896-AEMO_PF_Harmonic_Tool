@@ -384,7 +384,6 @@ class TestLoadFlowSettings(unittest.TestCase):
 		:return:
 		"""
 		# Following command imports the Load Flow settings from the default inputs spreadsheet
-		# TODO: Must ensure reference busbar is defined correctly and default settings match PowerFactory case
 		with pd.ExcelFile(def_inputs_file) as wkbk:
 			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			self.df = pd.read_excel(
@@ -400,7 +399,6 @@ class TestLoadFlowSettings(unittest.TestCase):
 		lf_settings = pscharmonics.file_io.LFSettings(existing_command=self.df.iloc[0], detailed_settings=self.df.iloc[1:])
 
 		# Confirm value of some inputs
-		# TODO: Add in a manual check to confirm that all settings are correct
 		self.assertFalse(lf_settings.cmd is None)
 		self.assertEqual(lf_settings.iopt_net, 0)
 		self.assertEqual(lf_settings.iopt_at, 1)
@@ -448,7 +446,6 @@ class TestFreqSweepSettings(unittest.TestCase):
 		:return:
 		"""
 		# Following command imports the Load Flow settings from the default inputs spreadsheet
-		# TODO: Must ensure reference busbar is defined correctly and default settings match PowerFactory case
 		with pd.ExcelFile(def_inputs_file) as wkbk:
 			# Import here should match pscconsulting.file_io.StudyInputs().process_lf_settings
 			self.df = pd.read_excel(

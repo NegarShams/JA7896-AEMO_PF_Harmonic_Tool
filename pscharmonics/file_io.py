@@ -445,7 +445,6 @@ class ExtractResults:
 										 startrow=row_convex, startcol=c.start_col,
 										 header=include_index, index_label=False)
 
-						# TODO: Write routine to include a graph showing the convex hull data points
 						# Add loci plots
 						self.add_loci_graphs(
 							writer=writer,
@@ -1579,8 +1578,6 @@ class StudyInputs:
 			# Import StudySettings
 			self.settings = StudySettings(wkbk=wkbk, gui_mode=gui_mode)
 			self.cases = self.process_study_cases(wkbk=wkbk)
-			# TODO: Need to combine these together so a single set of results are produced, also need to ensure names
-			# TODO: are unique across both sets
 			contingency_cmd_breaker, contingencies_breakers = self.process_contingencies(wkbk=wkbk)  # type: str, dict
 			contingency_cmd_lines, contingencies_lines = self.process_contingencies(wkbk=wkbk, line_data=True)  # type: str, dict
 			self.terminals = self.process_terminals(wkbk=wkbk)

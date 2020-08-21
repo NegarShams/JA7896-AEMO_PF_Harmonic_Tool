@@ -220,8 +220,6 @@ class Logger:
 		# Handler for process_log, overwrites existing files and buffers unless error message received
 		# delay=True prevents the file being created until a write event occurs
 
-
-		# TODO: Check if error with logger, could be due to use of append command
 		handler = logging.FileHandler(filename=pth, mode='a', delay=True)
 		self.file_handlers.append(handler)
 
