@@ -838,6 +838,11 @@ class MainGui:
 			title='Select the file to save the overall results to'
 		)
 
+		# Confirm results file has correct extension
+		if not pth_results.endswith(constants.Results.extension):
+			pth_results = '{}{}'.format(pth_results, constants.Results.extension)
+
+
 		if pth_results:
 			self.results_file = pth_results
 

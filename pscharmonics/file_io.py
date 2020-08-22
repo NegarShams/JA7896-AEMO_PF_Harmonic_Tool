@@ -142,6 +142,10 @@ class ExtractResults:
 		"""
 		self.logger = constants.logger
 
+		# Confirm target_file has the correct extension
+		if not target_file.endswith(constants.Results.extension):
+			target_file = '{}{}'.format(target_file, constants.Results.extension)
+
 		df, extract_vars = self.combine_multiple_runs(search_paths=search_paths)
 
 		# Function will calculate the convex hull for the R and X values at each node in this DataFrame.
@@ -347,6 +351,8 @@ class ExtractResults:
 		:param bool plot_graphs:  (optional=True) - If set to False then graphs will not be exported
 		:return None:
 		"""
+
+
 
 		self.logger.info('Exporting imported results to {}'.format(pth_file))
 
