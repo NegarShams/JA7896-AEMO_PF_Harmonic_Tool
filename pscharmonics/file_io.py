@@ -13,13 +13,14 @@ import pscharmonics.constants as constants
 import glob
 import pandas as pd
 import numpy as np
-import scipy.spatial
+import shapely.geometry
 import collections
 import math
 import shutil
 import time
 import xlsxwriter
 import xlsxwriter.utility
+import matplotlib.pyplot as plt
 
 def update_duplicates(key, df):
 	"""
@@ -132,6 +133,7 @@ class ExtractResults:
 	include_convex = False  # type: bool
 	freq_bands = dict()  # type: dict
 	exclude = dict()  # type: dict
+	max_vertices = dict()  # type: dict
 	nom_frequency = float()  # type: float
 
 	def __init__(self, target_file, search_paths):
@@ -155,7 +157,7 @@ class ExtractResults:
 			if constants.PowerFactory.pf_r1 and extract_vars and constants.PowerFactory.pf_x1 in extract_vars:
 				df_convex = calculate_convex_vertices(
 					df=df, frequency_bounds=self.freq_bands, percentage_to_exclude=self.exclude,
-					nom_frequency=self.nom_frequency
+					max_vertices=self.max_vertices, nom_frequency=self.nom_frequency
 				)
 			else:
 				self.logger.warning(
@@ -242,6 +244,16 @@ class ExtractResults:
 				else:
 					# Doesn't already exist so add it
 					self.exclude[h] = values
+
+			# Get max vertices settings based on all inputs and then set based on either unlimited or maximum of all
+			# values provided
+			for h, values in combined.inputs.loci_settings.max_vertices.items():
+				if h in self.max_vertices.keys():
+					# Replace existing value with new one
+					self.max_vertices[h] = min(values, self.max_vertices[h])
+				else:
+					# Doesn't already exist so add it
+					self.max_vertices[h] = values
 
 		# Combine all results together
 		df = pd.concat(all_dfs, axis=1)
@@ -464,7 +476,6 @@ class ExtractResults:
 							raw_x_data=raw_x_data,
 							raw_y_data=raw_y_data
 						)
-
 
 		except PermissionError:
 			self.logger.critical(
@@ -1000,7 +1011,7 @@ class PreviousResultsExport:
 		"""
 		c = constants.Results
 		sc_name = ''
-		cont_name = ''
+		# cont_name = ''
 
 		# Remove study_type and extension from filename
 		file_name = file_name.replace('.csv', '')
@@ -1406,10 +1417,12 @@ class LociSettings:
 	"""
 	# Establish default values
 	freq_bands = dict()
-	exclude = float()
+	exclude = dict()
+	max_vertices = dict()
 
 	custom_polygon = False
 	custom_exclude = False
+	custom_max_vertices = False
 
 	def __init__(self, sht=constants.StudyInputs.loci_settings, wkbk=None, pth_file=None):
 		"""
@@ -1434,6 +1447,7 @@ class LociSettings:
 		# Default values that are used unless a better input is provided
 		polygon_range = constants.LociInputs.def_polygon_range
 		impedance_exclude = constants.LociInputs.def_impedance_exclude
+		max_vertices = constants.LociInputs.unlimited_inputs
 
 		# Confirm sheet exists in workbook and if not raise a warning and return
 		if sht not in wkbk.sheet_names:
@@ -1454,29 +1468,34 @@ class LociSettings:
 			# Get high level settings to confirm whether using custom values or not
 			# Squeeze command to ensure converted to a series since only a single row is being imported
 			df = pd.read_excel(
-				wkbk, sheet_name=sht, skiprows=1, nrows=3, usecols=(0,1,2), index_col=None, header=None
+				wkbk, sheet_name=sht, skiprows=2, nrows=4, usecols=(0,1,2,3,4,5), index_col=None, header=None
 			)
 			# Extract the nominal frequency, +/- Hz values for each polygon and the impedance values that should be
 			# excluded
-			self.nom_freq = df.iloc[0,2]
+			self.nom_freq = df.iloc[0,5]
 			polygon_range = df.iloc[1,2]
 			impedance_exclude = df.iloc[2,2]
+			# Determine the maximum number of vertices that should be considered
+			max_vertices = df.iloc[3,2]
 
 			# Import loci settings into a DataFrame and process
 			df = pd.read_excel(
-				wkbk, sheet_name=sht, index_col=0, usecols=(0, 1, 2, 3, 4), skiprows=5, header=0
+				wkbk, sheet_name=sht, index_col=0, usecols=(0, 1, 2, 3, 4, 5), skiprows=7, header=0
 			)
 
 		# Process all inputs
-		self.process_inputs(polygon_range=polygon_range, impedance_exclude=impedance_exclude, df=df)
+		self.process_inputs(
+			polygon_range=polygon_range, impedance_exclude=impedance_exclude, max_vertices=max_vertices,df=df
+		)
 
-	def process_inputs(self, polygon_range, impedance_exclude, df):
+	def process_inputs(self, polygon_range, impedance_exclude, max_vertices, df):
 		"""
 			Process all of the provided inputs into a suitable format for processing as part of the results and
 			the custom values to use when provided.  If polygon_range or impedance_exclude == Custom then uses the
 			values defined in the DataFrame
-		:param float polygon_range:  +/- frequency range to use
-		:param float impedance_exclude:  decimal point representing percentage of values to exclude
+		:param int polygon_range:  +/- frequency range to use
+		:param int impedance_exclude:  decimal point representing percentage of values to exclude
+		:param int max_vertices:  Maximum number of vertices to include
 		:param pd.DataFrame df:  DataFrame of custom values to use when provided
 		:return None:
 		"""
@@ -1556,6 +1575,77 @@ class LociSettings:
 			# Use inputs based on general values provided (+1 to account for iterator not including last value)
 			for h in range(2, c.max_harm+1):
 				self.exclude[h] = impedance_exclude / 100.0
+
+		# Calculate the maximum vertice that should be included for each harmonic order
+		self.max_vertices = dict()
+		if max_vertices in c.custom_inputs:
+			if df.empty:
+				raise StudyInputs('Provided DataFrame is empty which is not expected, error in inputs or script')
+
+			self.custom_max_vertices = True
+			# Use custom inputs detailed in DataFrame rather than provided values
+			for h, values in df.iterrows():
+				max_value = values.loc[c.max_vertices]
+				if pd.isna(max_value):
+					max_value = c.def_max_vertices
+					self.logger.warning(
+						(
+							'Unsuitable value provided for maximum number of vertices associated with harmonic: {} and '
+							'so the default value of {} will be used instead'
+						).format(h, max_value)
+					)
+
+				elif max_value != c.unlimited_inputs:
+					# Confirm the value is an integer and not outside of an acceptable range
+					max_value = int(max_value)
+					if max_value < c.min_vertices:
+						self.logger.warning(
+							(
+								'For harmonic number {}, you have selected to calculate based on {} vertices, this is '
+								'too small and so a minimum value of {} vertices has been selected'
+							).format(h, max_value, c.min_vertices)
+						)
+						max_value = c.min_vertices
+					elif max_value > c.max_vertices:
+						self.logger.info(
+							(
+								'For harmonic number {}, you have selected to calculated based on a maximum of {} vertices, ' 
+								'this is very large and should be noted is only a maximum.  Less that this may be returned'
+							).format(h, max_value)
+						)
+				else:
+					# Set based on a very large value to identify as unlimited
+					max_value = int(c.unlimited_identifier)
+				# Only other option is that is has been set to unlimited, no further processing to do
+
+				self.max_vertices[h] = max_value
+		else:
+			# Using the same value for all harmonic orders
+			if max_vertices != c.unlimited_inputs:
+				# Confirm the value is an integer and not outside of an acceptable range
+				max_value = int(max_vertices)
+				if max_value < c.min_vertices:
+					self.logger.warning(
+						(
+							'You have selected to calculate based on {} vertices, this is '
+							'too small and so a minimum value of {} vertices has been selected'
+						).format(max_value, c.min_vertices)
+					)
+					max_value = c.min_vertices
+				elif max_value > c.max_vertices:
+					self.logger.info(
+						(
+							'You have selected to calculated based on a maximum of {} vertices, '
+							'this is very large and should be noted is only a maximum.  Less that this may be returned'
+						).format(max_value)
+					)
+			else:
+				# Set based on a very large value to identify as unlimited
+				max_value = int(c.unlimited_identifier)
+
+			# Use inputs based on general values provided (+1 to account for iterator not including last value)
+			for h in range(2, c.max_harm+1):
+				self.max_vertices[h] = max_value
 
 		return None
 
@@ -2438,51 +2528,254 @@ class ResultsExport:
 
 		return None
 
-
-def find_convex_vertices(x_values, y_values):
+def angle(x1, y1, x2, y2):
 	"""
-		Finds the ConvexHull that bounds around the provided x and y values
+		Use dotproduct to find the angle between vectors.
+
+		Angle returned in degrees between 0, 180 degrees
+	:param float x1:
+	:param float y1:
+	:param float x2:
+	:param float y2:
+	:return float angle:
+	"""
+	# Calculate numerator
+	numerator = (x1 * x2 + y1 * y2)
+	# Calculate denominator
+	denominator = math.sqrt((x1 ** 2 + y1 ** 2) * (x2 ** 2 + y2 ** 2))
+	an = math.degrees(math.acos(numerator / denominator))
+	return an
+
+def cross_sign(x1, y1, x2, y2):
+	"""
+		True if cross is positive, false if negative or zero
+	:param float x1:
+	:param float y1:
+	:param float x2:
+	:param float y2:
+	:return bool status:
+	"""
+	# True if cross is positive
+	# False if negative or zero
+	status = x1 * y2 > x2 * y1
+	return status
+
+def new_coordinates(x_source, y_source, x_target, y_target):
+	"""
+		Calculate a new coordinate for the loci point extending in the
+		direction of existing line to straighten out the points for the
+		parameter with the closest angle
+	:param float x_source:  x co-ordinate of start of line
+	:param float y_source:  y co-ordinate of start of line
+	:param float x_target:  x co-ordinate of point to be adjusted
+	:param float y_target:  y co-ordinate of point to be adjusted
+	:return (float, float), (x_new, y_new):  Returns new coordinates for x and y values
+	"""
+	# Calculate new deltas for x and y axis
+	# dx = length*math.cos(math.radians(an))
+	# dy = length*math.sin(math.radians(an))
+
+	# Determine length of source line
+	source_length = (((y_target-y_source)**2+(x_target-x_source)**2)**0.5)*constants.LociInputs.vertice_step_size
+
+	# Angle of line and determine direction
+	beta = math.atan((y_target-y_source)/(x_target-x_source))
+	if beta < 0:
+		y_multiplier = -1
+	else:
+		y_multiplier = 1
+
+	# Calculate delta changes in x and y directions
+	dx = abs(source_length*math.cos(beta))
+	dy = abs(source_length*math.sin(beta))*y_multiplier
+
+	# To account for quadrant calculate in both directions
+	x_new1 = x_target + dx
+	y_new1 = y_target + dy
+
+	x_new2 = x_target - dx
+	y_new2 = y_target - dy
+
+	# Determine distance from new points to source
+	length1 = (((y_source-y_new1)**2+(x_source-x_new1)**2)**0.5)*constants.LociInputs.vertice_step_size
+	length2 = (((y_source-y_new2)**2+(x_source-x_new2)**2)**0.5)*constants.LociInputs.vertice_step_size
+	lengths = (length1, length2)
+
+	# Determine the longest length which means it is in the correct direction and then implement that
+	idx_max = lengths.index(max(lengths))
+	if idx_max == 0:
+		x_new = x_new1
+		y_new = y_new1
+	else:
+		x_new = x_new2
+		y_new = y_new2
+
+	return x_new, y_new
+
+
+def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'):
+	"""
+		Finds the ConvexHull that bounds around the provided x and y values and ensures that the maximum number
+		of vertices does not exceed the provided value
 	:param tuple x_values: X axis values to be considered
 	:param tuple y_values: Y axis values to be considered
+	:param int max_vertices: Maximum number of vertices to allow
+	:param str node:  Name of node for logging purposes
+	:param str h:  Harmonic number for logging purposes
 	:return tuple corners: (x / y points for each corner
 	"""
 	c = constants.PowerFactory
+	# Constants used for columns in DataFrame
+	lbl_x = 'x'
+	lbl_y = 'y'
+	lbl_an = 'angle'
 
-	# Filter out values which are outside of allowed range
-	x_points = list()
-	y_points = list()
-	for x,y in zip(x_values, y_values):
-		if 0 < abs(x) < c.max_impedance and 0 < abs(y) < c.max_impedance:
-			x_points.append(x)
-			y_points.append(y)
+	# # Filter out values which are outside of allowed range
+	# x_points = list()
+	# y_points = list()
+	# for x,y in zip(x_values, y_values):
+	# 	if 0 < abs(x) < c.max_impedance and 0 < abs(y) < c.max_impedance:
+	# 		x_points.append(x)
+	# 		y_points.append(y)
 
-	# Convert provided data points into ndarray
-	points = np.column_stack((x_points, y_points))
+	# Convert provided data points into a MultiPoint object for only those x and y values that are within the acceptable
+	# range of being greater than 0 and less than the maximum allowed impedance
+	all_points = shapely.geometry.MultiPoint(
+		[
+			shapely.geometry.Point((x,y)) for x,y in zip(x_values, y_values)
+			if 0 < abs(x) < c.max_impedance and 0 < abs(y) < c.max_impedance
+		 ]
+	)
 
-	# Confirm the arrays not empty and must be greater than 2 to actually calculate some points
-	if points.shape[0] > 2:
-		# Determines the ConvexHull and extracts the vertices
-		hull = scipy.spatial.ConvexHull(points=points)
-		corners = hull.vertices
+	# Check that MultiPoint array is not empty, if it is then return none
+	if all_points.is_empty:
+		return list(), list()
 
-		# Convert the vertices to represent the x and y values and include the origin
-		x_corner = list(points[corners, 0])
-		x_corner.append(x_corner[0])
-		y_corner = list(points[corners, 1])
-		y_corner.append(y_corner[0])
-	elif points.shape[0] > 0:
-		# If length of 1 or 2 then just return those points
-		x_corner = x_points
-		y_corner = y_points
-	else:
-		# If no points then return empty list
-		x_corner = list()
-		y_corner = list()
+	# Determine convex hull and number of vertices (subtracting 1 to account for returning to the start)
+	convex_hull = all_points.convex_hull
+	x_corner, y_corner = convex_hull.exterior.xy
+	num_vertices = len(x_corner)-1
+
+	# Determine whether any limit on the number of vertices, if none then return corners
+	if max_vertices >= constants.LociInputs.unlimited_identifier:
+		return x_corner, y_corner
+
+	# Ensure all points are within polygon
+	all_points_inside = convex_hull.contains(all_points)
+
+	# Direction flag alternates for each loop to ensure that overall polygon is expanded rather than just 1 corner
+	direction = False
+
+	# plt.scatter(x_values, y_values)
+	# plt.plot(x_corner, y_corner, '-.', color='r')
+	# plt.pause(0.01)
+
+	# Loop to ensure the maximum number of vertices are not exceeded
+	counter = 0
+	counter_limit = 1E6
+	# num_vertices must be greater than 4 otherwise dealing with an envelope
+	while (num_vertices>max_vertices or not all_points_inside) and counter < counter_limit and num_vertices > 4:
+		# Counter just to ensure don't get stuck in infinite loop
+		counter += 1
+		# Direction toggles each time to ensure overall polygon expanded
+		direction = not direction
+
+		# Remove the last point of the corner which is the same as the starting point
+		x = x_corner[:-1]
+		y = y_corner[:-1]
+
+		# Determine new expanded ConvexHull with vertices stored in DataFrame along with angle between vertices
+		df = pd.DataFrame()
+		for i in range(len(x)):
+			# Obtain the reference points so vertice can be calculated
+			point1 = (x[i], y[i])
+			point_ref = (x[i-1], y[i-1])
+			point2 = (x[i-2], y[i-2])
+
+			# Calculate vertices
+			x1, y1 = point1[0]-point_ref[0], point1[1]-point_ref[1]
+			x2, y2 = point2[0]-point_ref[0], point2[1]-point_ref[1]
+
+			# Add reference points to DataFrame
+			df.loc[i, lbl_x] = point_ref[0]
+			df.loc[i, lbl_y] = point_ref[1]
+
+			# Calculate the angle between the vertices
+			if cross_sign(x1,y1,x2,y2):
+				# If clockwise then angle is negative for inner angle
+				df.loc[i, lbl_an] = 180 - angle(x1,y1,x2,y2)
+			else:
+				df.loc[i, lbl_an] = angle(x1,y1,x2,y2)
+
+		# Calculate the point either side of the one with the greatest angle depending on the direction for
+		# this iteration
+		# Point to be filtered out
+		idx0 = df.loc[:, lbl_an].idxmax()
+		if direction:
+			# If in one direction then obtain value 2 steps round
+			idx_target = idx0-1
+			# Check that haven't breached all the index values and if so restart at other extreme
+			if idx_target < min(df.index):
+				idx_target = max(df.index)
+
+			# Obtain source for line
+			idx_source = idx_target-1
+			# Confirm not outside of index limits
+			if idx_source < min(df.index):
+				idx_source = max(df.index)
+
+		else:
+			idx_target = idx0+1
+
+			# Check that haven't breached all the index values and if so restart at other extreme
+			if idx_target > max(df.index):
+				idx_target = min(df.index)
+
+			# Obtain source for line
+			idx_source = idx_target+1
+			# Confirm not outside of index limits
+			if idx_source > max(df.index):
+				idx_source = min(df.index)
+
+		# Obtain the coordinate that should be moved and angle it should be moved at
+		x_target, y_target = df.loc[idx_target, [lbl_x, lbl_y]]
+		x_source, y_source = df.loc[idx_source, [lbl_x, lbl_y]]
+
+		# Update the dataframe with the new x and y values
+		df.loc[idx_target, [lbl_x, lbl_y]] = new_coordinates(
+			x_source=x_source, y_source=y_source, x_target=x_target, y_target=y_target
+		)
+		# Obtain the new points that should be used for the convex hull
+		new_points = shapely.geometry.MultiPoint(
+			[shapely.geometry.Point(z) for z in df.loc[:, [lbl_x, lbl_y]].values]
+		)
+
+		# Calculate new ConvexHull corners, new vertices, etc.
+		x_corner, y_corner = new_points.convex_hull.exterior.xy
+		num_vertices = len(x_corner)-1
+		convex_hull = new_points.convex_hull
+		all_points_inside = convex_hull.contains(all_points)
+
+	# 	plt.plot(x_corner, y_corner, '-.', color='g')
+	# 	plt.pause(0.001)
+	#
+	# plt.plot(x_corner, y_corner, '-', color='b')
+	# plt.show()
+	# plt.clf()
+
+	if counter >= counter_limit:
+		constants.logger.error(
+			(
+				'In attempting to limit the vertices to {} ended up taking {} iterations and therefore abandoned.  '
+				'Results for node {} at harmonic number {} therefore has {} vertices'
+			).format(max_vertices, counter, node, h, num_vertices)
+		)
 
 	# Return tuple of R and X values
 	return x_corner, y_corner
 
-def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_frequency=50.0):
+def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, max_vertices, nom_frequency=50.0
+):
 	"""
 		Will loop through the provided DataFrame and calculate the convex hull that bounds the R and X
 		values for each.
@@ -2496,6 +2789,7 @@ def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_f
 									}
 	:param dict percentage_to_exclude:  Percentage of maximum points to exclude from the dataset
 	:param float nom_frequency:  Nominal frequency = 50.0 Hz
+	:param dict max_vertices:  Maximum number of vertices associated with each harmonic order
 	:return pd.DataFrame df_convex:  Returns a DataFrame in the same arrangement as the supplied DataFrame but with the
 									corners for each vertices
 	"""
@@ -2555,7 +2849,10 @@ def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, nom_f
 					r_harm = df_r[idx_selection].values.ravel()[idx_keep]
 					x_harm = df_x[idx_selection].values.ravel()[idx_keep]
 
-					vertices = find_convex_vertices(x_values=r_harm, y_values=x_harm)
+					vertices = find_convex_vertices(
+						x_values=r_harm, y_values=x_harm, max_vertices=max_vertices[h],
+						node=node_name, h=h
+					)
 
 					# Create a new DataFrame with the vertices as columns
 					df_single_harm = pd.DataFrame(data=np.array(vertices).T, columns=(constants.PowerFactory.pf_r1, constants.PowerFactory.pf_x1))

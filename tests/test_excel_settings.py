@@ -28,7 +28,7 @@ def_inputs_file = os.path.join(TESTS_DIR, 'Inputs.xlsx')
 # Some folders are created during running and these will be deleted
 delete_created_folders = True
 
-# Set to True if figures should be plotted and displated
+# Set to True if figures should be plotted and displayed
 PLOT_FIGURES = True
 
 # noinspection PyUnusedLocal
@@ -58,6 +58,7 @@ class MockExtractResults:
 		# Create target frequency range
 		self.target_freq_range = dict()
 		self.percentage_to_exclude = dict()
+		self.max_vertices = dict()
 
 class MockPreviousResultsExport:
 	""" Mock created to allow independent testing of results processing functions """
@@ -778,7 +779,7 @@ class TestCreateConvex(unittest.TestCase):
 		self.cls_extract = MockExtractResults()
 
 	def test_convex_points(self):
-		""" Tests can be created """
+		""" Tests can be created with unlimited vertices"""
 		# Upper limit of range
 		upper_limit = int(pscharmonics.constants.PowerFactory.max_impedance - 1)
 		number_points = 50
@@ -786,7 +787,9 @@ class TestCreateConvex(unittest.TestCase):
 		x_points = (random.sample(range(upper_limit), number_points))
 		y_points = (random.sample(range(upper_limit), number_points))
 
-		corners = pscharmonics.file_io.find_convex_vertices(x_values=x_points, y_values=y_points)
+		corners = pscharmonics.file_io.find_convex_vertices(
+			x_values=x_points, y_values=y_points, max_vertices=pscharmonics.constants.LociInputs.unlimited_identifier
+		)
 
 		# Confirm all points lie within the Polygon returned by the vertices
 		polygon = shapely.geometry.polygon.Polygon(list(zip(*corners)))
@@ -795,6 +798,34 @@ class TestCreateConvex(unittest.TestCase):
 
 		self.assertTrue(polygon.contains(point))
 
+
+		# If required will produce a plot of the required data
+		if PLOT_FIGURES:
+			matplotlib.pyplot.plot(x_points, y_points, 'o')
+
+			matplotlib.pyplot.plot(corners[0], corners[1], 'r--')
+			matplotlib.pyplot.show()
+
+	def test_convex_points_limited_vertices(self):
+		""" Tests can be created with maximum of 5 vertices """
+		max_vertices = 5
+		# Upper limit of range
+		upper_limit = int(pscharmonics.constants.PowerFactory.max_impedance - 1)
+		number_points = 50
+
+		x_points = (random.sample(range(upper_limit), number_points))
+		y_points = (random.sample(range(upper_limit), number_points))
+
+		corners = pscharmonics.file_io.find_convex_vertices(
+			x_values=x_points, y_values=y_points, max_vertices=max_vertices
+		)
+
+		# Confirm all points lie within the Polygon returned by the vertices
+		polygon = shapely.geometry.polygon.Polygon(list(zip(*corners)))
+		rand_point = random.randint(0, number_points-1)
+		point = shapely.geometry.Point(x_points[rand_point], y_points[rand_point])
+
+		self.assertTrue(polygon.contains(point))
 
 		# If required will produce a plot of the required data
 		if PLOT_FIGURES:
@@ -812,7 +843,9 @@ class TestCreateConvex(unittest.TestCase):
 		x_points = (random.sample(range(upper_limit), number_points))
 		y_points = (random.sample(range(upper_limit), number_points))
 
-		corners = pscharmonics.file_io.find_convex_vertices(x_values=x_points, y_values=y_points)
+		corners = pscharmonics.file_io.find_convex_vertices(
+			x_values=x_points, y_values=y_points, max_vertices=pscharmonics.constants.LociInputs.unlimited_identifier
+		)
 
 		# Confirm x and y points in list returned
 		self.assertTrue(x_points[0] in corners[0])
@@ -821,7 +854,9 @@ class TestCreateConvex(unittest.TestCase):
 	def test_convex_points_0_valid_values(self):
 		""" Tests can be created with only 2 points"""
 		# Upper limit of range
-		corners = pscharmonics.file_io.find_convex_vertices(x_values=tuple(), y_values=tuple())
+		corners = pscharmonics.file_io.find_convex_vertices(
+			x_values=tuple(), y_values=tuple(), max_vertices=pscharmonics.constants.LociInputs.unlimited_identifier
+		)
 
 		# Confirm x and y points in list returned
 		self.assertTrue(len(corners[0])==0)
@@ -840,14 +875,17 @@ class TestCreateConvex(unittest.TestCase):
 		# Create target frequency range
 		target_freq_range = dict()
 		percentage_to_exclude = dict()
+		max_vertices = dict()
 		nom_freq = 50.0
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / 2.0, h*nom_freq + nom_freq/2.0)
 			percentage_to_exclude[h] = 0.0
+			max_vertices[h] = pscharmonics.constants.LociInputs.unlimited_identifier
 
 		# Pass to function to calculate
 		df_convex = pscharmonics.file_io.calculate_convex_vertices(
-			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude,
+			max_vertices=max_vertices
 		)
 
 		# Confirm expected values returned (Expect harmonic order 11 to be empty)
@@ -866,15 +904,50 @@ class TestCreateConvex(unittest.TestCase):
 		# Create target frequency range
 		target_freq_range = dict()
 		percentage_to_exclude = dict()
+		max_vertices = dict()
 		nom_freq = 50.0
 		# Produce a dataset for the harmonic numbers which is non-linear
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / float(h), h*nom_freq + nom_freq/float(h))
 			percentage_to_exclude[h] = 0.0
+			max_vertices[h] = pscharmonics.constants.LociInputs.unlimited_identifier
 
 		# Pass to function to calculate
 		df_convex = pscharmonics.file_io.calculate_convex_vertices(
-			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude)
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude,
+			max_vertices=max_vertices
+		)
+
+		# Confirm expected values returned (Expect harmonic order 11 to be empty)
+		idx = pd.IndexSlice
+		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 2  (75.0 - 125.0 Hz)', :]].dropna().empty)
+		self.assertFalse(df_convex.loc[:, idx['CRANBOURNE 220KV', 'h = 4  (187.5 - 212.5 Hz)', :]].dropna().empty)
+
+	def test_convex_from_data_for_detailed4_data_nonlinear_harmonic_numbers_limited_vertices(self):
+		"""
+			Tests that imported data can be processed to calculate the convex hull for non-linear harmonic numbers
+		"""
+
+		# Import the necessary raw data
+		src_paths = (self.results4,)
+		df, extract_vars = self.cls_extract.combine_multiple_runs(search_paths=src_paths)
+
+		# Create target frequency range
+		target_freq_range = dict()
+		percentage_to_exclude = dict()
+		max_vertices = dict()
+		nom_freq = 50.0
+		# Produce a dataset for the harmonic numbers which is non-linear
+		for h in range(2, 12):
+			target_freq_range[h] = (h*nom_freq - nom_freq / float(h), h*nom_freq + nom_freq/float(h))
+			percentage_to_exclude[h] = 0.0
+			max_vertices[h] = 5
+
+		# Pass to function to calculate
+		df_convex = pscharmonics.file_io.calculate_convex_vertices(
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude,
+			max_vertices=max_vertices
+		)
 
 		# Confirm expected values returned (Expect harmonic order 11 to be empty)
 		idx = pd.IndexSlice
@@ -893,10 +966,12 @@ class TestCreateConvex(unittest.TestCase):
 		# Create target frequency range
 		target_freq_range = dict()
 		percentage_to_exclude = dict()
+		max_vertices = dict()
 		nom_freq = 50.0
 		for h in range(2, 12):
 			target_freq_range[h] = (h*nom_freq - nom_freq / 2.0, h*nom_freq + nom_freq/2.0)
 			percentage_to_exclude[h] = 0.0
+			max_vertices[h] = pscharmonics.constants.LociInputs.unlimited_identifier
 
 
 		# For the node:  Cranbourne would expect no values greater than 8 for R or X if top 5% excluded for 2nd harmonic
@@ -910,7 +985,8 @@ class TestCreateConvex(unittest.TestCase):
 
 		# Initially calculate with all data
 		df_convex_all = pscharmonics.file_io.calculate_convex_vertices(
-			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude,
+			max_vertices=max_vertices
 		)
 		# Obtain maximum values from this DataFrame
 		max_values_all = (
@@ -924,7 +1000,8 @@ class TestCreateConvex(unittest.TestCase):
 		# Calculate with top 5% excluded
 		percentage_to_exclude = {k: 0.05 for k in percentage_to_exclude.keys()}
 		df_convex_5 = pscharmonics.file_io.calculate_convex_vertices(
-			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude,
+			max_vertices=max_vertices
 		)
 		# Obtain maximum values from this DataFrame
 		max_values_5 = (
@@ -939,7 +1016,8 @@ class TestCreateConvex(unittest.TestCase):
 		# Calculate with top 50% excluded
 		percentage_to_exclude = {k: 0.5 for k in percentage_to_exclude.keys()}
 		df_convex_50 = pscharmonics.file_io.calculate_convex_vertices(
-			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude
+			df=df, frequency_bounds=target_freq_range, percentage_to_exclude=percentage_to_exclude,
+			max_vertices=max_vertices
 		)
 
 		# Obtain maximum values from this DataFrame

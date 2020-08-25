@@ -22,6 +22,7 @@
       <w>cosvar</w>
       <w>cranbourne</w>
       <w>csel</w>
+      <w>dotproduct</w>
       <w>elmmut</w>
       <w>elmres</w>
       <w>endcol</w>
@@ -122,6 +123,7 @@
       <w>uknom</w>
       <w>ushnm</w>
       <w>vert</w>
+      <w>vertice</w>
       <w>vlmax</w>
       <w>vlmin</w>
       <w>workbookname</w>
