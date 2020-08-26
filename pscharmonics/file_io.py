@@ -1468,15 +1468,15 @@ class LociSettings:
 			# Get high level settings to confirm whether using custom values or not
 			# Squeeze command to ensure converted to a series since only a single row is being imported
 			df = pd.read_excel(
-				wkbk, sheet_name=sht, skiprows=2, nrows=4, usecols=(0,1,2,3,4,5), index_col=None, header=None
+				wkbk, sheet_name=sht, skiprows=2, nrows=3, usecols=(0,1,2,3,4,5), index_col=None, header=None
 			)
 			# Extract the nominal frequency, +/- Hz values for each polygon and the impedance values that should be
 			# excluded
 			self.nom_freq = df.iloc[0,5]
-			polygon_range = df.iloc[1,2]
-			impedance_exclude = df.iloc[2,2]
+			polygon_range = df.iloc[0,2]
+			impedance_exclude = df.iloc[1,2]
 			# Determine the maximum number of vertices that should be considered
-			max_vertices = df.iloc[3,2]
+			max_vertices = df.iloc[2,2]
 
 			# Import loci settings into a DataFrame and process
 			df = pd.read_excel(
@@ -1578,7 +1578,7 @@ class LociSettings:
 
 		# Calculate the maximum vertice that should be included for each harmonic order
 		self.max_vertices = dict()
-		if max_vertices in c.custom_inputs:
+		if str(max_vertices) in (c.custom_inputs, c.unlimited_inputs):
 			if df.empty:
 				raise StudyInputs('Provided DataFrame is empty which is not expected, error in inputs or script')
 
@@ -1632,7 +1632,7 @@ class LociSettings:
 						).format(max_value, c.min_vertices)
 					)
 					max_value = c.min_vertices
-				elif max_value > c.max_vertices:
+				elif max_value > c.max_num_vertices:
 					self.logger.info(
 						(
 							'You have selected to calculated based on a maximum of {} vertices, '
@@ -2579,7 +2579,7 @@ def new_coordinates(x_source, y_source, x_target, y_target):
 	source_length = (((y_target-y_source)**2+(x_target-x_source)**2)**0.5)*constants.LociInputs.vertice_step_size
 
 	# Angle of line and determine direction
-	beta = math.atan((y_target-y_source)/(x_target-x_source))
+	beta = math.atan((y_target-y_source)/max((x_target-x_source),0.0001))
 	if beta < 0:
 		y_multiplier = -1
 	else:
@@ -2674,7 +2674,8 @@ def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'
 	counter = 0
 	counter_limit = 1E6
 	# num_vertices must be greater than 4 otherwise dealing with an envelope
-	while (num_vertices>max_vertices or not all_points_inside) and counter < counter_limit and num_vertices > 4:
+	# while (num_vertices>max_vertices or not all_points_inside) and counter < counter_limit and num_vertices > 4:
+	while num_vertices>max_vertices and counter < counter_limit:
 		# Counter just to ensure don't get stuck in infinite loop
 		counter += 1
 		# Direction toggles each time to ensure overall polygon expanded

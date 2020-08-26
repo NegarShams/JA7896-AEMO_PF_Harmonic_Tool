@@ -605,11 +605,12 @@ class LociInputs:
 
 	# Minimum allowable number of vertices, less than this and no calculation is really possible
 	min_vertices = 4
+	max_num_vertices = 100
 
 	# This is the percentage of the impedance that the vertice will be moved by, the smaller this is
 	# the longer results processing will take but the less likely that the loci will be increased in
 	# size excessively
-	vertice_step_size = 0.01
+	vertice_step_size = 0.1
 
 
 class GuiDefaults:
