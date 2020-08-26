@@ -20,7 +20,7 @@ import shutil
 import time
 import xlsxwriter
 import xlsxwriter.utility
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 def update_duplicates(key, df):
 	"""
@@ -2571,15 +2571,20 @@ def new_coordinates(x_source, y_source, x_target, y_target):
 	:param float y_target:  y co-ordinate of point to be adjusted
 	:return (float, float), (x_new, y_new):  Returns new coordinates for x and y values
 	"""
-	# Calculate new deltas for x and y axis
-	# dx = length*math.cos(math.radians(an))
-	# dy = length*math.sin(math.radians(an))
 
 	# Determine length of source line
 	source_length = (((y_target-y_source)**2+(x_target-x_source)**2)**0.5)*constants.LociInputs.vertice_step_size
 
+	# Calculate the deltas between the source point and the target point
+	y_change = y_target-y_source
+	x_change = x_target-x_source
+
+	# To avoid a div/0 error ensure a minimum value exists since result will be 90 degrees
+	if x_change == 0.0:
+		x_change = 0.0001
+
 	# Angle of line and determine direction
-	beta = math.atan((y_target-y_source)/max((x_target-x_source),0.0001))
+	beta = math.atan(y_change/x_change)
 	if beta < 0:
 		y_multiplier = -1
 	else:
@@ -2597,8 +2602,8 @@ def new_coordinates(x_source, y_source, x_target, y_target):
 	y_new2 = y_target - dy
 
 	# Determine distance from new points to source
-	length1 = (((y_source-y_new1)**2+(x_source-x_new1)**2)**0.5)*constants.LociInputs.vertice_step_size
-	length2 = (((y_source-y_new2)**2+(x_source-x_new2)**2)**0.5)*constants.LociInputs.vertice_step_size
+	length1 = (((y_new1-y_source)**2+(x_new1-x_source)**2)**0.5)*constants.LociInputs.vertice_step_size
+	length2 = (((y_new2-y_source)**2+(x_new2-x_source)**2)**0.5)*constants.LociInputs.vertice_step_size
 	lengths = (length1, length2)
 
 	# Determine the longest length which means it is in the correct direction and then implement that
@@ -2660,21 +2665,18 @@ def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'
 	if max_vertices >= constants.LociInputs.unlimited_identifier:
 		return x_corner, y_corner
 
-	# Ensure all points are within polygon
-	all_points_inside = convex_hull.contains(all_points)
-
 	# Direction flag alternates for each loop to ensure that overall polygon is expanded rather than just 1 corner
 	direction = False
 
-	plt.scatter(x_values, y_values)
-	plt.plot(x_corner, y_corner, '-.', color='r')
-	plt.pause(0.01)
+	# plt.scatter(x_values, y_values)
+	# plt.plot(x_corner, y_corner, '-.', color='r')
+	# plt.pause(0.01)
 
 	# Loop to ensure the maximum number of vertices are not exceeded
 	counter = 0
 	counter_limit = 1E6
-	# num_vertices must be greater than 4 otherwise dealing with an envelope
-	# while (num_vertices>max_vertices or not all_points_inside) and counter < counter_limit and num_vertices > 4:
+	# num_vertices must be greater than 4 otherwise dealing with an envelope but the minimum number of allowed vertices
+	# will always be greater than 4 so this cycle doesn't start
 	while num_vertices>max_vertices and counter < counter_limit:
 		# Counter just to ensure don't get stuck in infinite loop
 		counter += 1
@@ -2754,15 +2756,14 @@ def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'
 		# Calculate new ConvexHull corners, new vertices, etc.
 		x_corner, y_corner = new_points.convex_hull.exterior.xy
 		num_vertices = len(x_corner)-1
-		convex_hull = new_points.convex_hull
-		all_points_inside = convex_hull.contains(all_points)
+		# convex_hull = new_points.convex_hull
 
-		plt.plot(x_corner, y_corner, '-.', color='g')
-		plt.pause(0.001)
+		# plt.plot(x_corner, y_corner, '-.', color='g')
+		# plt.pause(0.001)
 
-	plt.plot(x_corner, y_corner, '-', color='b')
-	plt.show()
-	plt.clf()
+	# plt.plot(x_corner, y_corner, '-', color='b')
+	# plt.show()
+	# plt.clf()
 
 	if counter >= counter_limit:
 		constants.logger.error(

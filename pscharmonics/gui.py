@@ -11,7 +11,6 @@ import sys
 import os
 import webbrowser
 from PIL import Image, ImageTk
-import traceback
 
 import pscharmonics
 import pscharmonics.constants as constants
@@ -224,7 +223,7 @@ class CombineFiles:
 
 		self.logger.debug('GUI window created')
 		# Produce GUI window
-		self.master.mainloop()
+		# self.master.mainloop()
 
 	def row(self, i=0):
 		"""
@@ -361,7 +360,7 @@ class CombineFiles:
 		else:
 			self.logger.error(
 				(
-					'An error has occured in that results are trying to be combined but the user has not selected '
+					'An error has occurred in that results are trying to be combined but the user has not selected '
 					'either an export file or a results folder.  The following inputs were selected:\n'
 					'Export file = {}\n Previous results folders:\n\t{}'
 				).format(self.export_file, '\n\t'.join(self.results_files_list))
@@ -374,13 +373,13 @@ class CombineFiles:
 
 	def on_closing(self):
 		"""
-		Function runs when window is closed to determine if user actually wants to cancel the time series interface
+		Function runs when window is closed to determine if user actually wants to cancel the processing of all results
 		:return:
 		"""
 		# Ask user to confirm that they actually want to close the window
 		result = messagebox.askquestion(
-			title='Exit time series interface?',
-			message='Are you sure you want to exit the time series interface?',
+			title='Exit previous results processing?',
+			message='Are you sure you want to exit the previous results processing interface?',
 			icon='warning'
 		)
 
@@ -391,6 +390,8 @@ class CombineFiles:
 			self.abort = True
 		else:
 			return None
+
+
 
 class MainGui:
 	"""
@@ -548,10 +549,13 @@ class MainGui:
 
 		self.logger.debug('GUI window created')
 
-		# to make sure GUI open in front of PSSE gui
-		# self.master.deiconify()
-		# Produce GUI window
-		self.master.mainloop()
+	def __enter__(self):
+		""" Called when the GUI window is opened using the with statement """
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		""" Called when the GUI window is closed """
+		self.logger.debug('GUI window closed')
 
 	def row(self, i=0):
 		"""
@@ -796,7 +800,6 @@ class MainGui:
 
 		return None
 
-
 	def load_results(self, results):
 		"""
 			Loads a spreadsheet with the pre-case check results
@@ -1005,9 +1008,10 @@ class MainGui:
 			# Close window
 			self.abort = True
 			self.master.destroy()
-			return None
+			# return None
 		else:
-			return None
+			pass
+			# return None
 
 	def show_error(self, *args):
 		"""

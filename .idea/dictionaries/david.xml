@@ -66,6 +66,7 @@
       <w>loadmax</w>
       <w>locn</w>
       <w>mainheading</w>
+      <w>matplotlib</w>
       <w>messagebox</w>
       <w>mutelm</w>
       <w>mutuals</w>
@@ -99,6 +100,7 @@
       <w>psconsulting</w>
       <w>pspf</w>
       <w>pssplt</w>
+      <w>pyplot</w>
       <w>qfactor</w>
       <w>qtotn</w>
       <w>recnt</w>

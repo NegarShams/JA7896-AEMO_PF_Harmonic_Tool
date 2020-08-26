@@ -17,7 +17,7 @@ import time
 
 # Label used when displaying messages
 __title__ = 'PSC Automated Frequency Scan Tool'
-__version__ = '1.2.1'
+__version__ = '1.3.0'
 
 logger_name = 'PSC'
 logger = None
@@ -259,7 +259,7 @@ class PowerFactory:
 
 		"""
 
-		# If no pf_version is provided then the default version defined is used if it exists in the avaiable versions
+		# If no pf_version is provided then the default version defined is used if it exists in the available versions
 		# otherwise the latest version
 		if pf_version is None:
 			if self.target_power_factory not in self.available_power_factory_versions:

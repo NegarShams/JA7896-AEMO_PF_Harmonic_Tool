@@ -41,7 +41,9 @@ if __name__ == '__main__':
 	# Determine if running from PowerFactory and if so retrieve the current power factory version
 	pf_version = pscharmonics.pf.running_in_powerfactory()
 
-	main_gui = pscharmonics.gui.MainGui(pf_version=pf_version)
+	# Initialisation of GUI
+	with pscharmonics.gui.MainGui(pf_version=pf_version) as main_gui:
+		main_gui.master.mainloop()
 
 	# Capture final time and report complete
 	t_end = time.time()
