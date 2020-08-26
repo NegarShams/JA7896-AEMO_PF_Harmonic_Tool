@@ -2666,9 +2666,9 @@ def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'
 	# Direction flag alternates for each loop to ensure that overall polygon is expanded rather than just 1 corner
 	direction = False
 
-	# plt.scatter(x_values, y_values)
-	# plt.plot(x_corner, y_corner, '-.', color='r')
-	# plt.pause(0.01)
+	plt.scatter(x_values, y_values)
+	plt.plot(x_corner, y_corner, '-.', color='r')
+	plt.pause(0.01)
 
 	# Loop to ensure the maximum number of vertices are not exceeded
 	counter = 0
@@ -2757,12 +2757,12 @@ def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'
 		convex_hull = new_points.convex_hull
 		all_points_inside = convex_hull.contains(all_points)
 
-	# 	plt.plot(x_corner, y_corner, '-.', color='g')
-	# 	plt.pause(0.001)
-	#
-	# plt.plot(x_corner, y_corner, '-', color='b')
-	# plt.show()
-	# plt.clf()
+		plt.plot(x_corner, y_corner, '-.', color='g')
+		plt.pause(0.001)
+
+	plt.plot(x_corner, y_corner, '-', color='b')
+	plt.show()
+	plt.clf()
 
 	if counter >= counter_limit:
 		constants.logger.error(
