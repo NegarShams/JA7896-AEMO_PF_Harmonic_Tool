@@ -733,22 +733,14 @@ class MainGui:
 		option_menu.configure(state=state)
 		return variable
 
-	def review_edit_settings(self):
-		"""
-			Function to load another window which allows the user to review / edit the PowerFactory
-			settings which have been provided as inputs
-		:return:
-		"""
-		# Warning message until function fully implemented
-		frame = inspect.currentframe()
-		self.logger.warning('Function <{}> not yet implemented'.format(inspect.getframeinfo(frame).function))
-
 	def run_precase_check(self):
 		"""
 			Function to run a pre-case check on all the study files and then provide the option for the user to
 			view any issues with the loaded study cases
 		:return:
 		"""
+		# Restore button colours once clicked
+		self.styles.command_button_color_change(color=constants.GuiDefaults.color_main_window)
 
 		# Ask user for file to save results of pre_case check into
 		pth_precase = tk.filedialog.asksaveasfilename(
@@ -790,6 +782,9 @@ class MainGui:
 			Function to ask the user to select previous results and combine into a single results file
 		:return:
 		"""
+		# Restore button colours once clicked
+		self.styles.command_button_color_change(color=constants.GuiDefaults.color_main_window)
+
 		# Load pop-up window
 		tk_combine_previous_results = tk.Toplevel(self.master, bg=constants.GuiDefaults.color_pop_up_window)
 		_ = CombineFiles(
@@ -833,6 +828,9 @@ class MainGui:
 			Runs the full studies
 		:return:
 		"""
+		# Restore button colours once clicked
+		self.styles.command_button_color_change(color=constants.GuiDefaults.color_main_window)
+
 		# Ask user for file to save results of pre_case check into
 		pth_results = tk.filedialog.asksaveasfilename(
 			initialdir=self.init_dir,
@@ -841,13 +839,12 @@ class MainGui:
 			title='Select the file to save the overall results to'
 		)
 
-		# Confirm results file has correct extension
-		if not pth_results.endswith(constants.Results.extension):
-			pth_results = '{}{}'.format(pth_results, constants.Results.extension)
-
-
 		if pth_results:
-			self.results_file = pth_results
+			# Confirm results file has correct extension
+			if not pth_results.endswith(constants.Results.extension):
+				pth_results = '{}{}'.format(pth_results, constants.Results.extension)
+
+				self.results_file = pth_results
 
 			# Set the export folder for the inputs to be a new folder with the same name as the pth_results
 			self.inputs.settings.add_folder(pth_results)
@@ -891,6 +888,9 @@ class MainGui:
 		# self.master.iconify()
 
 		# Ask user to select file(s) or folders
+		# Restore button colours once clicked
+		self.styles.command_button_color_change(color=constants.GuiDefaults.color_main_window)
+
 		pth_settings = tk.filedialog.askopenfilename(
 			initialdir=self.init_dir,
 			filetypes=constants.GuiDefaults.xlsx_types,
@@ -975,9 +975,11 @@ class MainGui:
 		if self.pf_projects:
 			msg = 'PowerFactory projects initialised'
 			self.logger.info(msg)
+			self.styles.command_button_color_change(color=constants.GuiDefaults.color_main_window)
 		else:
 			msg = 'ERROR: Failed to initialise PowerFactory projects'
 			self.logger.error(msg)
+			self.styles.command_button_color_change(color=constants.GuiDefaults.error_color)
 		self.lbl_status.configure(text=msg)
 
 		return None

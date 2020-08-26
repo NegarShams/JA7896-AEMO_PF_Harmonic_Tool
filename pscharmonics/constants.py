@@ -524,8 +524,9 @@ class Results:
 			pth_color_map = os.path.join(os.path.dirname(os.path.realpath(__file__)),'N1_color_map.xlsm')
 
 		# Import data into a DataFrame in case there is any other processing that needs to be done
-		df_colormap = pd.read_excel(pth_color_map, header=0,
-									usecols=1, converters={1: hex_converter})
+		df_colormap = pd.read_excel(
+			pth_color_map, header=0, usecols=(0,1), converters={1: hex_converter}
+		)
 		# Set the index of the dataframe equal to the first column
 		df_colormap.set_index(df_colormap.columns[0], inplace=True)
 		# Remove any nan values so that only actual colours remain and the length of the dataframe can be used
@@ -658,7 +659,7 @@ class StudySettings:
 	export_rx = 'Excel_Export_RX'
 	export_mutual = 'Excel_Export_Z12'
 	include_intact = 'Include_Intact'
-	include_convex = 'Include_Convex'
+	include_loci = 'Include_Loci'
 
 	# Base_Scenario columns
 	name = 'NAME'

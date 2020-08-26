@@ -254,7 +254,7 @@ class TestStudySettings(unittest.TestCase):
 		with pd.ExcelFile(pth_inputs) as wkbk:
 			study_settings = self.test_cls(wkbk=wkbk)
 
-		self.assertTrue(study_settings.include_convex)
+		self.assertTrue(study_settings.include_loci)
 
 		# Test just confirms that runs correctly
 		self.assertIsNone(study_settings.process_inputs())
@@ -266,7 +266,7 @@ class TestStudySettings(unittest.TestCase):
 		with pd.ExcelFile(pth_inputs) as wkbk:
 			study_settings = self.test_cls(wkbk=wkbk)
 
-		self.assertFalse(study_settings.include_convex)
+		self.assertFalse(study_settings.include_loci)
 
 		# Test just confirms that runs correctly
 		self.assertIsNone(study_settings.process_inputs())

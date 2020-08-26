@@ -48,5 +48,5 @@ if __name__ == '__main__':
 	# Capture final time and report complete
 	t_end = time.time()
 	logger.info(
-		'GUI closed and any studies run after {:.0f} seconds'.format(t_end-t_start)
+		'GUI closed and any studies run in {:.0f} seconds'.format(t_end-t_start)
 	)

@@ -205,10 +205,10 @@ class ExtractResults:
 			# Include list of variables for export
 			vars_to_export.extend(combined.inputs.settings.get_vars_to_export())
 
-			# Determine whether include_convex is set to True or False and update overall setting accordingly
-			# will latch to True if any of the imported files have include_convex and then any errors during processing
+			# Determine whether include_loci is set to True or False and update overall setting accordingly
+			# will latch to True if any of the imported files have include_loci and then any errors during processing
 			# are dealt with accordingly
-			self.include_convex = self.include_convex or combined.inputs.settings.include_convex
+			self.include_convex = self.include_convex or combined.inputs.settings.include_loci
 
 			# Get nominal frequency from input settings
 			nom_frequency = combined.inputs.loci_settings.nom_freq
@@ -834,7 +834,7 @@ class PreviousResultsExport:
 					.format(len(dfs), no_files)
 			)
 
-		single_df = pd.concat(dfs, axis=1)
+		single_df = pd.concat(dfs, axis=1, sort=True)
 		self.logger.debug(
 			'Single dataset for all results in folder:  {}'.format(self.search_pth)
 		)
@@ -1154,7 +1154,7 @@ class StudySettings:
 		self.export_mutual = bool()
 		self.include_intact = bool()
 		# Option to decide whether to include ConvexHull in excel spreadsheets, default value is False
-		self.include_convex = False
+		self.include_loci = False
 
 		self.c = constants.StudySettings
 		self.logger = constants.logger
@@ -1224,7 +1224,7 @@ class StudySettings:
 		self.export_mutual = self.process_booleans(key=self.c.export_mutual)
 		self.include_intact = self.process_booleans(key=self.c.include_intact)
 
-		self.include_convex = self.process_booleans(key=self.c.include_convex)
+		self.include_loci = self.process_booleans(key=self.c.include_loci)
 
 		# Sanity check for Boolean values
 		self.boolean_sanity_check()
@@ -2658,6 +2658,17 @@ def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'
 
 	# Determine convex hull and number of vertices (subtracting 1 to account for returning to the start)
 	convex_hull = all_points.convex_hull
+
+	if type(convex_hull) is shapely.geometry.Point:
+		# Convex hull is a single point and therefore just need to return the points
+		x_corner, y_corner = convex_hull.coords.xy
+		return x_corner, y_corner
+	elif type(convex_hull) is shapely.geometry.LineString:
+		# Convex hull is a single line and therefore just need to return the points
+		x_corner, y_corner = convex_hull.coords.xy
+		return x_corner, y_corner
+
+
 	x_corner, y_corner = convex_hull.exterior.xy
 	num_vertices = len(x_corner)-1
 
@@ -2776,6 +2787,11 @@ def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'
 	# Return tuple of R and X values
 	return x_corner, y_corner
 
+def compare_nan_array(func, a, thresh):
+	out = ~pd.isna(a)
+	out[out] = func(a[out] , thresh)
+	return out
+
 def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, max_vertices, nom_frequency=50.0
 ):
 	"""
@@ -2835,7 +2851,8 @@ def calculate_convex_vertices(df, frequency_bounds, percentage_to_exclude, max_v
 				z_harm = df_z[idx_selection].values.ravel()
 				percentile_value = np.percentile(a=z_harm, q=(1-percentage_to_exclude[h])*100.0)
 				# Find index values for all values that are less than the percentile value
-				idx_keep = z_harm<=percentile_value
+				# idx_keep = z_harm<=percentile_value
+				idx_keep = compare_nan_array(np.less_equal, z_harm, percentile_value)
 
 				if not any(idx_keep):
 					constants.logger.error(
