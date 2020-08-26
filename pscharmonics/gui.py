@@ -1000,7 +1000,7 @@ class MainGui:
 				# Delete the temporary folders created for each project if required as part of the input settings
 				if self.inputs.settings.delete_created_folders:
 					self.logger.debug('Early closure of GUI so deleting temporarily created folders')
-					for project_name, pf_project in self.pf_projects.items():
+					for project_name, pf_project in self.pf_projects.items():  # type: str, pscharmonics.pf.PFProject
 						pf_project.delete_temp_folders()
 				else:
 					self.logger.debug('Early closure of GUI but no folders created')

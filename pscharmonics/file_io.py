@@ -1308,9 +1308,9 @@ class StudySettings:
 		if os.path.exists(target_folder):
 			self.logger.warning(
 				(
-					'The target folder for the results already exists, this will now be deleted including all of '
+					'The target folder {} for the results already exists, this will now be deleted including all of '
 					'its contents.  The script will wait {} seconds before doing this during which time you can stop it'
-				)
+				).format(target_folder, delay_counter)
 			)
 			for x in range(delay_counter):
 				self.logger.warning('Waiting {} / {} seconds'.format(x, delay_counter))
@@ -1563,7 +1563,7 @@ class LociSettings:
 
 				self.exclude[h] = exclude / 100.0
 		else:
-			if impedance_exclude / 100.0 < 0.001:
+			if impedance_exclude / 100.0 < 0.001 and impedance_exclude != 0.0:
 				self.logger.warning(
 					(
 						'The percentage to exclude value ({:.1f}%) is less than 0.1% and therefore it is assumed has'
@@ -1606,7 +1606,7 @@ class LociSettings:
 							).format(h, max_value, c.min_vertices)
 						)
 						max_value = c.min_vertices
-					elif max_value > c.max_vertices:
+					elif max_value > c.max_num_vertices:
 						self.logger.info(
 							(
 								'For harmonic number {}, you have selected to calculated based on a maximum of {} vertices, ' 
