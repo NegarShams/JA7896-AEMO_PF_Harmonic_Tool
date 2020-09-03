@@ -1578,7 +1578,7 @@ class LociSettings:
 
 		# Calculate the maximum vertice that should be included for each harmonic order
 		self.max_vertices = dict()
-		if str(max_vertices) in (c.custom_inputs, c.unlimited_inputs):
+		if str(max_vertices) == c.custom_inputs:
 			if df.empty:
 				raise StudyInputs('Provided DataFrame is empty which is not expected, error in inputs or script')
 

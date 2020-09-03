@@ -20,11 +20,7 @@ import time
 import pscharmonics
 
 input_spreadsheet_names = (
-	'Validation_Inputs_Loci10.xlsx',
-	'Validation_Inputs_Loci10_includeall.xlsx',
 	'Validation_Inputs_Loci10_unlim.xlsx',
-	'Validation_Inputs_Loci100.xlsx',
-	'Validation_Inputs_Loci100mutual.xlsx'
 )
 
 if __name__ == '__main__':
