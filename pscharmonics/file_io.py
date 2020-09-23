@@ -2617,7 +2617,6 @@ def new_coordinates(x_source, y_source, x_target, y_target):
 
 	return x_new, y_new
 
-
 def find_convex_vertices(x_values, y_values, max_vertices, node='None', h='None'):
 	"""
 		Finds the ConvexHull that bounds around the provided x and y values and ensures that the maximum number
