@@ -80,7 +80,8 @@ def run(pth_inputs=str(), test_settings=None, list_files=None):
 				include_mutual=inputs.settings.export_mutual,
 				export_pth=pre_case_check_file,
 				contingencies=inputs.contingencies,
-				contingencies_cmd=inputs.contingency_cmd
+				contingencies_cmd=inputs.contingency_cmd,
+				include_intact=inputs.settings.include_intact
 			)
 
 		# Update results folder to include the results file_name

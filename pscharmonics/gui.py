@@ -764,7 +764,8 @@ class MainGui:
 				include_mutual=self.inputs.settings.export_mutual,
 				export_pth=self.pre_case_file,
 				contingencies=self.inputs.contingencies,
-				contingencies_cmd=self.inputs.contingency_cmd
+				contingencies_cmd=self.inputs.contingency_cmd,
+				include_intact=self.inputs.settings.include_intact
 			)
 
 			# Needs to enable the precase check button
