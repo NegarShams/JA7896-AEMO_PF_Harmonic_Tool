@@ -844,7 +844,7 @@ class MainGui:
 			if not pth_results.endswith(constants.Results.extension):
 				pth_results = '{}{}'.format(pth_results, constants.Results.extension)
 
-				self.results_file = pth_results
+			self.results_file = pth_results
 
 			# Set the export folder for the inputs to be a new folder with the same name as the pth_results
 			self.inputs.settings.add_folder(pth_results)
