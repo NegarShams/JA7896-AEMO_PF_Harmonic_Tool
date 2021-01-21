@@ -864,6 +864,7 @@ class MainGui:
 				self.button_study_results.configure(state=tk.NORMAL)
 
 			except RuntimeError:
+				self.inputs.settings.delete_created_folders = False
 				self.lbl_status.configure(
 					text='ERROR: Unable to run studies, could be a license issue, check the error messages!'
 				)

@@ -1308,6 +1308,9 @@ class PFProject(object):
 		self.uid = uid
 		self.pf = PowerFactory()
 
+		# Delete folders blocker, if anything fails this is set to True to block the folders from being deleted
+		self.delete_folders = True
+
 		# Store details of settings
 		self.lf_settings = lf_settings
 		self.fs_settings = fs_settings
@@ -1349,6 +1352,8 @@ class PFProject(object):
 		# Get all folders which contain network elements
 		self.net_data_items = self.net_data.GetContents('*.{}'.format(constants.PowerFactory.pf_network_elements))
 
+		# Set to true once temporary folders associated with this project have been deleted
+		self.temp_folders_deleted = False
 		# Create temporary folders
 		self.temp_folders = list()
 		c = constants.PowerFactory
@@ -1610,13 +1615,21 @@ class PFProject(object):
 		:return None:
 		"""
 
-		for folder in self.temp_folders:
-			if folder is not None:
-				self.pf.delete_object(pf_obj=folder)
-				self.logger.debug('Temporary folder {} deleted'.format(folder))
-			# folder = None
+		# Confirm if folders already deleted or if deleting of folders should be skipped
+		if not self.temp_folders_deleted and self.delete_folders:
+			for folder in self.temp_folders:
+				if folder is not None:
+					self.pf.delete_object(pf_obj=folder)
+					self.logger.debug('Temporary folder {} deleted'.format(folder))
+				# folder = None
+			self.temp_folders_deleted = True
 
-		self.logger.debug('Temporary folders created in project {} have all been deleted'.format(self.prj))
+			self.logger.debug('Temporary folders created in project {} have all been deleted'.format(self.prj))
+		else:
+			self.logger.debug(
+				('Temporary folders in project {} have either already been deleted or deleting has been skipped'
+				 ).format(self.prj)
+			)
 
 		return None
 
@@ -2142,6 +2155,8 @@ class PFProject(object):
 			ierr2 = self.task_auto.Execute()
 
 		if ierr2 > 0:
+			# Set to False to block the deletion of folders since study failed
+			self.delete_folders = False
 			self.logger.critical(
 				(
 					'Unable to run results for project {}, there may be a license issue that the user should look into. '
@@ -2221,7 +2236,7 @@ class PowerFactory:
 		# Check the paths have already been found and if not call the relevant function
 		if not (self.c.dig_path and self.c.dig_python_path):
 			# Initialise so that the paths are looked for with the provided pf_version
-			self.c.select_power_factory_version(pf_version=pf_version)
+			pf_version = self.c.select_power_factory_version(pf_version=pf_version)
 			self.add_python_paths()
 
 		# Different APIs exist for different PowerFactory versions, if an old version is run then different
@@ -2229,7 +2244,7 @@ class PowerFactory:
 		global app
 		# Only initialise PowerFactory if not already initialised
 		if app is None:
-			self.logger.info('Initialising PowerFactory')
+			self.logger.info('Initialising PowerFactory version {}'.format(pf_version))
 			if distutils.version.StrictVersion(powerfactory.__version__) > distutils.version.StrictVersion('17.0.0'):
 				# Error sometimes in getting access to a license which returns certain error codes and therefore
 				# script will now make a few attempts for those cases

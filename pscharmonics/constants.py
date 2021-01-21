@@ -256,7 +256,7 @@ class PowerFactory:
 		:param str pf_version: (optional) - If None then the most recent PowerFactory version is used
 		:param str mock_python_version:  For TESTING only, gets replaced with a different version to check correct
 										errors thrown if incorrect version provided
-
+		:return str self.target_power_factory:  Returns the PowerFactory version in string
 		"""
 
 		# If no pf_version is provided then the default version defined is used if it exists in the available versions
@@ -341,6 +341,9 @@ class PowerFactory:
 				).format(current_python_version, self.target_power_factory, '\n\t Python '.join(list_of_available_versions))
 			)
 			raise EnvironmentError('Incompatible Python version')
+
+		# Returns the PF version that is being initialised
+		return self.target_power_factory
 
 class Contingencies:
 	""" Contains constants associated with naming of contingencies used in export """

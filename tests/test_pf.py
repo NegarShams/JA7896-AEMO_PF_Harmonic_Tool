@@ -198,6 +198,108 @@ class TestPFProject(unittest.TestCase):
 		active_project = self.pf.get_active_project()
 		self.assertTrue(active_project is None)
 
+	def test_project_temporary_folder_deletion_blocked(self):
+		"""
+			Confirm that at project level is possible to block the deletion of the temporary folders
+			in case a study execution fails.
+		:return None:
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(df_study_cases=self.df, uid=uid)
+
+		# Get reference to project
+		pf_project = pf_projects[pf_test_project] # type: pscharmonics.pf.PFProject
+
+		# Get reference to temporary folder location (existence tested as part of different unit test)
+		temp_folder_location = pscharmonics.pf.app.GetProjectFolder('study')
+
+		# Block deletion of project folder
+		pf_project.delete_folders = False
+
+		# When running the delete folders command they should not be deleted
+		pf_project.delete_temp_folders()
+		folder = temp_folder_location.GetContents(
+			'{}_{}.{}'.format(
+				pscharmonics.constants.PowerFactory.temp_sc_folder,
+				uid,
+				pscharmonics.constants.PowerFactory.pf_folder_type
+			)
+		)
+		self.assertTrue(len(folder) > 0)
+
+		# Set status back to True and try to delete folders again
+		pf_project.delete_folders = True
+
+		# Confirm project folder is deleted
+		pf_project.delete_temp_folders()
+		folder = temp_folder_location.GetContents(
+			'{}_{}.{}'.format(
+				pscharmonics.constants.PowerFactory.temp_sc_folder,
+				uid,
+				pscharmonics.constants.PowerFactory.pf_folder_type
+			)
+		)
+		self.assertTrue(len(folder) == 0)
+
+		# Deactivate project
+		pf_project.project_state(deactivate=True)
+		# Confirm deactivated
+		active_project = self.pf.get_active_project()
+		self.assertTrue(active_project is None)
+
+	def test_project_temporary_folder_deletion_skipped_2nd_time(self):
+		"""
+			Confirm that at project level if folders have already been deleted does not try to delete them again.
+		:return None:
+		"""
+		# Create new project instances
+		uid = 'TEST_CASE'
+		pf_projects = pscharmonics.pf.create_pf_project_instances(df_study_cases=self.df, uid=uid)
+
+		# Get reference to project
+		pf_project = pf_projects[pf_test_project] # type: pscharmonics.pf.PFProject
+
+		# Get reference to temporary folder location (existence tested as part of different unit test)
+		temp_folder_location = pscharmonics.pf.app.GetProjectFolder('study')
+
+		# Block deletion of project folders
+		pf_project.temp_folders_deleted = True
+
+		# When running the delete folders command they should not be deleted
+		pf_project.delete_temp_folders()
+		folder = temp_folder_location.GetContents(
+			'{}_{}.{}'.format(
+				pscharmonics.constants.PowerFactory.temp_sc_folder,
+				uid,
+				pscharmonics.constants.PowerFactory.pf_folder_type
+			)
+		)
+		self.assertTrue(len(folder) > 0)
+
+		# Allow deletion of temporary folders
+		pf_project.temp_folders_deleted = False
+
+		# Confirm project folder is deleted
+		pf_project.delete_temp_folders()
+		folder = temp_folder_location.GetContents(
+			'{}_{}.{}'.format(
+				pscharmonics.constants.PowerFactory.temp_sc_folder,
+				uid,
+				pscharmonics.constants.PowerFactory.pf_folder_type
+			)
+		)
+		self.assertTrue(len(folder) == 0)
+
+		# Confirm project folder is deleted flag has been set to True
+		self.assertTrue(pf_project.temp_folders_deleted)
+
+		# Deactivate project
+		pf_project.project_state(deactivate=True)
+		# Confirm deactivated
+		active_project = self.pf.get_active_project()
+		self.assertTrue(active_project is None)
+
 	def test_create_task_auto(self):
 		"""
 			Confirm that new project instances can be created and that it contains the auto_executable task
