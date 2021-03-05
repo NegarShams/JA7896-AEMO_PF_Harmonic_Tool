@@ -3,3 +3,7 @@ of the JA7896 project to produce the Python tools for carrying out the harmonic 
 
 This validation activity was carried out in PowerFactory 2019 by David Mills (david.mills@PSCconsulting.com) on the
 29th July 2020.
+
+These tests were repeated in PowerFactory 2020 by David Mills (david.mills@PSCconsulting.com) using the latest version
+of the AEMO PowerFactory model named:  AEMO_VIC_V0_TEST_CASE.pfd and dated 20th January 2021.  The validation tests
+were carried out on 05th March 2021.

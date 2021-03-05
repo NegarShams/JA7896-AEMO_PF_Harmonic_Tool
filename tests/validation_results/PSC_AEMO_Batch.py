@@ -20,8 +20,18 @@ import time
 import pscharmonics
 
 input_spreadsheet_names = (
+	'Validation_Inputs.xlsx',
+	'Validation_Inputs_10.xlsx',
+	'Validation_Inputs_100.xlsx',
+	'Validation_Inputs_Loci10.xlsx',
+	'Validation_Inputs_Loci10_includeall.xlsx',
 	'Validation_Inputs_Loci10_unlim.xlsx',
+	'Validation_Inputs_Loci100.xlsx',
+	'Validation_Inputs_Loci100mutual.xlsx'
 )
+
+# Force to use latest PowerFactory version
+pscharmonics.constants.PowerFactory.target_power_factory = str()
 
 if __name__ == '__main__':
 	"""
