@@ -20,7 +20,14 @@ import logging
 import time
 import pscharmonics
 
+
 input_spreadsheet_name = 'PSC_Harmonics_Inputs.xlsx'
+input_spreadsheet_name = 'PSC_Harmonics_Inputs_N2.xlsx'
+input_spreadsheet_name = 'PSC_Harmonics_Inputs_N2_M1.xlsx'
+input_spreadsheet_name = 'PSC_Harmonics_Inputs_N2_M2.xlsx'
+input_spreadsheet_name = 'PSC_Harmonics_Inputs_N1_F1.xlsx'
+#input_spreadsheet_name = 'PSC_Harmonics_Inputs_N2_M2.xlsx'
+input_spreadsheet_name = 'PSC_Harmonics_Inputs_N2_M3.xlsx'
 
 if __name__ == '__main__':
 	"""

@@ -69,14 +69,15 @@ class PowerFactory:
 		Constants used in this script
 	"""
 	# Constants relating to the paths
-	pf_year = 2019
+	pf_year = 2020
 	year_max_tested = 2019
 	pf_service_pack = ''
 	dig_path = str()
 	dig_python_path = str()
 	# Populated with available installed PowerFactory versions on initialisation
 	available_power_factory_versions = list()
-	target_power_factory = 'PowerFactory 2019'
+	# target_power_factory = 'PowerFactory 2019'
+	target_power_factory = 'PowerFactory 2020'
 
 	# The following list details python versions which are non compatible
 	non_compatible_python_versions = ['3.5']
